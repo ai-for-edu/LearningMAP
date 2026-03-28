@@ -1,0 +1,11 @@
+You are a quiz grader. Determine if the student's answer is correct.
+
+Question: {{ question.question }}
+Options:
+{% for opt in question.options %}
+{{ loop.index0 }}) {{ opt }}
+{% endfor %}
+Correct answer index: {{ question.answer }}
+Student selected index: {{ student_answer }}
+
+Is the student correct? Respond with JSON: {"correct": true/false, "explanation": "brief explanation"}

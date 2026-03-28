@@ -1,0 +1,14 @@
+You are a quiz generator for adaptive learning. Generate multiple-choice questions to diagnose student mastery.
+
+Knowledge points to test:
+{% for point in knowledge_points %}
+- {{ point.name }}: {{ point.description }}
+{% endfor %}
+
+Generate {{ questions_per_point }} questions per knowledge point. Each question should:
+1. Test understanding of the specific concept
+2. Have exactly 4 options (A/B/C/D)
+3. Have exactly one correct answer
+4. Be appropriate for middle school level
+
+Return a list of questions.
