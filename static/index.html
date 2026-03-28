@@ -110,14 +110,7 @@
 </button>
 </aside>
 <script src="sidebar.js"></script>
-<script>
-  // Clear old data to load new example sessions
-  if (!localStorage.getItem('openail_examples_v2')) {
-    localStorage.removeItem('openail_sessions');
-    localStorage.removeItem('openail_current_session');
-    localStorage.setItem('openail_examples_v2', '1');
-  }
-</script>
+<script src="api.js"></script>
 <!-- Main Content -->
 <main id="mainContent" class="ml-64 pt-24 pb-32 px-6 min-h-screen flex flex-col transition-all duration-300">
 <div class="max-w-4xl mx-auto w-full">
@@ -127,80 +120,91 @@
 <!-- Chat Input Fixed Bottom -->
 <div id="bottomBar" class="fixed bottom-0 left-64 right-0 p-6 bg-surface/80 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 transition-all duration-300">
 <div class="max-w-[720px] mx-auto relative">
-<input class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-6 pr-14 focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-body text-on-surface shadow-sm" placeholder="Ask a follow-up question..." type="text"/>
-<button class="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-primary text-white rounded-xl shadow-sm hover:shadow-md hover:bg-primary-container transition-all">
+<input id="chatInput" onkeydown="if(event.key==='Enter')handleSend()" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-6 pr-14 focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-body text-on-surface shadow-sm" placeholder="输入学习主题，例如：我想学习勾股定理" type="text"/>
+<button onclick="handleSend()" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-primary text-white rounded-xl shadow-sm hover:shadow-md hover:bg-primary-container transition-all">
 <span class="material-symbols-outlined text-xl">arrow_upward</span>
 </button>
 </div>
 <div class="max-w-[720px] mx-auto mt-3 flex gap-3 overflow-x-auto no-scrollbar pb-1" id="suggestBtns"></div>
 </div>
 <script>
-// Session content data
-const sessionContents = {
-  '二元一次方程': {
-    userMsg: '我想学习二元一次方程',
-    title: '二元一次方程 知识图谱',
-    desc: '我已经为你梳理了学习二元一次方程所需的相关知识点。这个知识网络展示了从基础运算到方程组求解之间的关联关系，让我们先诊断一下你的掌握情况。',
-    center: '二元一次方程',
-    nodes: ['一元一次方程', '不等式', '整式运算', '因式分解'],
-    suggests: ['什么是二元一次方程？', '需要哪些前置知识？', '直接开始诊断']
-  },
-  '勾股定理': {
-    userMsg: '我想学习勾股定理',
-    title: '勾股定理 知识图谱',
-    desc: '勾股定理是几何学中最重要的定理之一。我为你梳理了相关的前置知识和延伸概念，包括三角形基础、平方根运算等。',
-    center: '勾股定理',
-    nodes: ['直角三角形', '平方与平方根', '三角形面积', '坐标距离'],
-    suggests: ['勾股定理的证明方法？', '有哪些实际应用？', '直接开始诊断']
-  },
-  '英语时态总结': {
-    userMsg: '帮我总结英语时态',
-    title: '英语时态 知识图谱',
-    desc: '英语共有 16 种时态，我为你整理了核心时态之间的关联。掌握一般时态是理解进行时和完成时的基础。',
-    center: '英语时态',
-    nodes: ['一般现在时', '一般过去时', '现在进行时', '现在完成时'],
-    suggests: ['时态之间有什么规律？', '最容易混淆的时态？', '直接开始诊断']
-  },
-  '光的折射与反射': {
-    userMsg: '我想学习光的折射与反射',
-    title: '光的折射与反射 知识图谱',
-    desc: '光学是物理学的重要分支。我梳理了从光的直线传播到折射定律之间的知识关联，帮你系统理解光的行为。',
-    center: '光的折射与反射',
-    nodes: ['光的直线传播', '入射角与反射角', '折射率', '全反射'],
-    suggests: ['什么是折射率？', '生活中有哪些例子？', '直接开始诊断']
-  },
-  '细胞的结构与功能': {
-    userMsg: '我想学习细胞的结构与功能',
-    title: '细胞的结构与功能 知识图谱',
-    desc: '细胞是生命的基本单位。我为你整理了从细胞膜到细胞器的核心知识点，以及它们之间的功能关联。',
-    center: '细胞结构',
-    nodes: ['细胞膜', '细胞核', '线粒体', '内质网'],
-    suggests: ['动物细胞和植物细胞的区别？', '线粒体为什么重要？', '直接开始诊断']
-  }
-};
+let currentSessionId = getSessionId();
 
-function renderSessionContent() {
-  const sessions = JSON.parse(localStorage.getItem('openail_sessions') || '[]');
-  const currentId = localStorage.getItem('openail_current_session');
-  const current = sessions.find(s => s.id === currentId);
-  const name = current ? current.name : '未命名';
-  const data = sessionContents[name] || sessionContents['二元一次方程'];
+async function handleSend(text) {
+  const input = document.getElementById('chatInput');
+  const message = text || input.value.trim();
+  if (!message) return;
+  input.value = '';
 
-  // Render chat
-  document.getElementById('chatHistory').innerHTML = `
+  const chatHistory = document.getElementById('chatHistory');
+
+  // Show user message
+  chatHistory.innerHTML += `
     <div class="flex justify-end">
       <div class="bg-surface-container-low px-6 py-4 rounded-3xl rounded-tr-none max-w-[85%] text-on-surface shadow-sm">
-        <p class="font-body leading-relaxed">${data.userMsg}</p>
+        <p class="font-body leading-relaxed">${message}</p>
       </div>
-    </div>
+    </div>`;
+
+  // Show loading
+  chatHistory.innerHTML += `
+    <div class="flex gap-4" id="loading">
+      <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
+        <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+      </div>
+      <div class="flex-grow"><p class="font-body text-on-surface-variant animate-pulse">思考中...</p></div>
+    </div>`;
+  chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+  try {
+    const data = await sendMessage(message, currentSessionId);
+    currentSessionId = data.session_id;
+    setSessionId(currentSessionId);
+    document.getElementById('loading')?.remove();
+
+    if (data.mode === 'graph' && data.data?.graph) {
+      renderKnowledgeGraph(data);
+    } else {
+      chatHistory.innerHTML += `
+        <div class="flex gap-4">
+          <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+          </div>
+          <div class="flex-grow"><p class="font-body text-on-surface-variant leading-relaxed">${data.message}</p></div>
+        </div>`;
+    }
+  } catch (err) {
+    document.getElementById('loading')?.remove();
+    chatHistory.innerHTML += `<div class="text-error text-sm p-4">请求失败: ${err.message}</div>`;
+  }
+}
+
+function renderKnowledgeGraph(data) {
+  const graph = data.data.graph;
+  const chatHistory = document.getElementById('chatHistory');
+  const positions = [
+    'top-[20%] left-[25%]', 'top-[20%] right-[25%]',
+    'bottom-[20%] left-[25%]', 'bottom-[20%] right-[25%]',
+    'top-[50%] left-[10%]', 'top-[50%] right-[10%]',
+    'top-[35%] left-[15%]', 'bottom-[35%] right-[15%]'
+  ];
+  const nodesHtml = graph.nodes.map((n, i) => {
+    const pos = positions[i % positions.length];
+    const color = n.level === 'core' ? 'primary' : 'slate-400';
+    return `<div class="absolute ${pos} knowledge-label cursor-default">
+      <span class="font-headline font-bold text-xs tracking-wider text-${color}">${n.name}</span>
+    </div>`;
+  }).join('');
+
+  chatHistory.innerHTML += `
     <div class="flex gap-4">
       <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
         <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
       </div>
       <div class="flex-grow space-y-6">
         <div class="prose prose-slate max-w-none">
-          <p class="font-headline text-2xl font-bold tracking-tight text-primary">${data.title}</p>
-          <p class="font-body text-on-surface-variant leading-relaxed">${data.desc}</p>
+          <p class="font-headline text-2xl font-bold tracking-tight text-primary">${graph.topic} 知识图谱</p>
+          <p class="font-body text-on-surface-variant leading-relaxed">${data.message}</p>
         </div>
         <div class="relative bg-white rounded-[2.5rem] border border-slate-100 p-12 min-h-[400px] flex items-center justify-center overflow-hidden">
           <svg class="absolute inset-0 w-full h-full pointer-events-none opacity-10" xmlns="http://www.w3.org/2000/svg">
@@ -211,40 +215,21 @@ function renderSessionContent() {
           </svg>
           <div class="relative z-10 w-full h-full flex items-center justify-center">
             <div class="text-center">
-              <span class="font-headline font-extrabold text-sm tracking-widest text-primary">${data.center}</span>
+              <span class="font-headline font-extrabold text-sm tracking-widest text-primary">${graph.topic}</span>
             </div>
-            <div class="absolute top-[20%] left-[25%] knowledge-label cursor-default">
-              <span class="font-headline font-bold text-xs tracking-wider text-slate-400">${data.nodes[0]}</span>
-            </div>
-            <div class="absolute top-[20%] right-[25%] knowledge-label cursor-default">
-              <span class="font-headline font-bold text-xs tracking-wider text-slate-400">${data.nodes[1]}</span>
-            </div>
-            <div class="absolute bottom-[20%] left-[25%] knowledge-label cursor-default">
-              <span class="font-headline font-bold text-xs tracking-wider text-slate-400">${data.nodes[2]}</span>
-            </div>
-            <div class="absolute bottom-[20%] right-[25%] knowledge-label cursor-default">
-              <span class="font-headline font-bold text-xs tracking-wider text-slate-400">${data.nodes[3]}</span>
-            </div>
+            ${nodesHtml}
           </div>
           <div class="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-xs text-center">
-            <a href="diagnosis.html" class="block w-full bg-secondary text-white py-3 px-8 rounded-full font-headline font-bold tracking-wide shadow-md hover:bg-secondary/90 transition-all text-sm text-center">Start Diagnosis</a>
+            <a href="diagnosis.html?session_id=${currentSessionId}" class="block w-full bg-secondary text-white py-3 px-8 rounded-full font-headline font-bold tracking-wide shadow-md hover:bg-secondary/90 transition-all text-sm text-center">Start Diagnosis</a>
           </div>
         </div>
       </div>
-    </div>
-  `;
-
-  // Render suggest buttons
-  const btnClass = 'whitespace-nowrap bg-white border border-slate-200 px-4 py-1.5 rounded-full text-xs font-semibold text-slate-500 hover:text-primary hover:border-primary transition-colors';
-  document.getElementById('suggestBtns').innerHTML = data.suggests.map(s => `<button class="${btnClass}">${s}</button>`).join('');
+    </div>`;
 }
 
-// Render on load
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', renderSessionContent);
-} else {
-  renderSessionContent();
-}
+// Show welcome on load
+document.getElementById('chatHistory').innerHTML = '';
+document.getElementById('suggestBtns').innerHTML = '';
 </script>
 
 <script>
