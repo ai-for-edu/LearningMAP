@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OpenAILearning - Scholar Minimal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary": "#3c692b",
+              "error": "#ba1a1a",
+              "outline-variant": "#c1c7d3",
+              "secondary-fixed": "#bdf1a3",
+              "on-surface-variant": "#414751",
+              "on-primary-fixed": "#001c39",
+              "surface-container-low": "#f2f4f6",
+              "on-error": "#ffffff",
+              "surface-container": "#eceef0",
+              "secondary-fixed-dim": "#a1d489",
+              "surface-container-high": "#e6e8ea",
+              "surface-dim": "#d8dadc",
+              "primary": "#005da7",
+              "tertiary-fixed-dim": "#adcbda",
+              "on-secondary-fixed": "#052100",
+              "primary-fixed-dim": "#a4c9ff",
+              "surface": "#f7f9fb",
+              "surface-container-highest": "#e0e3e5",
+              "tertiary-fixed": "#c9e7f7",
+              "on-primary": "#ffffff",
+              "surface-variant": "#e0e3e5",
+              "on-tertiary-container": "#fbfdff",
+              "surface-tint": "#0060ac",
+              "on-tertiary": "#ffffff",
+              "primary-container": "#2976c7",
+              "surface-container-lowest": "#ffffff",
+              "inverse-on-surface": "#eff1f3",
+              "tertiary-container": "#5c7987",
+              "on-secondary-fixed-variant": "#255015",
+              "error-container": "#ffdad6",
+              "on-surface": "#191c1e",
+              "on-tertiary-fixed-variant": "#2e4b57",
+              "outline": "#717783",
+              "secondary-container": "#baeea0",
+              "on-tertiary-fixed": "#001f2a",
+              "inverse-surface": "#2d3133",
+              "on-secondary-container": "#406d2f",
+              "inverse-primary": "#a4c9ff",
+              "tertiary": "#43606d",
+              "on-error-container": "#93000a",
+              "on-background": "#191c1e",
+              "surface-bright": "#f7f9fb",
+              "background": "#f7f9fb",
+              "on-primary-container": "#fdfcff",
+              "on-primary-fixed-variant": "#004883"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .knowledge-label {
+            transition: all 0.2s ease-in-out;
+        }
+        .knowledge-label:hover {
+            color: #005da7;
+            transform: translateY(-1px);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
+<!-- Top Navigation Bar -->
+<nav class="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 flex justify-between items-center px-6 py-3">
+<div class="flex items-center gap-8">
+<span class="text-xl font-extrabold tracking-tighter text-blue-800 dark:text-blue-300">OpenAILearning</span>
+</div>
+<div class="flex items-center gap-4"></div>
+</nav>
+<!-- Permanent Side Navigation -->
+<aside id="sidebar" class="h-screen w-64 fixed left-0 top-0 pt-20 bg-white dark:bg-slate-950 flex flex-col p-4 border-r border-slate-100 dark:border-slate-800 z-40 transition-all duration-300">
+<button onclick="createNewSession()" class="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 px-4 rounded-xl font-headline font-bold text-sm shadow-sm hover:shadow-md hover:bg-primary-container transition-all mb-4">
+<span class="material-symbols-outlined text-lg">add</span>
+<span>New Session</span>
+</button>
+<div class="flex-grow overflow-y-auto space-y-1" id="session-list"></div>
+<!-- Collapse handle -->
+<button onclick="toggleSidebar()" id="collapseBtn" class="absolute top-1/2 -translate-y-1/2 -right-4 w-8 h-16 bg-white border border-slate-200 rounded-r-lg flex items-center justify-center shadow-sm hover:bg-slate-50 transition-colors z-50">
+  <span class="material-symbols-outlined text-sm text-slate-400" id="collapseIcon">chevron_left</span>
+</button>
+</aside>
+<script src="sidebar.js"></script>
+<script>
+  // Clear old data to load new example sessions
+  if (!localStorage.getItem('openail_examples_v2')) {
+    localStorage.removeItem('openail_sessions');
+    localStorage.removeItem('openail_current_session');
+    localStorage.setItem('openail_examples_v2', '1');
+  }
+</script>
+<!-- Main Content -->
+<main id="mainContent" class="ml-64 pt-24 pb-32 px-6 min-h-screen flex flex-col transition-all duration-300">
+<div class="max-w-4xl mx-auto w-full">
+<!-- Chat History (dynamic) -->
+<div class="flex flex-col gap-12" id="chatHistory"></div>
+</main>
+<!-- Chat Input Fixed Bottom -->
+<div id="bottomBar" class="fixed bottom-0 left-64 right-0 p-6 bg-surface/80 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 transition-all duration-300">
+<div class="max-w-[720px] mx-auto relative">
+<input class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-6 pr-14 focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-body text-on-surface shadow-sm" placeholder="Ask a follow-up question..." type="text"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-primary text-white rounded-xl shadow-sm hover:shadow-md hover:bg-primary-container transition-all">
+<span class="material-symbols-outlined text-xl">arrow_upward</span>
+</button>
+</div>
+<div class="max-w-[720px] mx-auto mt-3 flex gap-3 overflow-x-auto no-scrollbar pb-1" id="suggestBtns"></div>
+</div>
+<script>
+// Session content data
+const sessionContents = {
+  '二元一次方程': {
+    userMsg: '我想学习二元一次方程',
+    title: '二元一次方程 知识图谱',
+    desc: '我已经为你梳理了学习二元一次方程所需的相关知识点。这个知识网络展示了从基础运算到方程组求解之间的关联关系，让我们先诊断一下你的掌握情况。',
+    center: '二元一次方程',
+    nodes: ['一元一次方程', '不等式', '整式运算', '因式分解'],
+    suggests: ['什么是二元一次方程？', '需要哪些前置知识？', '直接开始诊断']
+  },
+  '勾股定理': {
+    userMsg: '我想学习勾股定理',
+    title: '勾股定理 知识图谱',
+    desc: '勾股定理是几何学中最重要的定理之一。我为你梳理了相关的前置知识和延伸概念，包括三角形基础、平方根运算等。',
+    center: '勾股定理',
+    nodes: ['直角三角形', '平方与平方根', '三角形面积', '坐标距离'],
+    suggests: ['勾股定理的证明方法？', '有哪些实际应用？', '直接开始诊断']
+  },
+  '英语时态总结': {
+    userMsg: '帮我总结英语时态',
+    title: '英语时态 知识图谱',
+    desc: '英语共有 16 种时态，我为你整理了核心时态之间的关联。掌握一般时态是理解进行时和完成时的基础。',
+    center: '英语时态',
+    nodes: ['一般现在时', '一般过去时', '现在进行时', '现在完成时'],
+    suggests: ['时态之间有什么规律？', '最容易混淆的时态？', '直接开始诊断']
+  },
+  '光的折射与反射': {
+    userMsg: '我想学习光的折射与反射',
+    title: '光的折射与反射 知识图谱',
+    desc: '光学是物理学的重要分支。我梳理了从光的直线传播到折射定律之间的知识关联，帮你系统理解光的行为。',
+    center: '光的折射与反射',
+    nodes: ['光的直线传播', '入射角与反射角', '折射率', '全反射'],
+    suggests: ['什么是折射率？', '生活中有哪些例子？', '直接开始诊断']
+  },
+  '细胞的结构与功能': {
+    userMsg: '我想学习细胞的结构与功能',
+    title: '细胞的结构与功能 知识图谱',
+    desc: '细胞是生命的基本单位。我为你整理了从细胞膜到细胞器的核心知识点，以及它们之间的功能关联。',
+    center: '细胞结构',
+    nodes: ['细胞膜', '细胞核', '线粒体', '内质网'],
+    suggests: ['动物细胞和植物细胞的区别？', '线粒体为什么重要？', '直接开始诊断']
+  }
+};
+
+function renderSessionContent() {
+  const sessions = JSON.parse(localStorage.getItem('openail_sessions') || '[]');
+  const currentId = localStorage.getItem('openail_current_session');
+  const current = sessions.find(s => s.id === currentId);
+  const name = current ? current.name : '未命名';
+  const data = sessionContents[name] || sessionContents['二元一次方程'];
+
+  // Render chat
+  document.getElementById('chatHistory').innerHTML = `
+    <div class="flex justify-end">
+      <div class="bg-surface-container-low px-6 py-4 rounded-3xl rounded-tr-none max-w-[85%] text-on-surface shadow-sm">
+        <p class="font-body leading-relaxed">${data.userMsg}</p>
+      </div>
+    </div>
+    <div class="flex gap-4">
+      <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
+        <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+      </div>
+      <div class="flex-grow space-y-6">
+        <div class="prose prose-slate max-w-none">
+          <p class="font-headline text-2xl font-bold tracking-tight text-primary">${data.title}</p>
+          <p class="font-body text-on-surface-variant leading-relaxed">${data.desc}</p>
+        </div>
+        <div class="relative bg-white rounded-[2.5rem] border border-slate-100 p-12 min-h-[400px] flex items-center justify-center overflow-hidden">
+          <svg class="absolute inset-0 w-full h-full pointer-events-none opacity-10" xmlns="http://www.w3.org/2000/svg">
+            <line stroke="#005da7" stroke-width="1" x1="50%" x2="35%" y1="50%" y2="30%"></line>
+            <line stroke="#005da7" stroke-width="1" x1="50%" x2="65%" y1="50%" y2="30%"></line>
+            <line stroke="#005da7" stroke-width="1" x1="50%" x2="35%" y1="50%" y2="70%"></line>
+            <line stroke="#005da7" stroke-width="1" x1="50%" x2="65%" y1="50%" y2="70%"></line>
+          </svg>
+          <div class="relative z-10 w-full h-full flex items-center justify-center">
+            <div class="text-center">
+              <span class="font-headline font-extrabold text-sm tracking-widest text-primary">${data.center}</span>
+            </div>
+            <div class="absolute top-[20%] left-[25%] knowledge-label cursor-default">
+              <span class="font-headline font-bold text-xs tracking-wider text-slate-400">${data.nodes[0]}</span>
+            </div>
+            <div class="absolute top-[20%] right-[25%] knowledge-label cursor-default">
+              <span class="font-headline font-bold text-xs tracking-wider text-slate-400">${data.nodes[1]}</span>
+            </div>
+            <div class="absolute bottom-[20%] left-[25%] knowledge-label cursor-default">
+              <span class="font-headline font-bold text-xs tracking-wider text-slate-400">${data.nodes[2]}</span>
+            </div>
+            <div class="absolute bottom-[20%] right-[25%] knowledge-label cursor-default">
+              <span class="font-headline font-bold text-xs tracking-wider text-slate-400">${data.nodes[3]}</span>
+            </div>
+          </div>
+          <div class="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-xs text-center">
+            <a href="diagnosis.html" class="block w-full bg-secondary text-white py-3 px-8 rounded-full font-headline font-bold tracking-wide shadow-md hover:bg-secondary/90 transition-all text-sm text-center">Start Diagnosis</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Render suggest buttons
+  const btnClass = 'whitespace-nowrap bg-white border border-slate-200 px-4 py-1.5 rounded-full text-xs font-semibold text-slate-500 hover:text-primary hover:border-primary transition-colors';
+  document.getElementById('suggestBtns').innerHTML = data.suggests.map(s => `<button class="${btnClass}">${s}</button>`).join('');
+}
+
+// Render on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', renderSessionContent);
+} else {
+  renderSessionContent();
+}
+</script>
+
+<script>
+let sidebarOpen = true;
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('mainContent');
+  const bottom = document.getElementById('bottomBar');
+  const icon = document.getElementById('collapseIcon');
+  if (sidebarOpen) {
+    sidebar.style.marginLeft = '0';
+    main.style.marginLeft = '16rem';
+    bottom.style.left = '16rem';
+    icon.textContent = 'chevron_left';
+  } else {
+    sidebar.style.marginLeft = '-15rem';
+    main.style.marginLeft = '0';
+    bottom.style.left = '0';
+    icon.textContent = 'chevron_right';
+  }
+}
+</script>
+</body></html>

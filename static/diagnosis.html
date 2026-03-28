@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OpenAILearning - Diagnosis</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "secondary": "#3c692b",
+          "error": "#ba1a1a",
+          "on-surface-variant": "#414751",
+          "surface-container-low": "#f2f4f6",
+          "surface-container": "#eceef0",
+          "surface-container-high": "#e6e8ea",
+          "primary": "#005da7",
+          "surface": "#f7f9fb",
+          "on-primary": "#ffffff",
+          "on-surface": "#191c1e",
+          "outline": "#717783",
+          "primary-fixed": "#d4e3ff",
+          "primary-container": "#2976c7",
+          "surface-container-lowest": "#ffffff",
+          "on-primary-container": "#fdfcff",
+        },
+        fontFamily: {
+          "headline": ["Manrope"],
+          "body": ["Inter"],
+          "label": ["Inter"]
+        },
+      },
+    },
+  }
+</script>
+<style>
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+  .option-btn {
+    transition: all 0.15s ease-in-out;
+  }
+  .option-btn:hover {
+    border-color: #005da7;
+    background-color: #d4e3ff;
+  }
+  .option-btn.selected {
+    border-color: #005da7;
+    background-color: #005da7;
+    color: white;
+  }
+  .option-btn.selected .option-letter {
+    background-color: white;
+    color: #005da7;
+  }
+</style>
+</head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
+
+<!-- Top Navigation Bar -->
+<nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 flex justify-between items-center px-6 py-3">
+  <div class="flex items-center gap-4">
+    <span class="text-xl font-extrabold tracking-tighter text-blue-800">OpenAILearning</span>
+    <span class="text-slate-300">|</span>
+    <span class="font-headline font-bold text-sm text-on-surface-variant">Diagnosis Mode</span>
+  </div>
+  <a href="index.html" class="flex items-center gap-1 text-sm text-slate-500 hover:text-error transition-colors">
+    <span class="material-symbols-outlined text-lg">close</span>
+    <span class="font-label font-medium">Exit</span>
+  </a>
+</nav>
+
+<!-- Progress Bar -->
+<div class="fixed top-[53px] left-0 right-0 z-40 bg-white border-b border-slate-100 px-6 py-3">
+  <div class="max-w-6xl mx-auto flex items-center gap-4">
+    <span class="font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest" id="progressText">Question 1 / 10</span>
+    <div class="flex-grow h-1.5 bg-slate-100 rounded-full overflow-hidden">
+      <div class="h-full bg-primary rounded-full transition-all duration-300" id="progressBar" style="width: 10%"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Split Layout -->
+<main class="pt-[110px] pb-8 px-6 min-h-screen flex">
+  <div class="max-w-6xl mx-auto w-full flex gap-8">
+
+    <!-- Left: Question Area -->
+    <div class="flex-1 flex flex-col">
+      <div class="bg-white rounded-3xl border border-slate-100 p-10 flex-grow shadow-sm">
+        <!-- Knowledge Point Tag -->
+        <div class="mb-6">
+          <span class="inline-flex items-center gap-1.5 bg-primary-fixed text-primary px-3 py-1 rounded-full text-xs font-headline font-bold" id="knowledgeTag">
+            <span class="material-symbols-outlined text-sm">label</span>
+            <span id="knowledgeTagText">一元一次方程</span>
+          </span>
+        </div>
+        <!-- Question Text -->
+        <p class="font-headline text-xl font-bold text-on-surface leading-relaxed mb-2" id="questionText">
+          解方程：2x + 5 = 11，x 的值是多少？
+        </p>
+        <p class="font-body text-sm text-on-surface-variant" id="questionHint">Select one answer</p>
+      </div>
+    </div>
+
+    <!-- Right: Answer Area -->
+    <div class="w-[420px] flex flex-col gap-4">
+      <!-- Options -->
+      <div class="flex flex-col gap-3" id="optionsContainer">
+        <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 0)">
+          <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">A</span>
+          <span class="font-body text-sm leading-relaxed text-on-surface" id="optA">x = 2</span>
+        </button>
+        <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 1)">
+          <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">B</span>
+          <span class="font-body text-sm leading-relaxed text-on-surface" id="optB">x = 3</span>
+        </button>
+        <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 2)">
+          <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">C</span>
+          <span class="font-body text-sm leading-relaxed text-on-surface" id="optC">x = 4</span>
+        </button>
+        <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 3)">
+          <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">D</span>
+          <span class="font-body text-sm leading-relaxed text-on-surface" id="optD">x = 8</span>
+        </button>
+      </div>
+
+      <!-- Next Button -->
+      <button class="w-full bg-primary text-white py-4 px-8 rounded-2xl font-headline font-bold text-sm shadow-sm hover:shadow-md hover:bg-primary-container transition-all disabled:opacity-40 disabled:cursor-not-allowed mt-2" id="nextBtn" disabled onclick="nextQuestion()">
+        <span id="nextBtnText">Next Question</span>
+        <span class="material-symbols-outlined text-lg align-middle ml-1">arrow_forward</span>
+      </button>
+    </div>
+
+  </div>
+</main>
+
+<script src="session-data.js"></script>
+<script>
+const questions = getSessionData().questions;
+
+// Init first question display
+(function() {
+  const q = questions[0];
+  document.getElementById('knowledgeTagText').textContent = q.knowledge;
+  document.getElementById('questionText').textContent = q.question;
+  document.getElementById('optA').textContent = q.options[0];
+  document.getElementById('optB').textContent = q.options[1];
+  document.getElementById('optC').textContent = q.options[2];
+  document.getElementById('optD').textContent = q.options[3];
+})();
+
+let currentQuestion = 0;
+let selectedOption = -1;
+
+function selectOption(btn, index) {
+  // Clear previous selection
+  document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  // Select current
+  btn.classList.add('selected');
+  selectedOption = index;
+  // Enable next button
+  document.getElementById('nextBtn').disabled = false;
+}
+
+function nextQuestion() {
+  if (selectedOption === -1) return;
+
+  currentQuestion++;
+
+  if (currentQuestion >= questions.length) {
+    // Diagnosis complete — show completion state
+    document.querySelector('main').innerHTML = `
+      <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <span class="material-symbols-outlined text-6xl text-secondary mb-6" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+        <p class="font-headline text-3xl font-extrabold text-on-surface mb-3">Diagnosis Complete</p>
+        <p class="font-body text-on-surface-variant mb-8">You answered all 10 questions. View your knowledge map to see the results.</p>
+        <a href="results.html" class="inline-block bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">
+          View Results
+        </a>
+      </div>
+    `;
+    document.getElementById('progressBar').style.width = '100%';
+    document.getElementById('progressText').textContent = 'Completed';
+    return;
+  }
+
+  // Load next question
+  const q = questions[currentQuestion];
+  document.getElementById('knowledgeTagText').textContent = q.knowledge;
+  document.getElementById('questionText').textContent = q.question;
+  document.getElementById('optA').textContent = q.options[0];
+  document.getElementById('optB').textContent = q.options[1];
+  document.getElementById('optC').textContent = q.options[2];
+  document.getElementById('optD').textContent = q.options[3];
+  document.getElementById('progressText').textContent = `Question ${currentQuestion + 1} / ${questions.length}`;
+  document.getElementById('progressBar').style.width = `${((currentQuestion + 1) / questions.length) * 100}%`;
+
+  // Update button text for last question
+  if (currentQuestion === questions.length - 1) {
+    document.getElementById('nextBtnText').textContent = 'Finish';
+  }
+
+  // Reset selection
+  selectedOption = -1;
+  document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('nextBtn').disabled = true;
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OpenAILearning - Results</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "secondary": "#3c692b",
+          "error": "#ba1a1a",
+          "outline-variant": "#c1c7d3",
+          "secondary-fixed": "#bdf1a3",
+          "on-surface-variant": "#414751",
+          "on-primary-fixed": "#001c39",
+          "surface-container-low": "#f2f4f6",
+          "on-error": "#ffffff",
+          "surface-container": "#eceef0",
+          "secondary-fixed-dim": "#a1d489",
+          "surface-container-high": "#e6e8ea",
+          "surface-dim": "#d8dadc",
+          "primary": "#005da7",
+          "tertiary-fixed-dim": "#adcbda",
+          "on-secondary-fixed": "#052100",
+          "primary-fixed-dim": "#a4c9ff",
+          "surface": "#f7f9fb",
+          "surface-container-highest": "#e0e3e5",
+          "tertiary-fixed": "#c9e7f7",
+          "on-primary": "#ffffff",
+          "surface-variant": "#e0e3e5",
+          "on-tertiary-container": "#fbfdff",
+          "surface-tint": "#0060ac",
+          "on-tertiary": "#ffffff",
+          "primary-container": "#2976c7",
+          "surface-container-lowest": "#ffffff",
+          "inverse-on-surface": "#eff1f3",
+          "tertiary-container": "#5c7987",
+          "on-secondary-fixed-variant": "#255015",
+          "error-container": "#ffdad6",
+          "on-surface": "#191c1e",
+          "on-tertiary-fixed-variant": "#2e4b57",
+          "outline": "#717783",
+          "secondary-container": "#baeea0",
+          "on-tertiary-fixed": "#001f2a",
+          "inverse-surface": "#2d3133",
+          "on-secondary-container": "#406d2f",
+          "inverse-primary": "#a4c9ff",
+          "tertiary": "#43606d",
+          "on-error-container": "#93000a",
+          "on-background": "#191c1e",
+          "surface-bright": "#f7f9fb",
+          "background": "#f7f9fb",
+          "on-primary-container": "#fdfcff",
+          "on-primary-fixed-variant": "#004883"
+        },
+        fontFamily: {
+          "headline": ["Manrope"],
+          "body": ["Inter"],
+          "label": ["Inter"]
+        },
+        borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+      },
+    },
+  }
+</script>
+<style>
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+  .knowledge-label { transition: all 0.2s ease-in-out; }
+  .knowledge-label:hover { color: #005da7; transform: translateY(-1px); }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
+</head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
+
+<!-- Top Navigation Bar -->
+<nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 flex justify-between items-center px-6 py-3">
+  <div class="flex items-center gap-8">
+    <span class="text-xl font-extrabold tracking-tighter text-blue-800">OpenAILearning</span>
+  </div>
+  <div class="flex items-center gap-4"></div>
+</nav>
+
+<!-- Permanent Side Navigation -->
+<aside id="sidebar" class="h-screen w-64 fixed left-0 top-0 pt-20 bg-white flex flex-col p-4 border-r border-slate-100 z-40 transition-all duration-300">
+  <button onclick="createNewSession()" class="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 px-4 rounded-xl font-headline font-bold text-sm shadow-sm hover:shadow-md hover:bg-primary-container transition-all mb-4">
+    <span class="material-symbols-outlined text-lg">add</span>
+    <span>New Session</span>
+  </button>
+  <div class="flex-grow overflow-y-auto space-y-1" id="session-list"></div>
+  <!-- Collapse handle -->
+  <button onclick="toggleSidebar()" class="absolute top-1/2 -translate-y-1/2 -right-4 w-8 h-16 bg-white border border-slate-200 rounded-r-lg flex items-center justify-center shadow-sm hover:bg-slate-50 transition-colors z-50">
+    <span class="material-symbols-outlined text-sm text-slate-400" id="collapseIcon">chevron_left</span>
+  </button>
+</aside>
+<script src="sidebar.js"></script>
+
+<!-- Main Content -->
+<main id="mainContent" class="ml-64 pt-24 pb-32 px-6 min-h-screen flex flex-col transition-all duration-300">
+<div class="max-w-4xl mx-auto w-full">
+<div class="flex flex-col gap-12" id="resultsContent"></div>
+</div>
+</main>
+
+<script src="session-data.js"></script>
+<script>
+(function() {
+  const data = getSessionData();
+  const r = data.results;
+  const name = getCurrentSessionName();
+  const dashOffset = 326.73 * (1 - r.score / 100);
+
+  const breakdownHtml = r.breakdown.map(function(item) {
+    if (item.status === 'mastered') {
+      return '<div class="flex items-center gap-3"><span class="material-symbols-outlined text-secondary text-lg" style="font-variation-settings:\'FILL\' 1;">check_circle</span><span class="font-body text-sm text-on-surface flex-grow">' + item.name + '</span><span class="font-label text-xs font-semibold text-secondary bg-secondary/10 px-2.5 py-0.5 rounded-full">' + item.detail + '</span></div>';
+    } else if (item.status === 'weak') {
+      return '<div class="flex items-center gap-3"><span class="material-symbols-outlined text-error text-lg" style="font-variation-settings:\'FILL\' 1;">cancel</span><span class="font-body text-sm text-on-surface flex-grow">' + item.name + '</span><span class="font-label text-xs font-semibold text-error bg-error/10 px-2.5 py-0.5 rounded-full">' + item.detail + '</span></div>';
+    } else {
+      return '<div class="flex items-center gap-3"><span class="material-symbols-outlined text-slate-400 text-lg" style="font-variation-settings:\'FILL\' 1;">radio_button_unchecked</span><span class="font-body text-sm text-on-surface flex-grow">' + item.name + '</span><span class="font-label text-xs font-semibold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">' + item.detail + '</span></div>';
+    }
+  }).join('');
+
+  const graphNodesHtml = r.graphNodes.map(function(n) {
+    var colorClass = n.color === 'secondary' ? 'secondary' : (n.color === 'error' ? 'error' : 'slate-300');
+    var textClass = n.color === 'secondary' ? 'secondary' : (n.color === 'error' ? 'error' : 'slate-400');
+    return '<div class="absolute ' + n.pos + '"><div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-' + colorClass + '"></span><span class="font-headline font-bold text-xs tracking-wider text-' + textClass + '">' + n.name + '</span></div></div>';
+  }).join('');
+
+  document.getElementById('resultsContent').innerHTML =
+    '<div class="flex justify-end"><div class="bg-surface-container-low px-6 py-4 rounded-3xl rounded-tr-none max-w-[85%] text-on-surface shadow-sm"><p class="font-body leading-relaxed">我想学习' + name + '</p></div></div>' +
+    '<div class="flex gap-4"><div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings:\'FILL\' 1;">smart_toy</span></div><div class="flex-grow"><p class="font-body text-on-surface-variant leading-relaxed">我已经为你梳理了' + name + '的知识图谱并开始了诊断。</p></div></div>' +
+    '<div class="flex gap-4"><div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings:\'FILL\' 1;">smart_toy</span></div><div class="flex-grow space-y-6">' +
+    '<div class="prose prose-slate max-w-none"><p class="font-headline text-2xl font-bold tracking-tight text-primary">诊断结果</p><p class="font-body text-on-surface-variant leading-relaxed">诊断完成！以下是你在各知识点上的表现总结。</p></div>' +
+    '<div class="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm"><div class="flex items-center gap-8 mb-8"><div class="relative w-28 h-28 shrink-0"><svg class="w-full h-full -rotate-90" viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="#e6e8ea" stroke-width="8"/><circle cx="60" cy="60" r="52" fill="none" stroke="#005da7" stroke-width="8" stroke-linecap="round" stroke-dasharray="326.73" stroke-dashoffset="' + dashOffset + '"/></svg><div class="absolute inset-0 flex flex-col items-center justify-center"><span class="font-headline text-3xl font-extrabold text-primary">' + r.score + '%</span><span class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest">Accuracy</span></div></div><div class="flex-grow space-y-3"><div class="flex items-center justify-between"><span class="font-body text-sm text-on-surface-variant">Total Questions</span><span class="font-headline font-bold text-on-surface">' + r.total + '</span></div><div class="flex items-center justify-between"><span class="font-body text-sm text-on-surface-variant">Correct</span><span class="font-headline font-bold text-secondary">' + r.correct + '</span></div><div class="flex items-center justify-between"><span class="font-body text-sm text-on-surface-variant">Incorrect</span><span class="font-headline font-bold text-error">' + r.incorrect + '</span></div></div></div>' +
+    '<div class="space-y-3"><p class="font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest mb-4">Knowledge Breakdown</p>' + breakdownHtml + '</div></div>' +
+    '<div class="bg-error/5 rounded-3xl border border-error/10 p-8"><div class="flex items-start gap-3"><span class="material-symbols-outlined text-error text-xl mt-0.5">warning</span><div><p class="font-headline font-bold text-on-surface mb-1">薄弱知识点</p><p class="font-body text-sm text-on-surface-variant leading-relaxed">根据诊断结果，你需要加强 <strong>' + r.weakPoints + '</strong> 的理解。我已为你准备了针对性的教案。</p></div></div></div>' +
+    '<div class="relative bg-white rounded-[2.5rem] border border-slate-100 p-12 min-h-[350px] flex items-center justify-center overflow-hidden"><svg class="absolute inset-0 w-full h-full pointer-events-none opacity-15" xmlns="http://www.w3.org/2000/svg"><line stroke="#005da7" stroke-width="1" x1="50%" x2="35%" y1="50%" y2="30%"/><line stroke="#005da7" stroke-width="1" x1="50%" x2="65%" y1="50%" y2="30%"/><line stroke="#005da7" stroke-width="1" x1="50%" x2="35%" y1="50%" y2="70%"/><line stroke="#005da7" stroke-width="1" x1="50%" x2="65%" y1="50%" y2="70%"/></svg><div class="relative z-10 w-full h-full flex items-center justify-center"><div class="text-center"><span class="font-headline font-extrabold text-sm tracking-widest text-primary">' + name + '</span></div>' + graphNodesHtml + '</div></div>' +
+    '<div class="text-center pt-2"><a href="lesson.html" class="inline-flex items-center gap-2 bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg hover:bg-primary-container transition-all"><span class="material-symbols-outlined text-lg">school</span>Start Learning</a></div>' +
+    '</div></div>';
+})();
+</script>
+
+<!-- Chat Input Fixed Bottom -->
+<div id="bottomBar" class="fixed bottom-0 left-64 right-0 p-6 bg-surface/80 backdrop-blur-xl border-t border-slate-100 transition-all duration-300">
+  <div class="max-w-[720px] mx-auto relative">
+    <input class="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 pr-14 focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-body text-on-surface shadow-sm" placeholder="Ask a follow-up question..." type="text"/>
+    <button class="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-primary text-white rounded-xl shadow-sm hover:shadow-md hover:bg-primary-container transition-all">
+      <span class="material-symbols-outlined text-xl">arrow_upward</span>
+    </button>
+  </div>
+</div>
+
+<script>
+let sidebarOpen = true;
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('mainContent');
+  const bottom = document.getElementById('bottomBar');
+  const icon = document.getElementById('collapseIcon');
+  if (sidebarOpen) {
+    sidebar.style.marginLeft = '0';
+    main.style.marginLeft = '16rem';
+    bottom.style.left = '16rem';
+    icon.textContent = 'chevron_left';
+  } else {
+    sidebar.style.marginLeft = '-15rem';
+    main.style.marginLeft = '0';
+    bottom.style.left = '0';
+    icon.textContent = 'chevron_right';
+  }
+}
+</script>
+</body></html>
