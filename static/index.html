@@ -88,6 +88,14 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+        /* Chat markdown */
+        .prose h3 { font-weight: 700; margin: 1rem 0 0.5rem; color: #191c1e; }
+        .prose p { margin: 0.5rem 0; }
+        .prose ul, .prose ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+        .prose li { margin: 0.25rem 0; }
+        .prose strong { color: #191c1e; }
+        .prose code { background: #eceef0; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em; }
+        .prose blockquote { border-left: 3px solid #005da7; padding-left: 1rem; color: #414751; margin: 0.5rem 0; }
     </style>
 </head>
 <body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
@@ -130,6 +138,7 @@
 </div>
 <script>
 let currentSessionId = getSessionId();
+let messageCount = 0;
 
 async function handleSend(text) {
   const input = document.getElementById('chatInput');
@@ -158,28 +167,32 @@ async function handleSend(text) {
   chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
   try {
-    const isFirstMessage = !currentSessionId || !document.querySelector('#chatHistory .flex.gap-4:not(#loading)');
+    messageCount++;
     const data = await sendMessage(message, currentSessionId);
     currentSessionId = data.session_id;
     setSessionId(currentSessionId);
 
-    // Sync sidebar: update session id and auto-rename on first message
-    if (isFirstMessage && typeof renameCurrentSession === 'function') {
-      const sessions = JSON.parse(localStorage.getItem('openail_sessions') || '[]');
-      const currentKey = localStorage.getItem('openail_current_session');
-      const existing = sessions.find(s => s.id === currentKey);
-      if (existing) {
-        // Update the placeholder session id to backend's real id
-        existing.id = currentSessionId;
-      } else {
-        sessions.unshift({ id: currentSessionId, name: '未命名' });
-      }
+    // Sync sidebar: ensure session exists
+    const sessions = JSON.parse(localStorage.getItem('openail_sessions') || '[]');
+    const currentKey = localStorage.getItem('openail_current_session');
+    const existing = sessions.find(s => s.id === currentKey || s.id === currentSessionId);
+    if (!existing) {
+      sessions.unshift({ id: currentSessionId, name: '未命名' });
       localStorage.setItem('openail_sessions', JSON.stringify(sessions));
-      localStorage.setItem('openail_current_session', currentSessionId);
+    } else if (existing.id !== currentSessionId) {
+      existing.id = currentSessionId;
+      localStorage.setItem('openail_sessions', JSON.stringify(sessions));
+    }
+    localStorage.setItem('openail_current_session', currentSessionId);
 
-      // Auto-rename: use topic from graph response, or first 15 chars of message
-      const autoName = data.data?.graph?.topic || message.substring(0, 15);
-      renameCurrentSession(autoName);
+    // Auto-rename: only after 3+ rounds or when topic/graph is detected
+    const sessionStillUnnamed = existing ? existing.name === '未命名' : true;
+    if (sessionStillUnnamed && typeof renameCurrentSession === 'function') {
+      if (data.data?.graph?.topic) {
+        renameCurrentSession(data.data.graph.topic);
+      } else if (messageCount >= 3) {
+        renameCurrentSession(message.substring(0, 15));
+      }
     }
     document.getElementById('loading')?.remove();
 
@@ -191,7 +204,7 @@ async function handleSend(text) {
           <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
             <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
           </div>
-          <div class="flex-grow"><p class="font-body text-on-surface-variant leading-relaxed">${data.message}</p></div>
+          <div class="flex-grow prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${(typeof marked !== 'undefined') ? marked.parse(data.message) : data.message}</div>
         </div>`;
     }
   } catch (err) {
@@ -203,18 +216,58 @@ async function handleSend(text) {
 function renderKnowledgeGraph(data) {
   const graph = data.data.graph;
   const chatHistory = document.getElementById('chatHistory');
-  const positions = [
-    'top-[20%] left-[25%]', 'top-[20%] right-[25%]',
-    'bottom-[20%] left-[25%]', 'bottom-[20%] right-[25%]',
-    'top-[50%] left-[10%]', 'top-[50%] right-[10%]',
-    'top-[35%] left-[15%]', 'bottom-[35%] right-[15%]'
-  ];
-  const nodesHtml = graph.nodes.map((n, i) => {
-    const pos = positions[i % positions.length];
-    const color = n.level === 'core' ? 'primary' : 'slate-400';
-    return `<div class="absolute ${pos} knowledge-label cursor-default">
-      <span class="font-headline font-bold text-xs tracking-wider text-${color}">${n.name}</span>
-    </div>`;
+  const nodes = graph.nodes || [];
+  const edges = graph.edges || [];
+
+  // Layout: center node + surrounding nodes in a circle
+  const W = 600, H = 400;
+  const cx = W / 2, cy = H / 2;
+  const radius = 140;
+
+  // Position nodes: core at center, others around
+  const coreNodes = nodes.filter(n => n.level === 'core');
+  const otherNodes = nodes.filter(n => n.level !== 'core');
+  const allPositioned = [];
+
+  // Place core nodes near center
+  coreNodes.forEach((n, i) => {
+    const angle = (i / Math.max(coreNodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    const r = coreNodes.length === 1 ? 0 : 50;
+    allPositioned.push({ ...n, x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
+  });
+
+  // Place other nodes in outer ring
+  otherNodes.forEach((n, i) => {
+    const angle = (i / Math.max(otherNodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    allPositioned.push({ ...n, x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
+  });
+
+  const nodeMap = {};
+  allPositioned.forEach(n => { nodeMap[n.id] = n; });
+
+  // Draw edges
+  const edgesHtml = edges.map(e => {
+    const s = nodeMap[e.source], t = nodeMap[e.target];
+    if (!s || !t) return '';
+    return `<line x1="${s.x}" y1="${s.y}" x2="${t.x}" y2="${t.y}" stroke="#a4c9ff" stroke-width="2" stroke-dasharray="6,4"/>`;
+  }).join('');
+
+  // Draw nodes
+  const nodesHtml = allPositioned.map(n => {
+    const isCore = n.level === 'core';
+    const r = isCore ? 36 : 28;
+    const fill = isCore ? '#005da7' : '#f2f4f6';
+    const stroke = isCore ? '#004883' : '#c1c7d3';
+    const textColor = isCore ? 'white' : '#414751';
+    const fontSize = isCore ? 11 : 10;
+    // Word wrap: split name into lines of ~4 chars
+    const name = n.name;
+    const lines = name.length > 5 ? [name.substring(0, Math.ceil(name.length/2)), name.substring(Math.ceil(name.length/2))] : [name];
+    const textHtml = lines.map((line, i) =>
+      `<tspan x="${n.x}" dy="${i === 0 ? -((lines.length - 1) * 6) : 14}" text-anchor="middle">${line}</tspan>`
+    ).join('');
+    return `<circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="2" class="drop-shadow-sm"/>` +
+      `<text x="${n.x}" y="${n.y + 4}" text-anchor="middle" fill="${textColor}" font-family="Manrope" font-weight="700" font-size="${fontSize}">${textHtml}</text>`;
   }).join('');
 
   chatHistory.innerHTML += `
@@ -227,21 +280,13 @@ function renderKnowledgeGraph(data) {
           <p class="font-headline text-2xl font-bold tracking-tight text-primary">${graph.topic} 知识图谱</p>
           <p class="font-body text-on-surface-variant leading-relaxed">${data.message}</p>
         </div>
-        <div class="relative bg-white rounded-[2.5rem] border border-slate-100 p-12 min-h-[400px] flex items-center justify-center overflow-hidden">
-          <svg class="absolute inset-0 w-full h-full pointer-events-none opacity-10" xmlns="http://www.w3.org/2000/svg">
-            <line stroke="#005da7" stroke-width="1" x1="50%" x2="35%" y1="50%" y2="30%"></line>
-            <line stroke="#005da7" stroke-width="1" x1="50%" x2="65%" y1="50%" y2="30%"></line>
-            <line stroke="#005da7" stroke-width="1" x1="50%" x2="35%" y1="50%" y2="70%"></line>
-            <line stroke="#005da7" stroke-width="1" x1="50%" x2="65%" y1="50%" y2="70%"></line>
-          </svg>
-          <div class="relative z-10 w-full h-full flex items-center justify-center">
-            <div class="text-center">
-              <span class="font-headline font-extrabold text-sm tracking-widest text-primary">${graph.topic}</span>
-            </div>
+        <div class="bg-white rounded-[2.5rem] border border-slate-100 p-6 shadow-sm overflow-hidden">
+          <svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-height: 420px;" xmlns="http://www.w3.org/2000/svg">
+            ${edgesHtml}
             ${nodesHtml}
-          </div>
-          <div class="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-xs text-center">
-            <a href="diagnosis.html?session_id=${currentSessionId}" class="block w-full bg-secondary text-white py-3 px-8 rounded-full font-headline font-bold tracking-wide shadow-md hover:bg-secondary/90 transition-all text-sm text-center">Start Diagnosis</a>
+          </svg>
+          <div class="text-center mt-4">
+            <a href="diagnosis.html?session_id=${currentSessionId}" class="inline-block bg-secondary text-white py-3 px-8 rounded-full font-headline font-bold tracking-wide shadow-md hover:bg-secondary/90 transition-all text-sm">Start Diagnosis</a>
           </div>
         </div>
       </div>

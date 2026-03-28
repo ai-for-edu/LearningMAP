@@ -42,6 +42,23 @@
     font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   }
   .lesson-section { scroll-margin-top: 100px; }
+  /* Lesson markdown typography */
+  .lesson-section h2 { font-family: 'Manrope'; font-weight: 800; font-size: 1.35rem; color: #191c1e; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e6e8ea; }
+  .lesson-section h3 { font-family: 'Manrope'; font-weight: 700; font-size: 1.1rem; color: #005da7; margin: 2rem 0 0.75rem; }
+  .lesson-section h4 { font-family: 'Manrope'; font-weight: 700; font-size: 0.95rem; color: #414751; margin: 1.5rem 0 0.5rem; }
+  .lesson-section p { line-height: 1.8; margin: 0.75rem 0; color: #414751; }
+  .lesson-section ul, .lesson-section ol { margin: 0.75rem 0; padding-left: 1.5rem; color: #414751; }
+  .lesson-section li { margin: 0.4rem 0; line-height: 1.7; }
+  .lesson-section strong { color: #191c1e; font-weight: 600; }
+  .lesson-section blockquote { border-left: 4px solid #005da7; background: #f2f4f6; padding: 1rem 1.25rem; margin: 1rem 0; border-radius: 0 0.75rem 0.75rem 0; }
+  .lesson-section blockquote p { color: #414751; margin: 0; }
+  .lesson-section code { background: #eceef0; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.875rem; color: #005da7; }
+  .lesson-section pre { background: #1e293b; color: #e2e8f0; padding: 1.25rem; border-radius: 0.75rem; overflow-x: auto; margin: 1rem 0; }
+  .lesson-section pre code { background: none; color: inherit; padding: 0; }
+  .lesson-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  .lesson-section th { background: #f2f4f6; font-weight: 700; text-align: left; padding: 0.75rem; border-bottom: 2px solid #e6e8ea; font-size: 0.875rem; }
+  .lesson-section td { padding: 0.75rem; border-bottom: 1px solid #e6e8ea; font-size: 0.875rem; }
+  .lesson-section hr { border: none; border-top: 1px solid #e6e8ea; margin: 2rem 0; }
   .nav-link { transition: all 0.15s ease-in-out; }
   .nav-link:hover, .nav-link.active { color: #005da7; border-left-color: #005da7; }
 
@@ -325,9 +342,34 @@
     '</div>';
   document.getElementById('lessonGraph').innerHTML = graphHtml;
 
-  // Progress
+  // Progress — bind after content rendered
   document.getElementById('lessonProgressLabel').textContent = weakPoints.join(' / ') || topic;
-  document.getElementById('lessonProgressNum').textContent = headings.length > 0 ? `共 ${headings.length} 节` : '第 1/1 节';
+  const totalSections = headings.length || 1;
+  document.getElementById('lessonProgressNum').textContent = `第 1/${totalSections} 节`;
+
+  const scrollContainer = document.getElementById('lessonScroll');
+  const progressBar = document.getElementById('lessonProgressBar');
+  const progressNum = document.getElementById('lessonProgressNum');
+  const allSections = document.querySelectorAll('.lesson-section h2[id], .lesson-section h3[id]');
+
+  function updateProgress() {
+    const scrollTop = scrollContainer.scrollTop;
+    const scrollHeight = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+    if (scrollHeight <= 0) return;
+    const percent = Math.min(Math.round((scrollTop / scrollHeight) * 100), 100);
+    progressBar.style.width = percent + '%';
+
+    let current = 0;
+    allSections.forEach((h, i) => {
+      const rect = h.getBoundingClientRect();
+      const containerRect = scrollContainer.getBoundingClientRect();
+      if (rect.top - containerRect.top < containerRect.height * 0.5) current = i;
+    });
+    progressNum.textContent = `第 ${current + 1}/${allSections.length || 1} 节`;
+  }
+
+  scrollContainer.addEventListener('scroll', updateProgress);
+  updateProgress();
 })();
 
 // Outline toggle
@@ -376,37 +418,6 @@ function toggleOutline() {
 })();
 </script>
 
-<script>
-const scrollContainer = document.getElementById('lessonScroll');
-const sections = document.querySelectorAll('.lesson-section');
-const progressBar = document.getElementById('lessonProgressBar');
-const progressLabel = document.getElementById('lessonProgressNum');
-
-scrollContainer.addEventListener('scroll', updateProgress);
-window.addEventListener('load', updateProgress);
-
-function updateProgress() {
-  const scrollTop = scrollContainer.scrollTop;
-  const scrollHeight = scrollContainer.scrollHeight - scrollContainer.clientHeight;
-
-  if (scrollHeight <= 0) return;
-
-  const percent = Math.min(Math.round((scrollTop / scrollHeight) * 100), 100);
-  progressBar.style.width = percent + '%';
-
-  // Determine which section is in view
-  let currentSection = 0;
-  sections.forEach((section, i) => {
-    const rect = section.getBoundingClientRect();
-    const containerRect = scrollContainer.getBoundingClientRect();
-    if (rect.top - containerRect.top < containerRect.height * 0.5) {
-      currentSection = i;
-    }
-  });
-
-  progressLabel.textContent = '第 ' + (currentSection + 1) + '/' + sections.length + ' 节';
-}
-</script>
 
 <!-- Selection Toolbar -->
 <div id="selectionToolbar">
