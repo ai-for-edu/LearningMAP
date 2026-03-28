@@ -32,7 +32,6 @@
     localStorage.setItem(CURRENT_KEY, id);
   }
 
-  // Initialize: start with empty sidebar (like ChatGPT)
   function init() {
     const sessions = getSessions();
     const currentId = getCurrentId();
@@ -55,11 +54,9 @@
     sessions.forEach(function (session) {
       const isActive = session.id === currentId;
 
-      // Wrapper div for hover group
       const wrapper = document.createElement('div');
       wrapper.className = 'relative group';
 
-      // Session button
       const item = document.createElement('button');
       item.className =
         'w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm transition-all ' +
@@ -89,19 +86,31 @@
       menuBtn.innerHTML = '<span class="material-symbols-outlined text-sm text-slate-400">more_horiz</span>';
       menuBtn.addEventListener('click', function (e) {
         e.stopPropagation();
-        // Close all other menus
         document.querySelectorAll('.session-menu').forEach(function (m) {
           m.classList.add('hidden');
         });
-        // Toggle this menu
         menu.classList.toggle('hidden');
       });
 
-      // Dropdown menu
+      // Dropdown menu with Rename + Delete
       const menu = document.createElement('div');
       menu.className =
         'session-menu hidden absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-20 min-w-[120px]';
 
+      // Rename button
+      const renameBtn = document.createElement('button');
+      renameBtn.className =
+        'w-full flex items-center gap-2 px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-high transition-colors text-left';
+      renameBtn.innerHTML =
+        '<span class="material-symbols-outlined text-base">edit</span>' +
+        '<span>Rename</span>';
+      renameBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        menu.classList.add('hidden');
+        showRenameInput(session.id, wrapper);
+      });
+
+      // Delete button
       const deleteBtn = document.createElement('button');
       deleteBtn.className =
         'w-full flex items-center gap-2 px-3 py-2 text-sm text-error hover:bg-error/5 transition-colors text-left';
@@ -114,6 +123,7 @@
         showDeleteConfirm(session.id, session.name);
       });
 
+      menu.appendChild(renameBtn);
       menu.appendChild(deleteBtn);
       wrapper.appendChild(item);
       wrapper.appendChild(menuBtn);
@@ -122,11 +132,39 @@
     });
   }
 
+  function showRenameInput(sessionId, wrapper) {
+    const sessions = getSessions();
+    const session = sessions.find(function (s) { return s.id === sessionId; });
+    if (!session) return;
+
+    // Replace wrapper content with inline input
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = session.name;
+    input.className = 'w-full px-3 py-2 rounded-xl text-sm border-2 border-primary outline-none font-body';
+    input.select();
+
+    wrapper.innerHTML = '';
+    wrapper.appendChild(input);
+    input.focus();
+
+    function save() {
+      const newName = input.value.trim() || '未命名';
+      session.name = newName;
+      saveSessions(sessions);
+      renderSidebar(sessions, getCurrentId());
+    }
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') save();
+      if (e.key === 'Escape') renderSidebar(sessions, getCurrentId());
+    });
+    input.addEventListener('blur', save);
+  }
+
   function showDeleteConfirm(sessionId, sessionName) {
-    // Create modal overlay
     const overlay = document.createElement('div');
     overlay.className = 'fixed inset-0 bg-black/30 flex items-center justify-center z-[100]';
-    overlay.id = 'deleteModal';
 
     overlay.innerHTML =
       '<div class="bg-white rounded-3xl p-8 max-w-sm mx-4 shadow-xl">' +
@@ -134,7 +172,7 @@
       '    <span class="material-symbols-outlined text-error text-2xl">warning</span>' +
       '    <h3 class="font-headline font-bold text-lg text-on-surface">Delete Conversation</h3>' +
       '  </div>' +
-      '  <p class="font-body text-sm text-on-surface-variant mb-6">Are you sure you want to delete "<strong>' + escapeHtml(sessionName) + '</strong>"? This will remove the conversation, diagnosis, and lesson data. This action cannot be undone.</p>' +
+      '  <p class="font-body text-sm text-on-surface-variant mb-6">确定要删除「' + escapeHtml(sessionName) + '」吗？此操作不可撤销。</p>' +
       '  <div class="flex gap-3 justify-end">' +
       '    <button id="cancelDelete" class="px-5 py-2.5 rounded-xl text-sm font-headline font-bold text-on-surface-variant hover:bg-slate-100 transition-colors">Cancel</button>' +
       '    <button id="confirmDelete" class="px-5 py-2.5 rounded-xl text-sm font-headline font-bold text-white bg-error hover:bg-error/90 transition-colors shadow-sm">Delete</button>' +
@@ -143,11 +181,8 @@
 
     document.body.appendChild(overlay);
 
-    // Close on overlay click
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) {
-        overlay.remove();
-      }
+      if (e.target === overlay) overlay.remove();
     });
 
     document.getElementById('cancelDelete').addEventListener('click', function () {
@@ -167,16 +202,9 @@
     sessions = sessions.filter(function (s) { return s.id !== sessionId; });
     saveSessions(sessions);
 
-    // If we deleted the current session, switch to another
     if (sessionId === currentId) {
-      if (sessions.length > 0) {
-        setCurrentId(sessions[0].id);
-        window.location.href = '/';
-      } else {
-        // No sessions left, create a new one
-        localStorage.removeItem(CURRENT_KEY);
-        window.location.href = '/';
-      }
+      localStorage.removeItem(CURRENT_KEY);
+      window.location.href = '/';
     } else {
       renderSidebar(sessions, getCurrentId());
     }
@@ -188,9 +216,14 @@
     return div.innerHTML;
   }
 
-  // New session handler — just go to clean index page
+  // +New Session: create entry in sidebar and navigate to clean page
   window.createNewSession = function () {
-    window.location.href = '/';
+    const sessions = getSessions();
+    const id = Date.now().toString();
+    sessions.unshift({ id: id, name: '未命名' });
+    saveSessions(sessions);
+    setCurrentId(id);
+    window.location.href = '/?session_id=' + id;
   };
 
   // Allow pages to rename current session
@@ -207,7 +240,6 @@
     renderSidebar(sessions, currentId);
   };
 
-  // Run on DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
