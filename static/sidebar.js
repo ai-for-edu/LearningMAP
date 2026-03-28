@@ -3,6 +3,14 @@
   const STORAGE_KEY = 'openail_sessions';
   const CURRENT_KEY = 'openail_current_session';
 
+  // One-time migration: clear legacy example data (v3)
+  if (!localStorage.getItem('openail_v3_clean')) {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(CURRENT_KEY);
+    localStorage.removeItem('openail_examples_v2');
+    localStorage.setItem('openail_v3_clean', '1');
+  }
+
   function getSessions() {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
