@@ -22,27 +22,28 @@ def lesson_node(state: LearningState) -> dict:
     breakdown = diagnosis.breakdown if hasattr(diagnosis, "breakdown") else diagnosis.get("breakdown", [])
     weak_items = [b for b in breakdown if (b.status if hasattr(b, "status") else b["status"]) == "weak"]
 
-    if not weak_items:
-        return {
-            "mode": "chat",
-            "lesson_content": "",
-            "messages": [AIMessage(content="你已经掌握了所有知识点，太棒了！有其他想学的吗？")],
-        }
-
-    # Build weak points info
+    # Build points info
     nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
     node_map = {(n.name if hasattr(n, "name") else n["name"]): n for n in nodes}
-    weak_points = []
-    for item in weak_items:
-        name = item.name if hasattr(item, "name") else item["name"]
-        node = node_map.get(name)
-        if node:
-            desc = node.description if hasattr(node, "description") else node.get("description", "")
-            weak_points.append({"name": name, "description": desc})
-        else:
-            weak_points.append({"name": name, "description": ""})
 
-    prompt = render_prompt("lesson_plan", topic=topic, weak_points=weak_points)
+    if not weak_items:
+        # All mastered — generate review/consolidation lesson
+        all_points = [{"name": n.name if hasattr(n, "name") else n["name"],
+                       "description": n.description if hasattr(n, "description") else n.get("description", "")}
+                      for n in nodes]
+        prompt = render_prompt("lesson_review", topic=topic, points=all_points)
+    else:
+        # Has weak points — generate targeted lesson
+        weak_points = []
+        for item in weak_items:
+            name = item.name if hasattr(item, "name") else item["name"]
+            node = node_map.get(name)
+            if node:
+                desc = node.description if hasattr(node, "description") else node.get("description", "")
+                weak_points.append({"name": name, "description": desc})
+            else:
+                weak_points.append({"name": name, "description": ""})
+        prompt = render_prompt("lesson_plan", topic=topic, weak_points=weak_points)
 
     client = get_raw_client()
     response = client.chat.completions.create(
