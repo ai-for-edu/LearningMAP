@@ -356,7 +356,7 @@
 
     new vis.Network(graphContainer, { nodes: visNodes, edges: visEdges }, {
       physics: { barnesHut: { gravitationalConstant: -1500, springLength: 100 }, stabilization: { iterations: 80 } },
-      interaction: { hover: true, tooltipDelay: 200, zoomView: true, dragView: true },
+      interaction: { hover: true, tooltipDelay: 200, zoomView: true, dragView: true, zoomSpeed: 0.3, minZoom: 0.4, maxZoom: 2.5 },
     });
   }
 })();
