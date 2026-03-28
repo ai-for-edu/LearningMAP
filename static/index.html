@@ -313,23 +313,23 @@ function renderDiagnosisResults(r, sessionId) {
     </div>`;
 }
 
-function renderLessonInChat(lessonContent, sessionId) {
+function renderLessonButton(sessionId) {
   const chatHistory = document.getElementById('chatHistory');
-  // Use marked.js if available, otherwise plain text
-  const html = (typeof marked !== 'undefined') ? marked.parse(lessonContent) : lessonContent.replace(/\n/g, '<br>');
   chatHistory.innerHTML += `
     <div class="flex gap-4">
       <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
         <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
       </div>
-      <div class="flex-grow space-y-4">
-        <p class="font-headline text-2xl font-bold tracking-tight text-primary">个性化教案</p>
-        <div class="prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${html}</div>
+      <div class="flex-grow">
+        <p class="font-body text-on-surface-variant mb-4">教案学习完成！你可以随时回顾。</p>
+        <a href="lesson.html?session_id=${sessionId}" class="inline-flex items-center gap-2 bg-primary/10 text-primary py-3 px-6 rounded-2xl font-headline font-bold text-sm hover:bg-primary/20 transition-all">
+          <span class="material-symbols-outlined text-lg">school</span>Review Lesson
+        </a>
       </div>
     </div>`;
 }
 
-// On load: rebuild conversation from state if returning from diagnosis/lesson
+// On load: always rebuild conversation from state when session_id exists
 (async function init() {
   const chatHistory = document.getElementById('chatHistory');
   chatHistory.innerHTML = '';
@@ -337,16 +337,14 @@ function renderLessonInChat(lessonContent, sessionId) {
 
   const params = new URLSearchParams(window.location.search);
   const sid = params.get('session_id');
-  const show = params.get('show');
 
   if (!sid) return;
 
   currentSessionId = sid;
   const state = await getSessionState(sid);
 
-  // Rebuild conversation: topic → knowledge graph → diagnosis → lesson
+  // Rebuild conversation: topic → graph → diagnosis → lesson button
   if (state.topic) {
-    // User message
     chatHistory.innerHTML += `
       <div class="flex justify-end">
         <div class="bg-surface-container-low px-6 py-4 rounded-3xl rounded-tr-none max-w-[85%] text-on-surface shadow-sm">
@@ -354,20 +352,17 @@ function renderLessonInChat(lessonContent, sessionId) {
         </div>
       </div>`;
 
-    // Knowledge graph (if available)
     if (state.graph) {
       renderKnowledgeGraph({ data: { graph: state.graph }, message: `我已经为你梳理了「${state.topic}」的知识图谱。`, session_id: sid });
     }
   }
 
-  // Diagnosis results
-  if (state.diagnosis_result && (show === 'results' || show === 'lesson')) {
+  if (state.diagnosis_result) {
     renderDiagnosisResults(state.diagnosis_result, sid);
   }
 
-  // Lesson content
-  if (state.lesson_content && show === 'lesson') {
-    renderLessonInChat(state.lesson_content, sid);
+  if (state.has_lesson) {
+    renderLessonButton(sid);
   }
 })();
 </script>

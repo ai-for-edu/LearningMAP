@@ -257,15 +257,22 @@
   const topic = state.topic || '';
   let lessonContent = state.lesson_content;
 
-  // If no lesson yet, trigger generation
+  // If no lesson yet, show spinner and generate
   if (!lessonContent) {
-    document.getElementById('lessonHeader').innerHTML =
-      '<div class="mb-10 animate-pulse"><p class="font-headline text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2">个性化教案</p>' +
-      '<h1 class="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-3">正在生成教案...</h1>' +
-      '<p class="font-body text-on-surface-variant">AI 正在根据你的诊断结果生成个性化教案，请稍候。</p></div>';
+    document.getElementById('lessonHeader').innerHTML = `
+      <div class="flex flex-col items-center justify-center py-20">
+        <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <p class="font-headline font-bold text-lg text-on-surface">正在生成个性化教案</p>
+        <p class="font-body text-sm text-on-surface-variant mt-2">AI 正在根据诊断结果编写教案，请稍候...</p>
+      </div>`;
+    document.getElementById('lessonSections').innerHTML = '';
 
-    const data = await sendMessage('生成教案', sessionId);
-    lessonContent = data.data?.lesson || data.message || '';
+    const resp = await fetch('/api/chat/' + sessionId + '/generate-lesson', { method: 'POST' });
+    const data = await resp.json();
+    lessonContent = data.lesson_content || '';
   }
 
   // Render lesson as plain text (LLM returns markdown-like text)

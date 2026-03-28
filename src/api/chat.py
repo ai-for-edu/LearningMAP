@@ -105,30 +105,42 @@ class SubmitQuizRequest(BaseModel):
 
 @router.post("/chat/{session_id}/submit-quiz")
 async def submit_quiz(session_id: str, req: SubmitQuizRequest) -> dict:
-    """Submit all quiz answers at once, run diagnosis + lesson."""
+    """Submit all quiz answers, run diagnosis only (no lesson)."""
     state = _sessions.get(session_id)
     if not state:
         return {"error": "session not found"}
 
     from src.agent.nodes.diagnosis import diagnosis_node
-    from src.agent.nodes.lesson import lesson_node
 
-    # Store answers and run diagnosis
     state["answers"] = req.answers
     state["current_question_index"] = len(req.answers)
 
     diag_result = diagnosis_node(state)
     state.update(diag_result)
-
-    lesson_result = lesson_node(state)
-    state.update(lesson_result)
-
     _sessions[session_id] = state
 
     dr = state.get("diagnosis_result")
     return {
         "session_id": session_id,
         "diagnosis_result": dr.model_dump() if hasattr(dr, "model_dump") else dr,
+    }
+
+
+@router.post("/chat/{session_id}/generate-lesson")
+async def generate_lesson(session_id: str) -> dict:
+    """Generate lesson for weak points (called from lesson page)."""
+    state = _sessions.get(session_id)
+    if not state:
+        return {"error": "session not found"}
+
+    from src.agent.nodes.lesson import lesson_node
+
+    lesson_result = lesson_node(state)
+    state.update(lesson_result)
+    _sessions[session_id] = state
+
+    return {
+        "session_id": session_id,
         "lesson_content": state.get("lesson_content", ""),
     }
 
