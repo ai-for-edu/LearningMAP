@@ -197,8 +197,9 @@ async function nextQuestion() {
         <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
           <span class="material-symbols-outlined text-6xl text-secondary mb-6" style="font-variation-settings: 'FILL' 1;">check_circle</span>
           <p class="font-headline text-3xl font-extrabold text-on-surface mb-3">Diagnosis Complete</p>
-          <p class="font-body text-on-surface-variant mb-8">${data.message}</p>
+          <p class="font-body text-on-surface-variant mb-8">所有题目已作答完毕，点击下方查看诊断结果。</p>
           <a href="results.html?session_id=${sessionId}" class="inline-block bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">View Results</a>
+          <a href="/?session_id=${sessionId}" class="inline-block mt-4 text-sm text-slate-500 hover:text-primary transition-colors">返回主页</a>
         </div>`;
       document.getElementById('progressBar').style.width = '100%';
       document.getElementById('progressText').textContent = 'Completed';
