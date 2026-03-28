@@ -5,6 +5,7 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>OpenAILearning - Lesson</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script>
@@ -275,9 +276,36 @@
     '<h1 class="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-3">' + topic + '：薄弱知识点</h1>' +
     '<p class="font-body text-on-surface-variant leading-relaxed">本教案根据诊断结果生成，重点讲解 ' + (weakDesc || '相关知识点') + '。</p></div><hr class="border-slate-100 mb-10"/>';
 
+  // Parse markdown to HTML
+  const parsedHtml = marked.parse(lessonContent);
+
   document.getElementById('lessonSections').innerHTML =
-    '<section class="lesson-section mb-12" id="section-1">' +
-    '<div class="space-y-5 font-body text-on-surface leading-relaxed whitespace-pre-wrap">' + lessonContent + '</div></section>';
+    '<section class="lesson-section mb-12 prose prose-slate max-w-none" id="section-1">' + parsedHtml + '</section>';
+
+  // Build outline from rendered headings
+  const sectionEl = document.getElementById('section-1');
+  const headings = sectionEl.querySelectorAll('h2, h3');
+  let outlineHtml = '';
+  headings.forEach((h, i) => {
+    const id = 'heading-' + i;
+    h.id = id;
+    const isH3 = h.tagName === 'H3';
+    outlineHtml += `<a href="#${id}" class="outline-item ${isH3 ? 'sub' : ''} block px-5 py-${isH3 ? '1.5' : '2'} text-sm text-on-surface-variant font-${isH3 ? 'body' : 'headline font-semibold'} rounded-r-lg">` +
+      (isH3 ? h.textContent : `<span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-error flex-shrink-0"></span>${h.textContent}</span>`) + '</a>';
+  });
+  if (!outlineHtml) {
+    outlineHtml = '<a href="#section-1" class="outline-item block px-5 py-2 text-sm text-on-surface-variant font-headline font-semibold rounded-r-lg active"><span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-error flex-shrink-0"></span>教案内容</span></a>';
+  }
+  document.getElementById('outlineList').innerHTML = outlineHtml;
+
+  // Smooth scroll for outline links
+  document.querySelectorAll('#outlineList a').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(link.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
 
   // Graph sidebar
   const graphHtml = '<div class="relative z-10 w-full h-full">' +
@@ -291,12 +319,7 @@
 
   // Progress
   document.getElementById('lessonProgressLabel').textContent = weakPoints.join(' / ') || topic;
-  document.getElementById('lessonProgressNum').textContent = '第 1/1 节';
-
-  // Outline
-  document.getElementById('outlineList').innerHTML =
-    '<a href="#section-1" class="outline-item block px-5 py-2 text-sm text-on-surface-variant font-headline font-semibold rounded-r-lg active">' +
-    '<span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-error flex-shrink-0"></span>教案内容</span></a>';
+  document.getElementById('lessonProgressNum').textContent = headings.length > 0 ? `共 ${headings.length} 节` : '第 1/1 节';
 })();
 
 // Outline toggle

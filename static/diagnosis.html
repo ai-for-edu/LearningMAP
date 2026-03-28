@@ -142,6 +142,9 @@
 <script src="api.js"></script>
 <script>
 let sessionId = getSessionId();
+let allQuestions = [];
+let currentIndex = 0;
+let answers = [];
 let selectedOption = -1;
 
 async function initDiagnosis() {
@@ -151,20 +154,25 @@ async function initDiagnosis() {
     return;
   }
   try {
+    document.getElementById('questionText').textContent = '正在生成题目...';
     const data = await sendMessage('开始诊断', sessionId);
     sessionId = data.session_id;
-    if (data.mode === 'quiz' && data.data?.question) {
-      renderQuestion(data.data.question, data.data.progress);
+    if (data.mode === 'quiz' && data.data?.questions) {
+      allQuestions = data.data.questions;
+      currentIndex = 0;
+      answers = [];
+      showQuestion();
     }
   } catch (err) {
     document.getElementById('questionText').textContent = '加载失败: ' + err.message;
   }
 }
 
-function renderQuestion(q, progress) {
-  const [cur, total] = progress.split('/').map(Number);
-  document.getElementById('progressText').textContent = `Question ${cur} / ${total}`;
-  document.getElementById('progressBar').style.width = `${(cur / total) * 100}%`;
+function showQuestion() {
+  const q = allQuestions[currentIndex];
+  const total = allQuestions.length;
+  document.getElementById('progressText').textContent = `Question ${currentIndex + 1} / ${total}`;
+  document.getElementById('progressBar').style.width = `${((currentIndex + 1) / total) * 100}%`;
   document.getElementById('knowledgeTagText').textContent = q.knowledge_point;
   document.getElementById('questionText').textContent = q.question;
   document.getElementById('optA').textContent = q.options[0];
@@ -174,7 +182,7 @@ function renderQuestion(q, progress) {
   selectedOption = -1;
   document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('nextBtn').disabled = true;
-  document.getElementById('nextBtnText').textContent = cur >= total ? 'Finish' : 'Next Question';
+  document.getElementById('nextBtnText').textContent = (currentIndex >= total - 1) ? 'Finish' : 'Next Question';
 }
 
 function selectOption(btn, index) {
@@ -186,27 +194,38 @@ function selectOption(btn, index) {
 
 async function nextQuestion() {
   if (selectedOption === -1) return;
-  const letter = ['A', 'B', 'C', 'D'][selectedOption];
+  answers.push(selectedOption);
+  currentIndex++;
+
+  if (currentIndex < allQuestions.length) {
+    showQuestion();
+    return;
+  }
+
+  // All done — submit answers to backend
   document.getElementById('nextBtn').disabled = true;
+  document.getElementById('nextBtnText').textContent = '提交中...';
   try {
-    const data = await sendMessage(letter, sessionId);
-    if (data.mode === 'quiz' && data.data?.question) {
-      renderQuestion(data.data.question, data.data.progress);
-    } else {
-      document.querySelector('main').innerHTML = `
-        <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
-          <span class="material-symbols-outlined text-6xl text-secondary mb-6" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-          <p class="font-headline text-3xl font-extrabold text-on-surface mb-3">Diagnosis Complete</p>
-          <p class="font-body text-on-surface-variant mb-8">所有题目已作答完毕，点击下方查看诊断结果。</p>
-          <a href="results.html?session_id=${sessionId}" class="inline-block bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">View Results</a>
-          <a href="/?session_id=${sessionId}" class="inline-block mt-4 text-sm text-slate-500 hover:text-primary transition-colors">返回主页</a>
-        </div>`;
-      document.getElementById('progressBar').style.width = '100%';
-      document.getElementById('progressText').textContent = 'Completed';
-    }
+    const resp = await fetch(`/api/chat/${sessionId}/submit-quiz`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers }),
+    });
+    if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+
+    document.querySelector('main').innerHTML = `
+      <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <span class="material-symbols-outlined text-6xl text-secondary mb-6" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+        <p class="font-headline text-3xl font-extrabold text-on-surface mb-3">Diagnosis Complete</p>
+        <p class="font-body text-on-surface-variant mb-8">所有题目已作答完毕，点击下方查看诊断结果。</p>
+        <a href="/?session_id=${sessionId}&show=results" class="inline-block bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">View Results</a>
+      </div>`;
+    document.getElementById('progressBar').style.width = '100%';
+    document.getElementById('progressText').textContent = 'Completed';
   } catch (err) {
-    document.getElementById('questionText').textContent = '提交失败: ' + err.message;
+    document.getElementById('nextBtnText').textContent = 'Finish';
     document.getElementById('nextBtn').disabled = false;
+    alert('提交失败: ' + err.message);
   }
 }
 

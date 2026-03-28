@@ -227,9 +227,89 @@ function renderKnowledgeGraph(data) {
     </div>`;
 }
 
-// Show welcome on load
-document.getElementById('chatHistory').innerHTML = '';
-document.getElementById('suggestBtns').innerHTML = '';
+function renderDiagnosisResults(r, sessionId) {
+  const chatHistory = document.getElementById('chatHistory');
+  const dashOffset = 326.73 * (1 - r.score / 100);
+  const weakNames = r.breakdown.filter(b => b.status === 'weak').map(b => b.name).join(' 和 ');
+
+  const breakdownHtml = r.breakdown.map(item => {
+    if (item.status === 'mastered') {
+      return `<div class="flex items-center gap-3"><span class="material-symbols-outlined text-secondary text-lg" style="font-variation-settings:'FILL' 1;">check_circle</span><span class="font-body text-sm text-on-surface flex-grow">${item.name}</span><span class="font-label text-xs font-semibold text-secondary bg-secondary/10 px-2.5 py-0.5 rounded-full">${item.detail}</span></div>`;
+    } else if (item.status === 'weak') {
+      return `<div class="flex items-center gap-3"><span class="material-symbols-outlined text-error text-lg" style="font-variation-settings:'FILL' 1;">cancel</span><span class="font-body text-sm text-on-surface flex-grow">${item.name}</span><span class="font-label text-xs font-semibold text-error bg-error/10 px-2.5 py-0.5 rounded-full">${item.detail}</span></div>`;
+    } else {
+      return `<div class="flex items-center gap-3"><span class="material-symbols-outlined text-slate-400 text-lg" style="font-variation-settings:'FILL' 1;">radio_button_unchecked</span><span class="font-body text-sm text-on-surface flex-grow">${item.name}</span><span class="font-label text-xs font-semibold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">${item.detail}</span></div>`;
+    }
+  }).join('');
+
+  chatHistory.innerHTML += `
+    <div class="flex gap-4">
+      <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
+        <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+      </div>
+      <div class="flex-grow space-y-6">
+        <div class="prose prose-slate max-w-none">
+          <p class="font-headline text-2xl font-bold tracking-tight text-primary">诊断结果</p>
+        </div>
+        <div class="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+          <div class="flex items-center gap-8 mb-8">
+            <div class="relative w-28 h-28 shrink-0">
+              <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="#e6e8ea" stroke-width="8"/>
+                <circle cx="60" cy="60" r="52" fill="none" stroke="#005da7" stroke-width="8" stroke-linecap="round" stroke-dasharray="326.73" stroke-dashoffset="${dashOffset}"/>
+              </svg>
+              <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <span class="font-headline text-3xl font-extrabold text-primary">${r.score}%</span>
+                <span class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest">Accuracy</span>
+              </div>
+            </div>
+            <div class="flex-grow space-y-3">
+              <div class="flex items-center justify-between"><span class="font-body text-sm text-on-surface-variant">Total</span><span class="font-headline font-bold text-on-surface">${r.total}</span></div>
+              <div class="flex items-center justify-between"><span class="font-body text-sm text-on-surface-variant">Correct</span><span class="font-headline font-bold text-secondary">${r.correct}</span></div>
+              <div class="flex items-center justify-between"><span class="font-body text-sm text-on-surface-variant">Incorrect</span><span class="font-headline font-bold text-error">${r.incorrect}</span></div>
+            </div>
+          </div>
+          <div class="space-y-3">
+            <p class="font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest mb-4">Knowledge Breakdown</p>
+            ${breakdownHtml}
+          </div>
+        </div>
+        ${weakNames ? `<div class="bg-error/5 rounded-3xl border border-error/10 p-8">
+          <div class="flex items-start gap-3">
+            <span class="material-symbols-outlined text-error text-xl mt-0.5">warning</span>
+            <div>
+              <p class="font-headline font-bold text-on-surface mb-1">薄弱知识点</p>
+              <p class="font-body text-sm text-on-surface-variant">需要加强 <strong>${weakNames}</strong> 的理解。</p>
+            </div>
+          </div>
+        </div>` : ''}
+        <div class="text-center pt-2">
+          <a href="lesson.html?session_id=${sessionId}" class="inline-flex items-center gap-2 bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg hover:bg-primary-container transition-all">
+            <span class="material-symbols-outlined text-lg">school</span>Start Learning
+          </a>
+        </div>
+      </div>
+    </div>`;
+}
+
+// On load: clean page, then check if returning from diagnosis
+(async function init() {
+  const chatHistory = document.getElementById('chatHistory');
+  chatHistory.innerHTML = '';
+  document.getElementById('suggestBtns').innerHTML = '';
+
+  const params = new URLSearchParams(window.location.search);
+  const sid = params.get('session_id');
+  const show = params.get('show');
+
+  if (sid && show === 'results') {
+    currentSessionId = sid;
+    const state = await getSessionState(sid);
+    if (state.diagnosis_result) {
+      renderDiagnosisResults(state.diagnosis_result, sid);
+    }
+  }
+})();
 </script>
 
 <script>

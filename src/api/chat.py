@@ -82,13 +82,9 @@ async def chat(req: ChatRequest) -> ChatResponse:
         data = {"graph": kg.model_dump() if hasattr(kg, "model_dump") else kg}
     elif mode == "quiz" and result.get("questions"):
         questions = result["questions"]
-        idx = result.get("current_question_index", 0)
-        if idx < len(questions):
-            q = questions[idx]
-            data = {
-                "question": q.model_dump() if hasattr(q, "model_dump") else q,
-                "progress": f"{idx+1}/{len(questions)}",
-            }
+        data = {
+            "questions": [q.model_dump() if hasattr(q, "model_dump") else q for q in questions],
+        }
     elif mode == "result" and result.get("diagnosis_result"):
         dr = result["diagnosis_result"]
         data = {"result": dr.model_dump() if hasattr(dr, "model_dump") else dr}
@@ -101,6 +97,40 @@ async def chat(req: ChatRequest) -> ChatResponse:
         message=last_ai_msg,
         data=data,
     )
+
+
+class SubmitQuizRequest(BaseModel):
+    answers: list[int]  # list of selected option indices [0-3]
+
+
+@router.post("/chat/{session_id}/submit-quiz")
+async def submit_quiz(session_id: str, req: SubmitQuizRequest) -> dict:
+    """Submit all quiz answers at once, run diagnosis + lesson."""
+    state = _sessions.get(session_id)
+    if not state:
+        return {"error": "session not found"}
+
+    from src.agent.nodes.diagnosis import diagnosis_node
+    from src.agent.nodes.lesson import lesson_node
+
+    # Store answers and run diagnosis
+    state["answers"] = req.answers
+    state["current_question_index"] = len(req.answers)
+
+    diag_result = diagnosis_node(state)
+    state.update(diag_result)
+
+    lesson_result = lesson_node(state)
+    state.update(lesson_result)
+
+    _sessions[session_id] = state
+
+    dr = state.get("diagnosis_result")
+    return {
+        "session_id": session_id,
+        "diagnosis_result": dr.model_dump() if hasattr(dr, "model_dump") else dr,
+        "lesson_content": state.get("lesson_content", ""),
+    }
 
 
 @router.get("/chat/{session_id}/state")
