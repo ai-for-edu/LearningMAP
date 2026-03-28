@@ -6,6 +6,7 @@
 <title>OpenAILearning - Lesson</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
 <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -291,7 +292,7 @@
     '<p class="font-body text-on-surface-variant leading-relaxed">本教案根据诊断结果生成，重点讲解 ' + (weakDesc || '相关知识点') + '。</p></div><hr class="border-slate-100 mb-10"/>';
 
   // Parse markdown to HTML
-  const parsedHtml = marked.parse(lessonContent);
+  const parsedHtml = DOMPurify.sanitize(marked.parse(lessonContent));
 
   document.getElementById('lessonSections').innerHTML =
     '<section class="lesson-section mb-12 prose prose-slate max-w-none" id="section-1">' + parsedHtml + '</section>';

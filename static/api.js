@@ -1,6 +1,21 @@
 // static/api.js — Frontend API helper module
 const API_BASE = '/api';
 
+// XSS protection: escape HTML entities
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Safe markdown rendering: parse + sanitize
+function safeMarkdown(text) {
+  if (typeof marked === 'undefined') return escapeHtml(text);
+  const html = marked.parse(text);
+  if (typeof DOMPurify !== 'undefined') return DOMPurify.sanitize(html);
+  return html;
+}
+
 // 从 URL 参数获取 session_id
 function getSessionId() {
   return new URLSearchParams(window.location.search).get('session_id');

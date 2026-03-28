@@ -226,7 +226,7 @@ async function initDiagnosis() {
       <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
         <span class="material-symbols-outlined text-4xl text-error mb-4">error</span>
         <p class="font-headline font-bold text-on-surface mb-2">加载失败</p>
-        <p class="font-body text-sm text-on-surface-variant mb-6">${err.message}</p>
+        <p class="font-body text-sm text-on-surface-variant mb-6">${escapeHtml(err.message)}</p>
         <a href="/" class="text-primary font-headline font-bold text-sm hover:underline">返回主页</a>
       </div>`;
   }

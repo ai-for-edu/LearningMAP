@@ -17,13 +17,20 @@ def knowledge_graph_node(state: LearningState) -> dict:
     topic = state.get("topic", "")
     prompt = render_prompt("knowledge_graph", topic=topic, max_nodes=MAX_NODES)
 
-    client = get_llm_client()
-    graph = client.chat.completions.create(
-        model=get_model_name(),
-        max_tokens=2048,
-        messages=[{"role": "user", "content": prompt}],
-        response_model=KnowledgeGraph,
-    )
+    try:
+        client = get_llm_client()
+        graph = client.chat.completions.create(
+            model=get_model_name(),
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}],
+            response_model=KnowledgeGraph,
+        )
+    except Exception:
+        logger.exception("Knowledge graph generation failed")
+        return {
+            "messages": [AIMessage(content="知识图谱生成失败，请稍后再试。")],
+            "mode": "chat",
+        }
 
     reply = f"我已经为你梳理了「{topic}」的知识图谱，包含 {len(graph.nodes)} 个知识点。准备好了就点击开始诊断！"
     return {

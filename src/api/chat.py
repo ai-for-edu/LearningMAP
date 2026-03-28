@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from typing import Any
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field, field_validator
 from langchain_core.messages import HumanMessage
 from src.agent.graph import build_graph
 from src.api.store import load_session, save_session
@@ -57,7 +58,7 @@ def _save(session_id: str, state: dict[str, Any]) -> None:
 
 class ChatRequest(BaseModel):
     session_id: str | None = None
-    message: str
+    message: str = Field(..., min_length=1, max_length=5000)
 
 
 class ChatResponse(BaseModel):
@@ -79,9 +80,9 @@ async def chat(req: ChatRequest) -> ChatResponse:
     state["messages"] = list(state.get("messages", []))
     state["messages"].append(HumanMessage(content=req.message))
 
-    # Run graph
+    # Run graph (blocking call → run in thread to avoid blocking event loop)
     graph = _get_graph()
-    result = graph.invoke(state)
+    result = await asyncio.to_thread(graph.invoke, state)
 
     # Save state
     _save(session_id, result)
@@ -121,7 +122,15 @@ async def chat(req: ChatRequest) -> ChatResponse:
 
 
 class SubmitQuizRequest(BaseModel):
-    answers: list[int]  # list of selected option indices [0-3]
+    answers: list[int] = Field(..., min_length=1, max_length=50)
+
+    @field_validator("answers")
+    @classmethod
+    def validate_answer_range(cls, v: list[int]) -> list[int]:
+        for ans in v:
+            if not 0 <= ans <= 3:
+                raise ValueError(f"Answer index must be 0-3, got {ans}")
+        return v
 
 
 @router.post("/chat/{session_id}/submit-quiz")
@@ -129,14 +138,14 @@ async def submit_quiz(session_id: str, req: SubmitQuizRequest) -> dict:
     """Submit all quiz answers, run diagnosis only (no lesson)."""
     state = _get_session(session_id)
     if not state:
-        return {"error": "session not found"}
+        raise HTTPException(status_code=404, detail="Session not found")
 
     from src.agent.nodes.diagnosis import diagnosis_node
 
     state["answers"] = req.answers
     state["current_question_index"] = len(req.answers)
 
-    diag_result = diagnosis_node(state)
+    diag_result = await asyncio.to_thread(diagnosis_node, state)
     state.update(diag_result)
     _save(session_id, state)
 
@@ -152,11 +161,11 @@ async def generate_lesson(session_id: str) -> dict:
     """Generate lesson for weak points (called from lesson page)."""
     state = _get_session(session_id)
     if not state:
-        return {"error": "session not found"}
+        raise HTTPException(status_code=404, detail="Session not found")
 
     from src.agent.nodes.lesson import lesson_node
 
-    lesson_result = lesson_node(state)
+    lesson_result = await asyncio.to_thread(lesson_node, state)
     state.update(lesson_result)
     _save(session_id, state)
 

@@ -66,19 +66,19 @@ def _deserialize_state(data: str) -> dict[str, Any]:
         try:
             raw["knowledge_graph"] = KnowledgeGraph(**raw["knowledge_graph"])
         except Exception:
-            pass
+            logger.warning("Failed to deserialize knowledge_graph", exc_info=True)
 
     if raw.get("questions") and isinstance(raw["questions"], list):
         try:
             raw["questions"] = [QuizQuestion(**q) if isinstance(q, dict) else q for q in raw["questions"]]
         except Exception:
-            pass
+            logger.warning("Failed to deserialize questions", exc_info=True)
 
     if raw.get("diagnosis_result") and isinstance(raw["diagnosis_result"], dict):
         try:
             raw["diagnosis_result"] = DiagnosisResult(**raw["diagnosis_result"])
         except Exception:
-            pass
+            logger.warning("Failed to deserialize diagnosis_result", exc_info=True)
 
     return raw
 
@@ -87,13 +87,11 @@ def save_session(session_id: str, state: dict[str, Any]) -> None:
     """Persist session state to SQLite."""
     try:
         data = _serialize_state(state)
-        db = _get_db()
-        db.execute(
-            "INSERT OR REPLACE INTO sessions (id, data) VALUES (?, ?)",
-            (session_id, data),
-        )
-        db.commit()
-        db.close()
+        with sqlite3.connect(str(_DB_PATH)) as db:
+            db.execute(
+                "INSERT OR REPLACE INTO sessions (id, data) VALUES (?, ?)",
+                (session_id, data),
+            )
     except Exception:
         logger.exception("Failed to save session %s", session_id)
 
@@ -101,11 +99,10 @@ def save_session(session_id: str, state: dict[str, Any]) -> None:
 def load_session(session_id: str) -> dict[str, Any] | None:
     """Load session state from SQLite."""
     try:
-        db = _get_db()
-        row = db.execute(
-            "SELECT data FROM sessions WHERE id = ?", (session_id,)
-        ).fetchone()
-        db.close()
+        with sqlite3.connect(str(_DB_PATH)) as db:
+            row = db.execute(
+                "SELECT data FROM sessions WHERE id = ?", (session_id,)
+            ).fetchone()
         if row:
             return _deserialize_state(row[0])
     except Exception:
