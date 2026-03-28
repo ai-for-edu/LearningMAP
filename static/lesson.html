@@ -178,7 +178,7 @@
     <span class="text-slate-300">|</span>
     <span class="font-headline font-bold text-sm text-on-surface-variant">Lesson Mode</span>
   </div>
-  <a href="results.html" class="flex items-center gap-1 text-sm text-slate-500 hover:text-primary transition-colors">
+  <a id="backLink" href="results.html" class="flex items-center gap-1 text-sm text-slate-500 hover:text-primary transition-colors">
     <span class="material-symbols-outlined text-lg">arrow_back</span>
     <span class="font-label font-medium">Back to Chat</span>
   </a>
@@ -242,78 +242,61 @@
 
 </main>
 
-<script src="session-data.js"></script>
+<script src="api.js"></script>
 <script>
-(function() {
-  const data = getSessionData();
-  const L = data.lesson;
-  const name = getCurrentSessionName();
+(async function() {
+  const sessionId = getSessionId();
+  if (!sessionId) { window.location.href = '/'; return; }
 
-  // Header
+  // Update back link
+  document.getElementById('backLink').href = 'results.html?session_id=' + sessionId;
+
+  const state = await getSessionState(sessionId);
+  const topic = state.topic || '';
+  let lessonContent = state.lesson_content;
+
+  // If no lesson yet, trigger generation
+  if (!lessonContent) {
+    document.getElementById('lessonHeader').innerHTML =
+      '<div class="mb-10 animate-pulse"><p class="font-headline text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2">个性化教案</p>' +
+      '<h1 class="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-3">正在生成教案...</h1>' +
+      '<p class="font-body text-on-surface-variant">AI 正在根据你的诊断结果生成个性化教案，请稍候。</p></div>';
+
+    const data = await sendMessage('生成教案', sessionId);
+    lessonContent = data.data?.lesson || data.message || '';
+  }
+
+  // Render lesson as plain text (LLM returns markdown-like text)
+  const weakPoints = state.diagnosis_result?.breakdown?.filter(b => b.status === 'weak').map(b => b.name) || [];
+  const weakDesc = weakPoints.map(n => '<strong class="text-error">' + n + '</strong>').join(' 和 ');
+
   document.getElementById('lessonHeader').innerHTML =
     '<div class="mb-10"><p class="font-headline text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2">个性化教案</p>' +
-    '<h1 class="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-3">' + L.title + '</h1>' +
-    '<p class="font-body text-on-surface-variant leading-relaxed">' + L.desc + '</p></div><hr class="border-slate-100 mb-10"/>';
+    '<h1 class="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-3">' + topic + '：薄弱知识点</h1>' +
+    '<p class="font-body text-on-surface-variant leading-relaxed">本教案根据诊断结果生成，重点讲解 ' + (weakDesc || '相关知识点') + '。</p></div><hr class="border-slate-100 mb-10"/>';
 
-  // Sections
-  document.getElementById('lessonSections').innerHTML = L.sections.map(function(s, i) {
-    var sep = i < L.sections.length - 1 ? '<hr class="border-slate-100 mb-10"/>' : '';
-    return '<section class="lesson-section mb-12" id="' + s.id + '">' +
-      '<div class="flex items-center gap-2 mb-6"><span class="w-3 h-3 rounded-full bg-error"></span>' +
-      '<h2 class="font-headline text-xl font-bold text-on-surface">' + s.name + '</h2></div>' +
-      '<div class="space-y-5 font-body text-on-surface leading-relaxed">' + s.content + '</div></section>' + sep;
-  }).join('');
+  document.getElementById('lessonSections').innerHTML =
+    '<section class="lesson-section mb-12" id="section-1">' +
+    '<div class="space-y-5 font-body text-on-surface leading-relaxed whitespace-pre-wrap">' + lessonContent + '</div></section>';
 
   // Graph sidebar
-  var graphHtml = '<svg class="absolute inset-0 w-full h-full pointer-events-none opacity-15" xmlns="http://www.w3.org/2000/svg"><line stroke="#ba1a1a" stroke-width="1.5" x1="50%" x2="65%" y1="45%" y2="25%"/><line stroke="#ba1a1a" stroke-width="1.5" x1="50%" x2="35%" y1="45%" y2="70%"/></svg>';
-  graphHtml += '<div class="relative z-10 w-full h-full"><div class="absolute top-[40%] left-1/2 -translate-x-1/2 text-center"><span class="font-headline font-extrabold text-xs tracking-widest text-slate-300">' + name + '</span></div>';
-  L.graphNodes.forEach(function(n) {
-    graphHtml += '<div class="absolute ' + n.pos + '"><a href="#' + n.id + '" class="flex items-center gap-1.5 group"><span class="w-3 h-3 rounded-full bg-error ring-4 ring-error/20 group-hover:ring-error/40 transition-all"></span><span class="font-headline font-bold text-xs tracking-wider text-error">' + n.name + '</span></a></div>';
-  });
-  graphHtml += '</div>';
+  const graphHtml = '<div class="relative z-10 w-full h-full">' +
+    '<div class="absolute top-[40%] left-1/2 -translate-x-1/2 text-center"><span class="font-headline font-extrabold text-xs tracking-widest text-slate-300">' + topic + '</span></div>' +
+    weakPoints.map((n, i) => {
+      const positions = ['top-[18%] right-[10%]', 'bottom-[22%] left-[10%]', 'top-[18%] left-[10%]', 'bottom-[22%] right-[10%]'];
+      return '<div class="absolute ' + positions[i % positions.length] + '"><div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-error ring-4 ring-error/20"></span><span class="font-headline font-bold text-xs tracking-wider text-error">' + n + '</span></div></div>';
+    }).join('') +
+    '</div>';
   document.getElementById('lessonGraph').innerHTML = graphHtml;
 
-  // Progress label
-  var sectionNames = L.sections.map(function(s) { return s.name; }).join(' / ');
-  document.getElementById('lessonProgressLabel').textContent = sectionNames;
-  document.getElementById('lessonProgressNum').textContent = '第 1/' + L.sections.length + ' 节';
+  // Progress
+  document.getElementById('lessonProgressLabel').textContent = weakPoints.join(' / ') || topic;
+  document.getElementById('lessonProgressNum').textContent = '第 1/1 节';
 
-  // Build outline from rendered sections
-  var outlineHtml = '';
-  L.sections.forEach(function(s) {
-    // Section heading (h2 level)
-    outlineHtml += '<a href="#' + s.id + '" class="outline-item block px-5 py-2 text-sm text-on-surface-variant font-headline font-semibold rounded-r-lg" data-section="' + s.id + '">' +
-      '<span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-error flex-shrink-0"></span>' + s.name + '</span></a>';
-
-    // Extract h3 sub-headings from content
-    var tempDiv = document.createElement('div');
-    tempDiv.innerHTML = s.content;
-    var h3s = tempDiv.querySelectorAll('h3');
-    h3s.forEach(function(h3, idx) {
-      var subId = s.id + '-sub-' + idx;
-      // Find actual h3 in rendered DOM and add id
-      var renderedSection = document.getElementById(s.id);
-      if (renderedSection) {
-        var renderedH3s = renderedSection.querySelectorAll('h3');
-        if (renderedH3s[idx]) {
-          renderedH3s[idx].id = subId;
-        }
-      }
-      outlineHtml += '<a href="#' + subId + '" class="outline-item sub block px-5 py-1.5 text-on-surface-variant font-body rounded-r-lg">' + h3.textContent + '</a>';
-    });
-  });
-  document.getElementById('outlineList').innerHTML = outlineHtml;
-
-  // Smooth scroll for outline links
-  document.querySelectorAll('#outlineList a').forEach(function(link) {
-    link.addEventListener('click', function(e) {
-      e.preventDefault();
-      var target = document.querySelector(this.getAttribute('href'));
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    });
-  });
+  // Outline
+  document.getElementById('outlineList').innerHTML =
+    '<a href="#section-1" class="outline-item block px-5 py-2 text-sm text-on-surface-variant font-headline font-semibold rounded-r-lg active">' +
+    '<span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-error flex-shrink-0"></span>教案内容</span></a>';
 })();
 
 // Outline toggle
