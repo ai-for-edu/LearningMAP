@@ -23,25 +23,10 @@
     localStorage.setItem(CURRENT_KEY, id);
   }
 
-  // Initialize: seed with example sessions if empty
+  // Initialize: start with empty sidebar (like ChatGPT)
   function init() {
-    let sessions = getSessions();
-    let currentId = getCurrentId();
-
-    if (sessions.length === 0 || !currentId) {
-      const now = Date.now();
-      sessions = [
-        { id: String(now), name: '二元一次方程' },
-        { id: String(now - 86400000), name: '勾股定理' },
-        { id: String(now - 172800000), name: '英语时态总结' },
-        { id: String(now - 259200000), name: '光的折射与反射' },
-        { id: String(now - 345600000), name: '细胞的结构与功能' },
-      ];
-      saveSessions(sessions);
-      setCurrentId(String(now));
-      currentId = String(now);
-    }
-
+    const sessions = getSessions();
+    const currentId = getCurrentId();
     renderSidebar(sessions, currentId);
   }
 
@@ -84,7 +69,7 @@
       item.addEventListener('click', function () {
         if (!isActive) {
           setCurrentId(session.id);
-          window.location.href = 'index.html';
+          window.location.href = '/?session_id=' + session.id;
         }
       });
 
@@ -194,14 +179,9 @@
     return div.innerHTML;
   }
 
-  // New session handler
+  // New session handler — just go to clean index page
   window.createNewSession = function () {
-    const sessions = getSessions();
-    const id = Date.now().toString();
-    sessions.unshift({ id: id, name: '未命名' });
-    saveSessions(sessions);
-    setCurrentId(id);
-    window.location.href = 'index.html';
+    window.location.href = '/';
   };
 
   // Allow pages to rename current session

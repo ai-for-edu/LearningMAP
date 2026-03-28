@@ -160,6 +160,16 @@ async function handleSend(text) {
     const data = await sendMessage(message, currentSessionId);
     currentSessionId = data.session_id;
     setSessionId(currentSessionId);
+    // Save to sidebar history
+    if (typeof renameCurrentSession === 'function') {
+      const sessions = JSON.parse(localStorage.getItem('openail_sessions') || '[]');
+      if (!sessions.find(s => s.id === currentSessionId)) {
+        sessions.unshift({ id: currentSessionId, name: message.substring(0, 20) });
+        localStorage.setItem('openail_sessions', JSON.stringify(sessions));
+        localStorage.setItem('openail_current_session', currentSessionId);
+        renameCurrentSession(message.substring(0, 20));
+      }
+    }
     document.getElementById('loading')?.remove();
 
     if (data.mode === 'graph' && data.data?.graph) {
