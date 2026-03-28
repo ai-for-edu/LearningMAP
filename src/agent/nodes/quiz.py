@@ -30,7 +30,7 @@ def quiz_node(state: LearningState) -> dict:
 
         prompt = render_prompt("quiz_generate", knowledge_points=points, questions_per_point=QUESTIONS_PER_POINT)
         client = get_llm_client()
-        generated = client.messages.create(
+        generated = client.chat.completions.create(
             model=get_model_name(),
             max_tokens=4096,
             messages=[{"role": "user", "content": prompt}],

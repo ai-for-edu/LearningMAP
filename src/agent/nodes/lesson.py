@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import logging
 from src.agent.state import LearningState
-from src.llm.client import get_model_name
+from src.llm.client import get_raw_client, get_model_name
 from src.prompts.loader import render_prompt
 from langchain_core.messages import AIMessage
-import anthropic
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +44,14 @@ def lesson_node(state: LearningState) -> dict:
 
     prompt = render_prompt("lesson_plan", topic=topic, weak_points=weak_points)
 
-    client = anthropic.Anthropic()
-    response = client.messages.create(
+    client = get_raw_client()
+    response = client.chat.completions.create(
         model=get_model_name(),
         max_tokens=4096,
         messages=[{"role": "user", "content": prompt}],
     )
 
-    lesson_text = response.content[0].text
+    lesson_text = response.choices[0].message.content
     return {
         "lesson_content": lesson_text,
         "mode": "lesson",

@@ -18,7 +18,7 @@ def knowledge_graph_node(state: LearningState) -> dict:
     prompt = render_prompt("knowledge_graph", topic=topic, max_nodes=MAX_NODES)
 
     client = get_llm_client()
-    graph = client.messages.create(
+    graph = client.chat.completions.create(
         model=get_model_name(),
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],

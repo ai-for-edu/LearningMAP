@@ -34,7 +34,7 @@ def intent_node(state: LearningState) -> dict:
 
     try:
         client = get_llm_client()
-        result = client.messages.create(
+        result = client.chat.completions.create(
             model=get_model_name(),
             max_tokens=200,
             messages=[{"role": "user", "content": prompt}],

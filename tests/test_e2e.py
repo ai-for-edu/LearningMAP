@@ -6,7 +6,7 @@ from run.serve import app
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("ANTHROPIC_API_KEY", "your-key-here") == "your-key-here",
+    not os.environ.get("OPENAI_API_KEY"),
     reason="No API key configured",
 )
 async def test_full_chat_flow():
