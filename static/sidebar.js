@@ -3,10 +3,14 @@
   const STORAGE_KEY = 'openail_sessions';
   const CURRENT_KEY = 'openail_current_session';
 
-  // Always start clean — sessions come from server, not localStorage
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(CURRENT_KEY);
-  localStorage.removeItem('openail_examples_v2');
+  // One-time cleanup: remove legacy example sessions
+  if (!localStorage.getItem('openail_v4')) {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(CURRENT_KEY);
+    localStorage.removeItem('openail_examples_v2');
+    localStorage.removeItem('openail_v3_clean');
+    localStorage.setItem('openail_v4', '1');
+  }
 
   function getSessions() {
     try {
@@ -167,11 +171,11 @@
     if (sessionId === currentId) {
       if (sessions.length > 0) {
         setCurrentId(sessions[0].id);
-        window.location.href = 'index.html';
+        window.location.href = '/';
       } else {
         // No sessions left, create a new one
         localStorage.removeItem(CURRENT_KEY);
-        window.location.href = 'index.html';
+        window.location.href = '/';
       }
     } else {
       renderSidebar(sessions, getCurrentId());
