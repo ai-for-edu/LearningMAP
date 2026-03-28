@@ -6,6 +6,7 @@
 <title>OpenAILearning - Scholar Minimal</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -213,62 +214,21 @@ async function handleSend(text) {
   }
 }
 
+let _graphCounter = 0;
+
 function renderKnowledgeGraph(data) {
   const graph = data.data.graph;
   const chatHistory = document.getElementById('chatHistory');
-  const nodes = graph.nodes || [];
-  const edges = graph.edges || [];
+  const graphNodes = graph.nodes || [];
+  const graphEdges = graph.edges || [];
+  const containerId = 'kg-container-' + (++_graphCounter);
 
-  // Layout: center node + surrounding nodes in a circle
-  const W = 600, H = 400;
-  const cx = W / 2, cy = H / 2;
-  const radius = 140;
-
-  // Position nodes: core at center, others around
-  const coreNodes = nodes.filter(n => n.level === 'core');
-  const otherNodes = nodes.filter(n => n.level !== 'core');
-  const allPositioned = [];
-
-  // Place core nodes near center
-  coreNodes.forEach((n, i) => {
-    const angle = (i / Math.max(coreNodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
-    const r = coreNodes.length === 1 ? 0 : 50;
-    allPositioned.push({ ...n, x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
-  });
-
-  // Place other nodes in outer ring
-  otherNodes.forEach((n, i) => {
-    const angle = (i / Math.max(otherNodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
-    allPositioned.push({ ...n, x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
-  });
-
-  const nodeMap = {};
-  allPositioned.forEach(n => { nodeMap[n.id] = n; });
-
-  // Draw edges
-  const edgesHtml = edges.map(e => {
-    const s = nodeMap[e.source], t = nodeMap[e.target];
-    if (!s || !t) return '';
-    return `<line x1="${s.x}" y1="${s.y}" x2="${t.x}" y2="${t.y}" stroke="#a4c9ff" stroke-width="2" stroke-dasharray="6,4"/>`;
-  }).join('');
-
-  // Draw nodes
-  const nodesHtml = allPositioned.map(n => {
-    const isCore = n.level === 'core';
-    const r = isCore ? 36 : 28;
-    const fill = isCore ? '#005da7' : '#f2f4f6';
-    const stroke = isCore ? '#004883' : '#c1c7d3';
-    const textColor = isCore ? 'white' : '#414751';
-    const fontSize = isCore ? 11 : 10;
-    // Word wrap: split name into lines of ~4 chars
-    const name = n.name;
-    const lines = name.length > 5 ? [name.substring(0, Math.ceil(name.length/2)), name.substring(Math.ceil(name.length/2))] : [name];
-    const textHtml = lines.map((line, i) =>
-      `<tspan x="${n.x}" dy="${i === 0 ? -((lines.length - 1) * 6) : 14}" text-anchor="middle">${line}</tspan>`
-    ).join('');
-    return `<circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="2" class="drop-shadow-sm"/>` +
-      `<text x="${n.x}" y="${n.y + 4}" text-anchor="middle" fill="${textColor}" font-family="Manrope" font-weight="700" font-size="${fontSize}">${textHtml}</text>`;
-  }).join('');
+  // Color palette by level
+  const levelColors = {
+    core:         { background: '#005da7', border: '#004883', font: { color: '#ffffff' } },
+    prerequisite: { background: '#e8f0fe', border: '#a4c9ff', font: { color: '#191c1e' } },
+    extension:    { background: '#f0fdf4', border: '#86efac', font: { color: '#191c1e' } },
+  };
 
   chatHistory.innerHTML += `
     <div class="flex gap-4">
@@ -280,17 +240,59 @@ function renderKnowledgeGraph(data) {
           <p class="font-headline text-2xl font-bold tracking-tight text-primary">${graph.topic} 知识图谱</p>
           <p class="font-body text-on-surface-variant leading-relaxed">${data.message}</p>
         </div>
-        <div class="bg-white rounded-[2.5rem] border border-slate-100 p-6 shadow-sm overflow-hidden">
-          <svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-height: 420px;" xmlns="http://www.w3.org/2000/svg">
-            ${edgesHtml}
-            ${nodesHtml}
-          </svg>
-          <div class="text-center mt-4">
+        <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden" style="padding: 0;">
+          <div id="${containerId}" style="height: 420px; width: 100%;"></div>
+          <div class="text-center py-4">
             <a href="diagnosis.html?session_id=${currentSessionId}" class="inline-block bg-secondary text-white py-3 px-8 rounded-full font-headline font-bold tracking-wide shadow-md hover:bg-secondary/90 transition-all text-sm">Start Diagnosis</a>
           </div>
         </div>
       </div>
     </div>`;
+
+  // Build vis.js data after DOM is ready
+  setTimeout(() => {
+    const container = document.getElementById(containerId);
+    if (!container || typeof vis === 'undefined') return;
+
+    const visNodes = new vis.DataSet(graphNodes.map(n => {
+      const colors = levelColors[n.level] || levelColors.prerequisite;
+      const isCore = n.level === 'core';
+      return {
+        id: n.id,
+        label: n.name,
+        title: n.description,
+        size: isCore ? 30 : 22,
+        shape: 'dot',
+        color: colors,
+        font: { ...colors.font, size: isCore ? 14 : 12, face: 'Manrope', bold: isCore },
+        borderWidth: 2,
+        shadow: { enabled: true, size: 6, color: 'rgba(0,0,0,0.08)' },
+      };
+    }));
+
+    const visEdges = new vis.DataSet(graphEdges.map(e => ({
+      from: e.source,
+      to: e.target,
+      arrows: { to: { enabled: true, scaleFactor: 0.6 } },
+      color: { color: '#c1c7d3', highlight: '#005da7', hover: '#005da7' },
+      width: 1.5,
+      smooth: { type: 'continuous' },
+    })));
+
+    new vis.Network(container, { nodes: visNodes, edges: visEdges }, {
+      physics: {
+        barnesHut: { gravitationalConstant: -2500, springLength: 150, springConstant: 0.04 },
+        stabilization: { iterations: 100 },
+      },
+      interaction: {
+        hover: true,
+        tooltipDelay: 200,
+        zoomView: true,
+        dragView: true,
+      },
+      layout: { improvedLayout: true },
+    });
+  }, 50);
 }
 
 function renderDiagnosisResults(r, sessionId) {
