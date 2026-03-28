@@ -223,11 +223,11 @@ function renderKnowledgeGraph(data) {
   const graphEdges = graph.edges || [];
   const containerId = 'kg-container-' + (++_graphCounter);
 
-  // Color palette by level
-  const levelColors = {
-    core:         { background: '#005da7', border: '#004883', font: { color: '#ffffff' } },
-    prerequisite: { background: '#e8f0fe', border: '#a4c9ff', font: { color: '#191c1e' } },
-    extension:    { background: '#f0fdf4', border: '#86efac', font: { color: '#191c1e' } },
+  // Color palette by level — all labels dark for readability
+  const levelStyles = {
+    core:         { bg: '#005da7', border: '#004883', size: 28 },
+    prerequisite: { bg: '#a4c9ff', border: '#6ba3e8', size: 20 },
+    extension:    { bg: '#86efac', border: '#4ade80', size: 18 },
   };
 
   chatHistory.innerHTML += `
@@ -242,7 +242,12 @@ function renderKnowledgeGraph(data) {
         </div>
         <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden" style="padding: 0;">
           <div id="${containerId}" style="height: 420px; width: 100%;"></div>
-          <div class="text-center py-4">
+          <div class="flex items-center justify-center gap-6 py-3 border-t border-slate-100">
+            <span class="flex items-center gap-1.5 text-xs text-on-surface-variant"><span class="w-3 h-3 rounded-full" style="background:#005da7;"></span>核心知识点</span>
+            <span class="flex items-center gap-1.5 text-xs text-on-surface-variant"><span class="w-3 h-3 rounded-full" style="background:#a4c9ff;"></span>前置知识</span>
+            <span class="flex items-center gap-1.5 text-xs text-on-surface-variant"><span class="w-3 h-3 rounded-full" style="background:#86efac;"></span>拓展知识</span>
+          </div>
+          <div class="text-center pb-4">
             <a href="diagnosis.html?session_id=${currentSessionId}" class="inline-block bg-secondary text-white py-3 px-8 rounded-full font-headline font-bold tracking-wide shadow-md hover:bg-secondary/90 transition-all text-sm">Start Diagnosis</a>
           </div>
         </div>
@@ -255,18 +260,28 @@ function renderKnowledgeGraph(data) {
     if (!container || typeof vis === 'undefined') return;
 
     const visNodes = new vis.DataSet(graphNodes.map(n => {
-      const colors = levelColors[n.level] || levelColors.prerequisite;
+      const style = levelStyles[n.level] || levelStyles.prerequisite;
       const isCore = n.level === 'core';
       return {
         id: n.id,
         label: n.name,
-        title: n.description,
-        size: isCore ? 30 : 22,
+        title: n.description || n.name,
+        size: style.size,
         shape: 'dot',
-        color: colors,
-        font: { ...colors.font, size: isCore ? 14 : 12, face: 'Manrope', bold: isCore },
-        borderWidth: 2,
-        shadow: { enabled: true, size: 6, color: 'rgba(0,0,0,0.08)' },
+        color: {
+          background: style.bg,
+          border: style.border,
+          highlight: { background: '#005da7', border: '#004883' },
+          hover: { background: '#005da7', border: '#004883' },
+        },
+        font: {
+          color: '#191c1e',
+          size: isCore ? 14 : 12,
+          face: 'Manrope, sans-serif',
+          bold: { color: '#191c1e', size: 14, face: 'Manrope, sans-serif' },
+        },
+        borderWidth: isCore ? 3 : 2,
+        shadow: { enabled: true, size: 8, color: 'rgba(0,0,0,0.1)' },
       };
     }));
 
