@@ -110,7 +110,7 @@ async def get_state(session_id: str) -> dict:
     if not state:
         return {"mode": "chat", "session_id": session_id}
 
-    return {
+    result = {
         "session_id": session_id,
         "mode": state.get("mode", "chat"),
         "topic": state.get("topic"),
@@ -119,3 +119,18 @@ async def get_state(session_id: str) -> dict:
         "has_result": state.get("diagnosis_result") is not None,
         "has_lesson": state.get("lesson_content") is not None,
     }
+
+    # Include full data when available
+    kg = state.get("knowledge_graph")
+    if kg:
+        result["graph"] = kg.model_dump() if hasattr(kg, "model_dump") else kg
+
+    dr = state.get("diagnosis_result")
+    if dr:
+        result["diagnosis_result"] = dr.model_dump() if hasattr(dr, "model_dump") else dr
+
+    lc = state.get("lesson_content")
+    if lc:
+        result["lesson_content"] = lc
+
+    return result
