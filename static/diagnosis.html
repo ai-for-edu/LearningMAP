@@ -139,77 +139,77 @@
   </div>
 </main>
 
-<script src="session-data.js"></script>
+<script src="api.js"></script>
 <script>
-const questions = getSessionData().questions;
-
-// Init first question display
-(function() {
-  const q = questions[0];
-  document.getElementById('knowledgeTagText').textContent = q.knowledge;
-  document.getElementById('questionText').textContent = q.question;
-  document.getElementById('optA').textContent = q.options[0];
-  document.getElementById('optB').textContent = q.options[1];
-  document.getElementById('optC').textContent = q.options[2];
-  document.getElementById('optD').textContent = q.options[3];
-})();
-
-let currentQuestion = 0;
+let sessionId = getSessionId();
 let selectedOption = -1;
 
-function selectOption(btn, index) {
-  // Clear previous selection
-  document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-  // Select current
-  btn.classList.add('selected');
-  selectedOption = index;
-  // Enable next button
-  document.getElementById('nextBtn').disabled = false;
-}
-
-function nextQuestion() {
-  if (selectedOption === -1) return;
-
-  currentQuestion++;
-
-  if (currentQuestion >= questions.length) {
-    // Diagnosis complete — show completion state
-    document.querySelector('main').innerHTML = `
-      <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <span class="material-symbols-outlined text-6xl text-secondary mb-6" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-        <p class="font-headline text-3xl font-extrabold text-on-surface mb-3">Diagnosis Complete</p>
-        <p class="font-body text-on-surface-variant mb-8">You answered all 10 questions. View your knowledge map to see the results.</p>
-        <a href="results.html" class="inline-block bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">
-          View Results
-        </a>
-      </div>
-    `;
-    document.getElementById('progressBar').style.width = '100%';
-    document.getElementById('progressText').textContent = 'Completed';
+async function initDiagnosis() {
+  if (!sessionId) {
+    alert('请先从主页选择学习主题');
+    window.location.href = '/';
     return;
   }
+  try {
+    const data = await sendMessage('开始诊断', sessionId);
+    sessionId = data.session_id;
+    if (data.mode === 'quiz' && data.data?.question) {
+      renderQuestion(data.data.question, data.data.progress);
+    }
+  } catch (err) {
+    document.getElementById('questionText').textContent = '加载失败: ' + err.message;
+  }
+}
 
-  // Load next question
-  const q = questions[currentQuestion];
-  document.getElementById('knowledgeTagText').textContent = q.knowledge;
+function renderQuestion(q, progress) {
+  const [cur, total] = progress.split('/').map(Number);
+  document.getElementById('progressText').textContent = `Question ${cur} / ${total}`;
+  document.getElementById('progressBar').style.width = `${(cur / total) * 100}%`;
+  document.getElementById('knowledgeTagText').textContent = q.knowledge_point;
   document.getElementById('questionText').textContent = q.question;
   document.getElementById('optA').textContent = q.options[0];
   document.getElementById('optB').textContent = q.options[1];
   document.getElementById('optC').textContent = q.options[2];
   document.getElementById('optD').textContent = q.options[3];
-  document.getElementById('progressText').textContent = `Question ${currentQuestion + 1} / ${questions.length}`;
-  document.getElementById('progressBar').style.width = `${((currentQuestion + 1) / questions.length) * 100}%`;
-
-  // Update button text for last question
-  if (currentQuestion === questions.length - 1) {
-    document.getElementById('nextBtnText').textContent = 'Finish';
-  }
-
-  // Reset selection
   selectedOption = -1;
   document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('nextBtn').disabled = true;
+  document.getElementById('nextBtnText').textContent = cur >= total ? 'Finish' : 'Next Question';
 }
+
+function selectOption(btn, index) {
+  document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedOption = index;
+  document.getElementById('nextBtn').disabled = false;
+}
+
+async function nextQuestion() {
+  if (selectedOption === -1) return;
+  const letter = ['A', 'B', 'C', 'D'][selectedOption];
+  document.getElementById('nextBtn').disabled = true;
+  try {
+    const data = await sendMessage(letter, sessionId);
+    if (data.mode === 'quiz' && data.data?.question) {
+      renderQuestion(data.data.question, data.data.progress);
+    } else {
+      document.querySelector('main').innerHTML = `
+        <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
+          <span class="material-symbols-outlined text-6xl text-secondary mb-6" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+          <p class="font-headline text-3xl font-extrabold text-on-surface mb-3">Diagnosis Complete</p>
+          <p class="font-body text-on-surface-variant mb-8">${data.message}</p>
+          <a href="results.html?session_id=${sessionId}" class="inline-block bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">View Results</a>
+        </div>`;
+      document.getElementById('progressBar').style.width = '100%';
+      document.getElementById('progressText').textContent = 'Completed';
+    }
+  } catch (err) {
+    document.getElementById('questionText').textContent = '提交失败: ' + err.message;
+    document.getElementById('nextBtn').disabled = false;
+  }
+}
+
+initDiagnosis();
 </script>
 
 </body>
