@@ -6,6 +6,7 @@
 <title>OpenAILearning - Lesson</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script>
@@ -320,15 +321,44 @@
     });
   });
 
-  // Graph sidebar
-  const graphHtml = '<div class="relative z-10 w-full h-full">' +
-    '<div class="absolute top-[40%] left-1/2 -translate-x-1/2 text-center"><span class="font-headline font-extrabold text-xs tracking-widest text-slate-300">' + topic + '</span></div>' +
-    weakPoints.map((n, i) => {
-      const positions = ['top-[18%] right-[10%]', 'bottom-[22%] left-[10%]', 'top-[18%] left-[10%]', 'bottom-[22%] right-[10%]'];
-      return '<div class="absolute ' + positions[i % positions.length] + '"><div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-error ring-4 ring-error/20"></span><span class="font-headline font-bold text-xs tracking-wider text-error">' + n + '</span></div></div>';
-    }).join('') +
-    '</div>';
-  document.getElementById('lessonGraph').innerHTML = graphHtml;
+  // Graph sidebar — vis.js interactive graph
+  const graphContainer = document.getElementById('lessonGraph');
+  if (graphContainer && typeof vis !== 'undefined' && state.graph) {
+    const allNodes = state.graph.nodes || [];
+    const allEdges = state.graph.edges || [];
+    const weakSet = new Set(weakPoints);
+
+    const visNodes = new vis.DataSet(allNodes.map(n => {
+      const isWeak = weakSet.has(n.name);
+      const isCore = n.level === 'core';
+      return {
+        id: n.id,
+        label: n.name,
+        title: n.description || n.name,
+        size: isCore ? 22 : 16,
+        shape: 'dot',
+        color: {
+          background: isWeak ? '#fca5a5' : (isCore ? '#005da7' : '#a4c9ff'),
+          border: isWeak ? '#ef4444' : (isCore ? '#004883' : '#6ba3e8'),
+        },
+        font: { color: '#191c1e', size: 11, face: 'Manrope, sans-serif' },
+        borderWidth: isWeak ? 3 : 2,
+      };
+    }));
+
+    const visEdges = new vis.DataSet(allEdges.map(e => ({
+      from: e.source, to: e.target,
+      arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+      color: { color: '#c1c7d3' },
+      width: 1.5,
+      smooth: { type: 'continuous' },
+    })));
+
+    new vis.Network(graphContainer, { nodes: visNodes, edges: visEdges }, {
+      physics: { barnesHut: { gravitationalConstant: -1500, springLength: 100 }, stabilization: { iterations: 80 } },
+      interaction: { hover: true, tooltipDelay: 200, zoomView: true, dragView: true },
+    });
+  }
 })();
 
 // Outline toggle
