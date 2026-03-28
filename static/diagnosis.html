@@ -207,10 +207,16 @@ async function initDiagnosis() {
                 <span class="font-body text-sm leading-relaxed text-on-surface" id="optD"></span>
               </button>
             </div>
-            <button class="w-full bg-primary text-white py-4 px-8 rounded-2xl font-headline font-bold text-sm shadow-sm hover:shadow-md hover:bg-primary-container transition-all disabled:opacity-40 disabled:cursor-not-allowed mt-2" id="nextBtn" disabled onclick="nextQuestion()">
-              <span id="nextBtnText">Next Question</span>
-              <span class="material-symbols-outlined text-lg align-middle ml-1">arrow_forward</span>
-            </button>
+            <div class="flex gap-3 mt-2">
+              <button class="flex-1 bg-surface-container-high text-on-surface-variant py-4 px-6 rounded-2xl font-headline font-bold text-sm hover:bg-surface-container-highest transition-all disabled:opacity-30 disabled:cursor-not-allowed" id="prevBtn" disabled onclick="prevQuestion()">
+                <span class="material-symbols-outlined text-lg align-middle mr-1">arrow_back</span>
+                <span>Previous</span>
+              </button>
+              <button class="flex-1 bg-primary text-white py-4 px-6 rounded-2xl font-headline font-bold text-sm shadow-sm hover:shadow-md hover:bg-primary-container transition-all disabled:opacity-40 disabled:cursor-not-allowed" id="nextBtn" disabled onclick="nextQuestion()">
+                <span id="nextBtnText">Next Question</span>
+                <span class="material-symbols-outlined text-lg align-middle ml-1">arrow_forward</span>
+              </button>
+            </div>
           </div>
         </div>`;
       showQuestion();
@@ -237,10 +243,32 @@ function showQuestion() {
   document.getElementById('optB').textContent = q.options[1];
   document.getElementById('optC').textContent = q.options[2];
   document.getElementById('optD').textContent = q.options[3];
-  selectedOption = -1;
-  document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-  document.getElementById('nextBtn').disabled = true;
   document.getElementById('nextBtnText').textContent = (currentIndex >= total - 1) ? 'Finish' : 'Next Question';
+
+  // Previous button
+  const prevBtn = document.getElementById('prevBtn');
+  if (prevBtn) prevBtn.disabled = currentIndex === 0;
+
+  // Restore previous answer if going back
+  if (currentIndex < answers.length) {
+    selectedOption = answers[currentIndex];
+    const btns = document.querySelectorAll('.option-btn');
+    btns.forEach((b, i) => {
+      if (i === selectedOption) b.classList.add('selected');
+      else b.classList.remove('selected');
+    });
+    document.getElementById('nextBtn').disabled = false;
+  } else {
+    selectedOption = -1;
+    document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('nextBtn').disabled = true;
+  }
+}
+
+function prevQuestion() {
+  if (currentIndex <= 0) return;
+  currentIndex--;
+  showQuestion();
 }
 
 function selectOption(btn, index) {
@@ -252,7 +280,12 @@ function selectOption(btn, index) {
 
 async function nextQuestion() {
   if (selectedOption === -1) return;
-  answers.push(selectedOption);
+  // Update or push answer
+  if (currentIndex < answers.length) {
+    answers[currentIndex] = selectedOption;
+  } else {
+    answers.push(selectedOption);
+  }
   currentIndex++;
 
   if (currentIndex < allQuestions.length) {

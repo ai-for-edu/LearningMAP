@@ -8,11 +8,12 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
 from src.agent.graph import build_graph
+from src.api.store import load_session, save_session
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# In-memory session store (MVP)
+# In-memory cache backed by SQLite
 _sessions: dict[str, dict[str, Any]] = {}
 _graph = None
 
@@ -22,6 +23,36 @@ def _get_graph():
     if _graph is None:
         _graph = build_graph()
     return _graph
+
+
+_DEFAULT_STATE = {
+    "messages": [],
+    "mode": "chat",
+    "topic": None,
+    "knowledge_graph": None,
+    "current_question_index": 0,
+    "questions": [],
+    "answers": [],
+    "diagnosis_result": None,
+    "lesson_content": None,
+}
+
+
+def _get_session(session_id: str) -> dict[str, Any] | None:
+    """Get session from memory cache, falling back to SQLite."""
+    if session_id in _sessions:
+        return _sessions[session_id]
+    stored = load_session(session_id)
+    if stored:
+        _sessions[session_id] = stored
+        return stored
+    return None
+
+
+def _save(session_id: str, state: dict[str, Any]) -> None:
+    """Save session to both memory cache and SQLite."""
+    _sessions[session_id] = state
+    save_session(session_id, state)
 
 
 class ChatRequest(BaseModel):
@@ -42,17 +73,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
     session_id = req.session_id or str(uuid.uuid4())
 
     # Get or init session state
-    state = _sessions.get(session_id, {
-        "messages": [],
-        "mode": "chat",
-        "topic": None,
-        "knowledge_graph": None,
-        "current_question_index": 0,
-        "questions": [],
-        "answers": [],
-        "diagnosis_result": None,
-        "lesson_content": None,
-    })
+    state = _get_session(session_id) or dict(_DEFAULT_STATE)
 
     # Add user message
     state["messages"] = list(state.get("messages", []))
@@ -63,7 +84,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
     result = graph.invoke(state)
 
     # Save state
-    _sessions[session_id] = result
+    _save(session_id, result)
 
     # Extract response
     messages = result.get("messages", [])
@@ -106,7 +127,7 @@ class SubmitQuizRequest(BaseModel):
 @router.post("/chat/{session_id}/submit-quiz")
 async def submit_quiz(session_id: str, req: SubmitQuizRequest) -> dict:
     """Submit all quiz answers, run diagnosis only (no lesson)."""
-    state = _sessions.get(session_id)
+    state = _get_session(session_id)
     if not state:
         return {"error": "session not found"}
 
@@ -117,7 +138,7 @@ async def submit_quiz(session_id: str, req: SubmitQuizRequest) -> dict:
 
     diag_result = diagnosis_node(state)
     state.update(diag_result)
-    _sessions[session_id] = state
+    _save(session_id, state)
 
     dr = state.get("diagnosis_result")
     return {
@@ -129,7 +150,7 @@ async def submit_quiz(session_id: str, req: SubmitQuizRequest) -> dict:
 @router.post("/chat/{session_id}/generate-lesson")
 async def generate_lesson(session_id: str) -> dict:
     """Generate lesson for weak points (called from lesson page)."""
-    state = _sessions.get(session_id)
+    state = _get_session(session_id)
     if not state:
         return {"error": "session not found"}
 
@@ -137,7 +158,7 @@ async def generate_lesson(session_id: str) -> dict:
 
     lesson_result = lesson_node(state)
     state.update(lesson_result)
-    _sessions[session_id] = state
+    _save(session_id, state)
 
     return {
         "session_id": session_id,
@@ -148,7 +169,7 @@ async def generate_lesson(session_id: str) -> dict:
 @router.get("/chat/{session_id}/state")
 async def get_state(session_id: str) -> dict:
     """Get current session state for frontend UI switching."""
-    state = _sessions.get(session_id)
+    state = _get_session(session_id)
     if not state:
         return {"mode": "chat", "session_id": session_id}
 

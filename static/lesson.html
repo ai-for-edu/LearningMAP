@@ -244,18 +244,6 @@
       <p class="font-body text-xs text-on-surface-variant mt-1">薄弱知识点高亮</p>
     </div>
     <div class="flex-grow flex items-center justify-center p-6 relative" id="lessonGraph"></div>
-    <div class="p-6 border-t border-slate-100">
-      <p class="font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest mb-3">学习进度</p>
-      <div class="space-y-2">
-        <div class="flex items-center justify-between">
-          <span class="font-body text-xs text-on-surface-variant" id="lessonProgressLabel"></span>
-          <span class="font-label text-xs font-semibold text-on-surface-variant" id="lessonProgressNum">第 1/1 节</span>
-        </div>
-        <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-          <div class="h-full bg-primary rounded-full" style="width: 0%" id="lessonProgressBar"></div>
-        </div>
-      </div>
-    </div>
   </div>
 
 </main>
@@ -341,35 +329,6 @@
     }).join('') +
     '</div>';
   document.getElementById('lessonGraph').innerHTML = graphHtml;
-
-  // Progress — bind after content rendered
-  document.getElementById('lessonProgressLabel').textContent = weakPoints.join(' / ') || topic;
-  const totalSections = headings.length || 1;
-  document.getElementById('lessonProgressNum').textContent = `第 1/${totalSections} 节`;
-
-  const scrollContainer = document.getElementById('lessonScroll');
-  const progressBar = document.getElementById('lessonProgressBar');
-  const progressNum = document.getElementById('lessonProgressNum');
-  const allSections = document.querySelectorAll('.lesson-section h2[id], .lesson-section h3[id]');
-
-  function updateProgress() {
-    const scrollTop = scrollContainer.scrollTop;
-    const scrollHeight = scrollContainer.scrollHeight - scrollContainer.clientHeight;
-    if (scrollHeight <= 0) return;
-    const percent = Math.min(Math.round((scrollTop / scrollHeight) * 100), 100);
-    progressBar.style.width = percent + '%';
-
-    let current = 0;
-    allSections.forEach((h, i) => {
-      const rect = h.getBoundingClientRect();
-      const containerRect = scrollContainer.getBoundingClientRect();
-      if (rect.top - containerRect.top < containerRect.height * 0.5) current = i;
-    });
-    progressNum.textContent = `第 ${current + 1}/${allSections.length || 1} 节`;
-  }
-
-  scrollContainer.addEventListener('scroll', updateProgress);
-  updateProgress();
 })();
 
 // Outline toggle
