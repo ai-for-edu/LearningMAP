@@ -154,17 +154,75 @@ async function initDiagnosis() {
     return;
   }
   try {
-    document.getElementById('questionText').textContent = '正在生成题目...';
+    // Show full-screen loading spinner
+    document.querySelector('main').innerHTML = `
+      <div class="max-w-6xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh]">
+        <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <p class="font-headline font-bold text-lg text-on-surface">正在生成诊断题目</p>
+        <p class="font-body text-sm text-on-surface-variant mt-2">AI 正在根据知识图谱出题，请稍候...</p>
+      </div>`;
+    document.getElementById('progressText').textContent = 'Loading...';
+    document.getElementById('progressBar').style.width = '0%';
+
     const data = await sendMessage('开始诊断', sessionId);
     sessionId = data.session_id;
     if (data.mode === 'quiz' && data.data?.questions) {
       allQuestions = data.data.questions;
       currentIndex = 0;
       answers = [];
+      // Restore quiz UI
+      document.querySelector('main').innerHTML = `
+        <div class="max-w-6xl mx-auto w-full flex gap-8">
+          <div class="flex-1 flex flex-col">
+            <div class="bg-white rounded-3xl border border-slate-100 p-10 flex-grow shadow-sm">
+              <div class="mb-6">
+                <span class="inline-flex items-center gap-1.5 bg-primary-fixed text-primary px-3 py-1 rounded-full text-xs font-headline font-bold">
+                  <span class="material-symbols-outlined text-sm">label</span>
+                  <span id="knowledgeTagText"></span>
+                </span>
+              </div>
+              <p class="font-headline text-xl font-bold text-on-surface leading-relaxed mb-2" id="questionText"></p>
+              <p class="font-body text-sm text-on-surface-variant">Select one answer</p>
+            </div>
+          </div>
+          <div class="w-[420px] flex flex-col gap-4">
+            <div class="flex flex-col gap-3" id="optionsContainer">
+              <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 0)">
+                <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">A</span>
+                <span class="font-body text-sm leading-relaxed text-on-surface" id="optA"></span>
+              </button>
+              <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 1)">
+                <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">B</span>
+                <span class="font-body text-sm leading-relaxed text-on-surface" id="optB"></span>
+              </button>
+              <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 2)">
+                <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">C</span>
+                <span class="font-body text-sm leading-relaxed text-on-surface" id="optC"></span>
+              </button>
+              <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 3)">
+                <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">D</span>
+                <span class="font-body text-sm leading-relaxed text-on-surface" id="optD"></span>
+              </button>
+            </div>
+            <button class="w-full bg-primary text-white py-4 px-8 rounded-2xl font-headline font-bold text-sm shadow-sm hover:shadow-md hover:bg-primary-container transition-all disabled:opacity-40 disabled:cursor-not-allowed mt-2" id="nextBtn" disabled onclick="nextQuestion()">
+              <span id="nextBtnText">Next Question</span>
+              <span class="material-symbols-outlined text-lg align-middle ml-1">arrow_forward</span>
+            </button>
+          </div>
+        </div>`;
       showQuestion();
     }
   } catch (err) {
-    document.getElementById('questionText').textContent = '加载失败: ' + err.message;
+    document.querySelector('main').innerHTML = `
+      <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <span class="material-symbols-outlined text-4xl text-error mb-4">error</span>
+        <p class="font-headline font-bold text-on-surface mb-2">加载失败</p>
+        <p class="font-body text-sm text-on-surface-variant mb-6">${err.message}</p>
+        <a href="/" class="text-primary font-headline font-bold text-sm hover:underline">返回主页</a>
+      </div>`;
   }
 }
 

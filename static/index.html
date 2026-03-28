@@ -5,6 +5,7 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>OpenAILearning - Scholar Minimal</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -312,7 +313,23 @@ function renderDiagnosisResults(r, sessionId) {
     </div>`;
 }
 
-// On load: clean page, then check if returning from diagnosis
+function renderLessonInChat(lessonContent, sessionId) {
+  const chatHistory = document.getElementById('chatHistory');
+  // Use marked.js if available, otherwise plain text
+  const html = (typeof marked !== 'undefined') ? marked.parse(lessonContent) : lessonContent.replace(/\n/g, '<br>');
+  chatHistory.innerHTML += `
+    <div class="flex gap-4">
+      <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
+        <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+      </div>
+      <div class="flex-grow space-y-4">
+        <p class="font-headline text-2xl font-bold tracking-tight text-primary">个性化教案</p>
+        <div class="prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${html}</div>
+      </div>
+    </div>`;
+}
+
+// On load: rebuild conversation from state if returning from diagnosis/lesson
 (async function init() {
   const chatHistory = document.getElementById('chatHistory');
   chatHistory.innerHTML = '';
@@ -322,12 +339,35 @@ function renderDiagnosisResults(r, sessionId) {
   const sid = params.get('session_id');
   const show = params.get('show');
 
-  if (sid && show === 'results') {
-    currentSessionId = sid;
-    const state = await getSessionState(sid);
-    if (state.diagnosis_result) {
-      renderDiagnosisResults(state.diagnosis_result, sid);
+  if (!sid) return;
+
+  currentSessionId = sid;
+  const state = await getSessionState(sid);
+
+  // Rebuild conversation: topic → knowledge graph → diagnosis → lesson
+  if (state.topic) {
+    // User message
+    chatHistory.innerHTML += `
+      <div class="flex justify-end">
+        <div class="bg-surface-container-low px-6 py-4 rounded-3xl rounded-tr-none max-w-[85%] text-on-surface shadow-sm">
+          <p class="font-body leading-relaxed">我想学习${state.topic}</p>
+        </div>
+      </div>`;
+
+    // Knowledge graph (if available)
+    if (state.graph) {
+      renderKnowledgeGraph({ data: { graph: state.graph }, message: `我已经为你梳理了「${state.topic}」的知识图谱。`, session_id: sid });
     }
+  }
+
+  // Diagnosis results
+  if (state.diagnosis_result && (show === 'results' || show === 'lesson')) {
+    renderDiagnosisResults(state.diagnosis_result, sid);
+  }
+
+  // Lesson content
+  if (state.lesson_content && show === 'lesson') {
+    renderLessonInChat(state.lesson_content, sid);
   }
 })();
 </script>

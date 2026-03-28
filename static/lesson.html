@@ -211,7 +211,7 @@
 
       <!-- Finish Button -->
       <div class="text-center py-10">
-        <a href="index.html" class="inline-flex items-center gap-2 bg-secondary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">
+        <a id="finishBtn" href="/" class="inline-flex items-center gap-2 bg-secondary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">
           <span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
           Finish Learning
         </a>
@@ -250,7 +250,8 @@
   if (!sessionId) { window.location.href = '/'; return; }
 
   // Update back link
-  document.getElementById('backLink').href = 'results.html?session_id=' + sessionId;
+  document.getElementById('backLink').href = '/?session_id=' + sessionId + '&show=results';
+  document.getElementById('finishBtn').href = '/?session_id=' + sessionId + '&show=lesson';
 
   const state = await getSessionState(sessionId);
   const topic = state.topic || '';
