@@ -1,19 +1,27 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
 from src.api.chat import router as chat_router
 
+load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
 app = FastAPI(title="OpenAILearning API", version="0.1.0")
 
+# CORS: 从 .env 读取 ALLOWED_ORIGINS，默认允许所有（开发阶段）
+# 生产环境在 .env 中设置：ALLOWED_ORIGINS=https://yourdomain.com,https://another.com
+_origins = os.environ.get("ALLOWED_ORIGINS", "*")
+_origin_list = ["*"] if _origins == "*" else [o.strip() for o in _origins.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],
+    allow_origins=_origin_list,
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
