@@ -327,18 +327,72 @@ CDN 库：
 
 ---
 
-## 启动方式
+## 安装与部署
+
+### 1. 环境要求
+
+- **Python 3.11+**（项目通过 `.python-version` 锁定 3.11）
+- **uv**（Python 包管理器，替代 pip + venv）
+- **Git**
+- 一个 OpenAI 兼容的 API Key（支持 OpenAI、Anthropic 代理、DeepSeek 等）
+
+如果没有 uv，先安装：
 
 ```bash
-# 安装依赖
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+安装后重启终端，或执行 `source ~/.zshrc`（macOS）/ `source ~/.bashrc`（Linux）使 `uv` 命令生效。
+
+### 2. 克隆 + 安装依赖
+
+```bash
+git clone <仓库地址>
+cd openail
+
+# uv 会自动安装 Python 3.11（如果本地没有）并创建虚拟环境
 uv sync
+```
 
-# 配置 API 密钥
-# 编辑 .env 文件，设置 OPENAI_API_KEY、OPENAI_BASE_URL、LLM_MODEL
+执行完成后，项目根目录下会出现 `.venv/` 虚拟环境目录，所有依赖已安装。
 
-# 启动服务
-uv run python run/serve.py  # 访问 http://localhost:8080
+### 3. 配置 .env
 
-# 运行测试
+在项目根目录创建 `.env` 文件（已被 `.gitignore` 忽略，不会提交到 Git）：
+
+```bash
+# .env
+OPENAI_API_KEY=你的API密钥
+OPENAI_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=gpt-4o
+```
+
+**不同 API 提供商的配置示例：**
+
+| 提供商 | OPENAI_BASE_URL | LLM_MODEL |
+|--------|----------------|-----------|
+| OpenAI 官方 | `https://api.openai.com/v1` | `gpt-4o` |
+| DeepSeek | `https://api.deepseek.com/v1` | `deepseek-chat` |
+| 第三方代理 | `https://你的代理地址/v1` | 代理支持的模型名 |
+
+> 只要 API 兼容 OpenAI 的 `/v1/chat/completions` 接口格式即可。
+
+### 4. 启动 + 访问
+
+```bash
+uv run python run/serve.py
+```
+
+看到以下输出表示启动成功：
+
+```
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+```
+
+打开浏览器访问 **http://localhost:8080**，即可使用。
+
+**运行测试（可选）：**
+
+```bash
 uv run python -m pytest tests/ -v
 ```
