@@ -211,4 +211,14 @@ async def get_state(session_id: str) -> dict:
         result["questions"] = [q.model_dump() if hasattr(q, "model_dump") else q for q in questions]
         result["answers"] = state.get("answers", [])
 
+    # Messages for export
+    messages = state.get("messages", [])
+    if messages:
+        result["messages"] = [
+            {"role": "ai" if getattr(m, "type", "human") == "ai" else "user", "content": m.content}
+            if hasattr(m, "content")
+            else {"role": "user", "content": str(m)}
+            for m in messages
+        ]
+
     return result

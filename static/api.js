@@ -79,6 +79,19 @@ function buildMarkdownReport(state) {
   const topic = state.topic || '未命名主题';
   let md = `# 学习报告：${topic}\n\n`;
 
+  // 对话记录
+  const messages = state.messages || [];
+  if (messages.length > 0) {
+    md += `## 对话记录\n\n`;
+    for (const m of messages) {
+      const role = m.role === 'ai' ? 'AI' : '学生';
+      // 截断过长的 AI 消息（教案等）
+      const content = m.content.length > 200 ? m.content.substring(0, 200) + '...' : m.content;
+      md += `- **${role}：** ${content}\n`;
+    }
+    md += '\n';
+  }
+
   // 知识图谱
   if (state.graph && state.graph.nodes) {
     md += `## 知识图谱\n\n`;
