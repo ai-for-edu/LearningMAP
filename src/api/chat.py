@@ -205,4 +205,10 @@ async def get_state(session_id: str) -> dict:
     if lc:
         result["lesson_content"] = lc
 
+    # Questions and answers for export
+    questions = state.get("questions", [])
+    if questions:
+        result["questions"] = [q.model_dump() if hasattr(q, "model_dump") else q for q in questions]
+        result["answers"] = state.get("answers", [])
+
     return result

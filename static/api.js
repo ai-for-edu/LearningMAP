@@ -49,3 +49,90 @@ async function getSessionState(sessionId) {
   if (!resp.ok) throw new Error(`API error: ${resp.status}`);
   return resp.json();
 }
+
+// 导出会话
+async function exportSession(sessionId, format) {
+  const state = await getSessionState(sessionId);
+  let content, filename, mime;
+  const name = (state.topic || 'session').replace(/[/\\?%*:|"<>]/g, '-');
+
+  if (format === 'json') {
+    content = JSON.stringify(state, null, 2);
+    filename = `${name}-${sessionId.substring(0, 8)}.json`;
+    mime = 'application/json';
+  } else {
+    content = buildMarkdownReport(state);
+    filename = `${name}-${sessionId.substring(0, 8)}.md`;
+    mime = 'text/markdown';
+  }
+
+  const blob = new Blob([content], { type: mime + ';charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function buildMarkdownReport(state) {
+  const topic = state.topic || '未命名主题';
+  let md = `# 学习报告：${topic}\n\n`;
+
+  // 知识图谱
+  if (state.graph && state.graph.nodes) {
+    md += `## 知识图谱\n\n`;
+    md += `| 知识点 | 层级 | 描述 |\n|--------|------|------|\n`;
+    const levelMap = { prerequisite: '前置', core: '核心', extension: '拓展' };
+    for (const n of state.graph.nodes) {
+      md += `| ${n.name} | ${levelMap[n.level] || n.level} | ${n.description} |\n`;
+    }
+    md += '\n';
+  }
+
+  // 诊断测验
+  const questions = state.questions || [];
+  const answers = state.answers || [];
+  if (questions.length > 0) {
+    md += `## 诊断测验\n\n`;
+    const letters = ['A', 'B', 'C', 'D'];
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      const studentIdx = i < answers.length ? answers[i] : -1;
+      const correctIdx = q.answer;
+      const isCorrect = studentIdx === correctIdx;
+      const mark = studentIdx === -1 ? '未作答' : (isCorrect ? '✓' : '✗');
+
+      md += `### 第 ${i + 1} 题（${q.knowledge_point}）${mark}\n\n`;
+      md += `**题目：** ${q.question}\n\n`;
+      for (let j = 0; j < q.options.length; j++) {
+        let prefix = `${letters[j]}) ${q.options[j]}`;
+        if (j === studentIdx && j === correctIdx) prefix += ' ← 学生答案 ✓';
+        else if (j === studentIdx) prefix += ' ← 学生答案 ✗';
+        else if (j === correctIdx) prefix += ' ← 正确答案';
+        md += `- ${prefix}\n`;
+      }
+      md += '\n';
+    }
+  }
+
+  // 诊断结果
+  const r = state.diagnosis_result;
+  if (r) {
+    md += `## 诊断结果\n\n`;
+    md += `**正确率：${r.score}%**（${r.correct}/${r.total}）\n\n`;
+    md += `| 知识点 | 状态 | 详情 |\n|--------|------|------|\n`;
+    const statusMap = { mastered: '已掌握 ✓', weak: '需复习 ✗', skipped: '已跳过 —' };
+    for (const b of r.breakdown) {
+      md += `| ${b.name} | ${statusMap[b.status] || b.status} | ${b.detail} |\n`;
+    }
+    md += '\n';
+  }
+
+  // 个性化教案
+  if (state.lesson_content) {
+    md += `## 个性化教案\n\n${state.lesson_content}\n`;
+  }
+
+  return md;
+}

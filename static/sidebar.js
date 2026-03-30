@@ -123,7 +123,21 @@
         showDeleteConfirm(session.id, session.name);
       });
 
+      // Export button
+      const exportBtn = document.createElement('button');
+      exportBtn.className =
+        'w-full flex items-center gap-2 px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-high transition-colors text-left';
+      exportBtn.innerHTML =
+        '<span class="material-symbols-outlined text-base">download</span>' +
+        '<span>Export</span>';
+      exportBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        menu.classList.add('hidden');
+        showExportChoice(session.id);
+      });
+
       menu.appendChild(renameBtn);
+      menu.appendChild(exportBtn);
       menu.appendChild(deleteBtn);
       wrapper.appendChild(item);
       wrapper.appendChild(menuBtn);
@@ -192,6 +206,50 @@
     document.getElementById('confirmDelete').addEventListener('click', function () {
       deleteSession(sessionId);
       overlay.remove();
+    });
+  }
+
+  function showExportChoice(sessionId) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-black/30 flex items-center justify-center z-[100]';
+
+    overlay.innerHTML =
+      '<div class="bg-white rounded-3xl p-8 max-w-sm mx-4 shadow-xl">' +
+      '  <div class="flex items-center gap-3 mb-4">' +
+      '    <span class="material-symbols-outlined text-primary text-2xl">download</span>' +
+      '    <h3 class="font-headline font-bold text-lg text-on-surface">Export Session</h3>' +
+      '  </div>' +
+      '  <p class="font-body text-sm text-on-surface-variant mb-6">选择导出格式：</p>' +
+      '  <div class="flex gap-3">' +
+      '    <button id="exportMd" class="flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-slate-200 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">' +
+      '      <span class="material-symbols-outlined text-2xl text-primary">description</span>' +
+      '      <span class="font-headline font-bold text-sm">Markdown</span>' +
+      '      <span class="text-xs text-on-surface-variant">学习报告</span>' +
+      '    </button>' +
+      '    <button id="exportJson" class="flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-slate-200 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">' +
+      '      <span class="material-symbols-outlined text-2xl text-primary">data_object</span>' +
+      '      <span class="font-headline font-bold text-sm">JSON</span>' +
+      '      <span class="text-xs text-on-surface-variant">结构化数据</span>' +
+      '    </button>' +
+      '  </div>' +
+      '  <button id="exportCancel" class="w-full mt-4 px-5 py-2.5 rounded-xl text-sm font-headline font-bold text-on-surface-variant hover:bg-slate-100 transition-colors">Cancel</button>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) overlay.remove();
+    });
+    document.getElementById('exportCancel').addEventListener('click', function () {
+      overlay.remove();
+    });
+    document.getElementById('exportMd').addEventListener('click', function () {
+      overlay.remove();
+      if (typeof exportSession === 'function') exportSession(sessionId, 'markdown');
+    });
+    document.getElementById('exportJson').addEventListener('click', function () {
+      overlay.remove();
+      if (typeof exportSession === 'function') exportSession(sessionId, 'json');
     });
   }
 
