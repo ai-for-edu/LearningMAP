@@ -202,7 +202,7 @@ openail/
 | POST | `/api/chat` | 发送消息，运行状态机 | `{session_id?, message}` | `{session_id, mode, message, data}` |
 | POST | `/api/chat/{id}/submit-quiz` | 提交答题答案，运行诊断 | `{answers: [int]}` | `{session_id, diagnosis_result}` |
 | POST | `/api/chat/{id}/generate-lesson` | 生成个性化教案 | — | `{session_id, lesson_content}` |
-| GET | `/api/chat/{id}/state` | 获取会话完整状态 | — | 包含图谱、结果、教案的完整状态 |
+| GET | `/api/chat/{id}/state` | 获取会话完整状态（含导出数据） | — | 图谱、结果、教案、题目、答案、消息历史 |
 | GET | `/health` | 健康检查 | — | `{status: "ok"}` |
 
 ### 响应 `mode` 取值
@@ -299,9 +299,20 @@ CDN 库：
 └── DOMPurify             # XSS 消毒
 
 本地脚本：
-├── api.js      # 共享：API 请求、escapeHtml、safeMarkdown
-└── sidebar.js  # 共享：会话列表管理
+├── api.js      # 共享：API 请求、escapeHtml、safeMarkdown、exportSession
+└── sidebar.js  # 共享：会话列表管理（Rename / Export / Delete）
 ```
+
+### 会话导出
+
+侧边栏三点菜单 → **Export** → 选择格式：
+
+| 格式 | 说明 | 内容 |
+|------|------|------|
+| **Markdown** | 学习报告，适合阅读和分享 | 对话记录 → 知识图谱表格 → 诊断题目（含学生答案/正确答案）→ 诊断结果 → 个性化教案 |
+| **JSON** | 结构化数据，适合程序处理 | state API 返回的完整原始数据 |
+
+导出在浏览器端完成，不需要额外后端接口。从 `GET /api/chat/{id}/state` 获取数据，前端组装后触发文件下载。
 
 ### 会话命名策略
 
@@ -317,7 +328,7 @@ CDN 库：
 | 威胁 | 防护手段 |
 |------|---------|
 | XSS 跨站脚本 | 所有用户内容使用 `escapeHtml()` 转义，Markdown 使用 DOMPurify 消毒 |
-| CORS 跨域 | 限制来源为 `localhost:8080`，关闭 credentials |
+| CORS 跨域 | 通过 `ALLOWED_ORIGINS` 环境变量配置，默认允许所有（开发），生产可限定域名 |
 | 输入验证 | 消息最长 5000 字符，答案索引限制 0-3 |
 | SQL 注入 | 使用 `?` 参数化查询 |
 | 阻塞 I/O | LLM 调用通过 `asyncio.to_thread` 异步化 |
@@ -365,6 +376,7 @@ uv sync
 OPENAI_API_KEY=你的API密钥
 OPENAI_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=gpt-4o
+# ALLOWED_ORIGINS=https://yourdomain.com  # 可选，生产环境限定 CORS 来源
 ```
 
 **不同 API 提供商的配置示例：**
