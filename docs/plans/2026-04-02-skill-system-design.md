@@ -4,6 +4,97 @@
 
 让老师/教育者通过上传 SKILL.md 文件定义教学方法，系统在对话、出题、教案等环节自动识别并应用对应的教学策略。
 
+---
+
+## 与 OpenClaw Skill 系统的架构差异
+
+OpenClaw 和 OpenAILearning 都使用 SKILL.md 文件定义 skill，但两者的底层架构完全不同，导致 skill 的格式和使用方式有本质区别。
+
+### 架构对比
+
+```
+OpenClaw：单 Agent 持续会话
+┌─────────────────────────────────┐
+│           Claude Agent          │
+│  ┌─────────────────────────┐   │
+│  │     System Prompt       │   │
+│  │  + skill 目录（摘要）    │   │
+│  └─────────────────────────┘   │
+│                                 │
+│  用户消息 → Agent 判断 →        │
+│  读取 SKILL.md → 按指令执行     │
+│  （Agent 一直在，记得 skill）    │
+└─────────────────────────────────┘
+
+OpenAILearning：多节点状态机，每个节点独立调 LLM
+┌──────────┐  ┌──────────┐  ┌──────┐  ┌────────┐
+│  intent  │→│  graph   │→│ quiz │→│ lesson │
+│ (LLM 1) │  │ (LLM 2) │  │(LLM 3)│  │(LLM 4) │
+└──────────┘  └──────────┘  └──────┘  └────────┘
+  每个节点是独立的 LLM 调用，互不知道彼此
+  skill 内容必须在每个需要的节点重复注入
+```
+
+### 这导致的三个关键差异
+
+**差异 1：Skill 内容的注入方式不同**
+
+| | OpenClaw | OpenAILearning |
+|---|---|---|
+| Agent 加载 skill 后... | Agent 记住了，后续所有对话自然遵循 | 每个节点是独立 LLM 调用，不记得上一个节点的 skill |
+| 所以... | Skill body 写一份通用指令即可 | Skill body 需要按节点分段，每个节点只注入自己需要的那段 |
+
+**差异 2：Skill body 的结构不同**
+
+OpenClaw 的 skill body 是给**一个 Agent** 看的通用指令：
+
+```markdown
+# GitHub Skill
+## When to Use
+- 当用户提到 PR、issue、CI 时使用
+## Common Commands
+### Pull Requests
+gh pr list ...
+### Issues
+gh issue create ...
+```
+
+我们的 skill body 需要按**环节**分段，因为不同环节是不同的 LLM 调用：
+
+```markdown
+# 费曼学习法
+## 对话指令（注入到 chat 节点）
+不直接给答案，引导学生自己解释...
+
+## 出题指令（注入到 quiz 节点）
+题目设计应侧重理解而非记忆...
+
+## 教案指令（注入到 lesson 节点）
+每个知识点后加"自我检测"环节...
+```
+
+**差异 3：匹配时机不同**
+
+| | OpenClaw | OpenAILearning |
+|---|---|---|
+| 判断频率 | 每条消息，Agent 自主决定 | 每条消息，intent 节点 LLM 判断 |
+| 判断方式 | Agent 在持续对话中自然理解上下文 | intent 节点只看当前消息 + skill 摘要列表 |
+| 加载方式 | Agent 用 read 工具读取文件 | 后端代码直接读文件，注入到 prompt |
+
+### 总结：我们借鉴了什么，改变了什么
+
+| 借鉴自 OpenClaw | 我们的适配 |
+|---|---|
+| SKILL.md 文件格式（YAML frontmatter + Markdown body） | 相同 |
+| description 放 frontmatter，触发判断用 | 相同 |
+| 按需加载（摘要先行，匹配后读全文） | 相同 |
+| 每条消息都判断是否匹配 skill | 相同 |
+| Body 写通用指令，Agent 自己理解 | **改为按环节分段**，因为我们是多节点独立 LLM 调用 |
+| Agent 用 read 工具读文件 | **改为后端代码读取 + 注入 prompt**，因为我们没有持续 Agent |
+| 新增 `affects` 字段 | **OpenClaw 没有这个字段**，因为它是单 Agent 不需要区分环节 |
+
+---
+
 ## Skill 文件格式
 
 每个 skill 是 `skills/<name>/SKILL.md`，YAML frontmatter + Markdown 指令：
