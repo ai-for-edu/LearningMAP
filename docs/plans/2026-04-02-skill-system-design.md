@@ -71,9 +71,9 @@ affects:
 ]
 ```
 
-### 第二步：intent 节点匹配（每个 session 只判断一次）
+### 第二步：intent 节点匹配（每条消息都判断，参照 OpenClaw）
 
-用户发第一条消息时，intent 节点的 prompt 里包含所有 skill 的摘要。LLM 在判断意图的同时判断是否匹配 skill。
+**每条用户消息**经过 intent 节点时，prompt 里都包含所有 skill 的摘要。LLM 在判断意图的同时判断是否匹配 skill。用户可以随时切换教学方法。
 
 **示例 1：用户明确指定 skill**
 
@@ -122,7 +122,25 @@ LLM 判断: 没有明确教学方法偏好
   → 系统行为和现在完全一样，不注入任何 skill
 ```
 
-### 第三步：加载并存储（匹配后一次性）
+**示例 4：中途切换 skill**
+
+```
+消息 1: "用费曼学习法帮我学勾股定理"
+  → intent: {intent: "learn_topic", topic: "勾股定理", skill: "feynman"}
+  → 后续节点用费曼学习法
+
+消息 5: "换成苏格拉底式提问吧"
+  → intent: {intent: "chat", skill: "socratic"}
+  → state 中 active_skill 更新为 "socratic"
+  → 后续节点改用苏格拉底式提问
+
+消息 8: "不用教学方法了，正常聊"
+  → intent: {intent: "chat", skill: null}
+  → state 中 active_skill 清空
+  → 回到默认模式
+```
+
+### 第三步：加载并存储
 
 intent 返回 `skill: "feynman"` 后：
 
@@ -131,14 +149,19 @@ intent 返回 `skill: "feynman"` 后：
 if result.skill:
     content = skill_registry.load_full_content(result.skill)
     return {
-        "mode": "graph",
-        "topic": result.topic,
         "active_skill": result.skill,
         "active_skill_content": content,  # 完整 SKILL.md body
     }
+elif result.skill is None and state.get("active_skill"):
+    # 用户明确要求取消 skill
+    return {
+        "active_skill": None,
+        "active_skill_content": None,
+    }
+# 否则保持 state 中现有的 skill 不变
 ```
 
-`active_skill_content` 存到 session state，后续所有节点直接从 state 读取。**整个 session 不再重新判断 skill。**
+`active_skill_content` 存到 session state，后续节点从 state 读取。每条消息都会重新判断，用户可随时切换或取消。
 
 ### 第四步：各节点注入（affects 控制）
 
