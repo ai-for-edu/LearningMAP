@@ -20,6 +20,15 @@ Based on the scene information above, generate a complete Canvas/PPT component f
 
 **Language Requirement**: All generated text content must be in Chinese.
 
+**Visual Style (IMPORTANT)**:
+- Use a colored ShapeElement as the title bar background (e.g., fill: "#005da7" with white title text on top)
+- Use light-colored ShapeElements as content card backgrounds (e.g., "#dbeafe", "#dcfce7", "#fef3c7", "#e8f4fd")
+- Add a decorative accent line or shape below the title (e.g., fill: "#5b9bd5", height: 3px)
+- Use colored highlight markers (vertical bar) beside important text (e.g., fill: "#ed7d31")
+- Do NOT make everything black and white — apply the colored design patterns from the system prompt examples
+- Background can be white or a very light color like "#f8fafc"
+- Title text on dark backgrounds should use white color ("#ffffff")
+
 **Content Density Rule (CRITICAL)**:
 - Maximum 5-7 elements total (including title, shapes, text blocks, and formulas)
 - All elements MUST fit within the canvas (1000 × 562.5) with 50px margins
