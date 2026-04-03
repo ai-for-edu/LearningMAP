@@ -259,4 +259,12 @@ async def get_state(session_id: str) -> dict:
             for m in messages
         ]
 
+    # Slide data
+    if state.get("slide_contents"):
+        result["slide_contents"] = state["slide_contents"]
+    if state.get("slide_outlines"):
+        result["slide_outlines"] = state["slide_outlines"]
+    if state.get("lesson_format"):
+        result["lesson_format"] = state["lesson_format"]
+
     return result
