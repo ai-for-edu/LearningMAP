@@ -97,8 +97,12 @@ tailwind.config = {
     <!-- Thumbnail strip -->
     <div id="thumbnailStrip" class="flex gap-3 mt-6 overflow-x-auto pb-2 max-w-[90vw]"></div>
 
-    <!-- Finish button -->
-    <div class="mt-8">
+    <!-- Action buttons -->
+    <div class="mt-8 flex gap-4">
+      <button onclick="exportPptx()" class="inline-flex items-center gap-2 bg-primary text-white py-3 px-8 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">
+        <span class="material-symbols-outlined text-lg">download</span>
+        Export PPTX
+      </button>
       <a id="finishBtn" href="/" class="inline-flex items-center gap-2 bg-secondary text-white py-3 px-8 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">
         <span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
         Finish Learning
@@ -374,6 +378,11 @@ function renderSlide(container, slideData) {
 
     container.appendChild(div);
   }
+}
+
+function exportPptx() {
+  if (!sessionId) return;
+  window.open('/api/chat/' + sessionId + '/export-pptx', '_blank');
 }
 
 init();

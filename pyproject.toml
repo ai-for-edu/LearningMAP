@@ -21,6 +21,8 @@ dependencies = [
     "sse-starlette>=2.0.0",
     "python-dotenv>=1.0.0",
     "openai>=2.30.0",
+    "python-pptx>=1.0.2",
+    "matplotlib>=3.10.8",
 ]
 
 [project.optional-dependencies]

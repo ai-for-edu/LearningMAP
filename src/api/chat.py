@@ -213,6 +213,31 @@ async def generate_slides(session_id: str) -> dict:
     }
 
 
+@router.get("/chat/{session_id}/export-pptx")
+async def export_pptx(session_id: str):
+    """Export slides as downloadable PPTX file."""
+    from fastapi.responses import StreamingResponse
+    from src.export.pptx_export import export_slides_to_pptx
+
+    state = _get_session(session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    slides = state.get("slide_contents", [])
+    if not slides:
+        raise HTTPException(status_code=400, detail="No slides to export")
+
+    buf = await asyncio.to_thread(export_slides_to_pptx, slides)
+    topic = state.get("topic", "lesson")
+    filename = f"{topic}.pptx"
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/chat/{session_id}/state")
 async def get_state(session_id: str) -> dict:
     """Get current session state for frontend UI switching."""
