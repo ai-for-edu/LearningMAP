@@ -94,6 +94,13 @@ def generate_slide_outlines(state: dict) -> list[SlideOutline]:
 # Stage 2: Per-slide content generation
 # ---------------------------------------------------------------------------
 
+TEACHER_CONTEXT = """Teacher Persona:
+Name: 小智老师
+你是一位热情、有耐心的教育专家。你的教学风格生动活泼，善于用类比和生活化的例子帮助学生理解抽象概念。
+你注重视觉化教学，喜欢用图表、对比、色彩丰富的板书来帮助学生记忆。
+请根据这位老师的风格来设计幻灯片内容和排版。"""
+
+
 def generate_slide_content(outline: SlideOutline) -> SlideData | None:
     """Generate single slide content from outline with full post-processing."""
     system_prompt = render_prompt("slide_content_system")
@@ -102,13 +109,14 @@ def generate_slide_content(outline: SlideOutline) -> SlideData | None:
         title=outline.title,
         description=outline.description,
         key_points=outline.keyPoints,
+        teacher_context=TEACHER_CONTEXT,
     )
 
     try:
         client = get_raw_client()
         response = client.chat.completions.create(
             model=get_model_name(),
-            max_tokens=4096,
+            max_tokens=16384,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
