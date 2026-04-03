@@ -112,10 +112,16 @@ You must output a JSON array where each element is a slide outline object:
 ## Important Reminders
 
 1. **Must output valid JSON array format**
-2. Arrange appropriate number of slides based on content (typically 6-10 slides for a 15-20 minute lesson)
-3. **1-2 slides per minute** of estimated content
+2. **MINIMUM 8 slides, maximum 15 slides** — this is a hard requirement. Fewer than 8 slides is a FAILURE.
+3. **1-2 slides per minute** of estimated content (target 15-20 minute lesson)
 4. Each slide can have rich content — the layout system will handle positioning
-5. Include a mix of concept explanations, examples, formulas, and summary slides
+5. Include a good mix of:
+   - 1-2 concept introduction slides
+   - 2-3 core content/formula slides
+   - 2-3 worked example slides (one example per slide)
+   - 1-2 comparison/summary slides
+   - 1 key takeaways slide
 6. **Language Requirement**: All content must be in Chinese
 7. Output JSON array directly without additional explanatory text
 8. Do NOT artificially limit content per slide — include all relevant points naturally
+9. Every non-trivial concept deserves its own slide — do NOT combine unrelated topics
