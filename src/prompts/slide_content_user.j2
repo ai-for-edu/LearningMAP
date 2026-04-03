@@ -16,9 +16,16 @@
 {% if content_draft %}
 ## Detailed Teaching Content (USE THIS as source material)
 
-The following is detailed teaching content for this slide. Design the slide to present this content visually — extract key text, formulas, examples, and structure them into slide elements.
+The following is detailed teaching content for this slide. **SELECT** the most important parts and design them into slide elements. Do NOT try to fit everything — a slide is a visual summary, not a document.
 
 {{ content_draft }}
+
+**CRITICAL: Content Selection Rule**
+- Extract only the 2-3 most important points from the content above
+- Condense long explanations into short bullet points (1 line each)
+- Keep formulas but drop verbose derivation steps
+- If there's an example, show only the key steps, not every calculation
+- White space is good — a clean slide with fewer elements is BETTER than a crowded one
 {% endif %}
 
 ## Available Resources
@@ -59,7 +66,9 @@ Based on the scene information above, generate a complete Canvas/PPT component f
 3. Do not add any text before or after the JSON
 4. Ensure the JSON format is correct and can be parsed directly
 5. All TextElement `height` values must be selected from the quick reference table in the system prompt
-6. Make the slide visually rich and engaging — a boring slide with only plain text is a FAILURE
+6. **OVERFLOW CHECK (P0)**: Before outputting, verify the LAST element's (top + height) ≤ 510. If any element exceeds this, REMOVE it or reduce font size. A slide that overflows is worse than one with less content.
+7. Use font sizes: title 28-32px, subtitle 20-24px, body 14-16px, caption 12-14px. When space is tight, use SMALLER fonts (14px body, 12px caption) rather than overflowing.
+8. Maximum 8 elements per slide (including shapes). More elements = more likely to overflow.
 
 **Output Structure Example**:
 {"background":{"type":"solid","color":"#ffffff"},"elements":[{"id":"title_bg","type":"shape","left":0,"top":0,"width":1000,"height":90,"path":"M 0 0 L 1 0 L 1 1 L 0 1 Z","viewBox":[1,1],"fill":"#005da7","fixedRatio":false},{"id":"title_001","type":"text","left":60,"top":7,"width":880,"height":76,"content":"<p style=\"font-size:32px; color:#ffffff;\"><strong>Title Content</strong></p>","defaultFontName":"","defaultColor":"#ffffff"},{"id":"card1_bg","type":"shape","left":60,"top":120,"width":420,"height":160,"path":"M 0 0 L 1 0 L 1 1 L 0 1 Z","viewBox":[1,1],"fill":"#dbeafe","fixedRatio":false},{"id":"card1_text","type":"text","left":80,"top":140,"width":380,"height":120,"content":"<p style=\"font-size:18px;\"><strong>Key Concept</strong></p><p style=\"font-size:16px;\">Explanation text here</p>","defaultFontName":"","defaultColor":"#1e40af"}]}
