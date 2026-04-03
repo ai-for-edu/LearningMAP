@@ -127,19 +127,41 @@ def _try_parse_json(json_str: str) -> Any | None:
 
         fixed = re.sub(r'"((?:[^"\\]|\\.)*?)"', _fix_latex_in_string, fixed)
 
-        # Fix 2: Fix truncated JSON arrays
+        # Fix 2: Fix truncated JSON — find last complete element
         trimmed = fixed.strip()
-        if trimmed.startswith("[") and not trimmed.endswith("]"):
+
+        # Strategy: find the last complete JSON object in the elements array
+        # by looking for the last "}," or "}" before truncation
+        if trimmed.startswith("{") and not trimmed.endswith("}"):
+            # Try to salvage: find last complete element in "elements" array
+            last_complete = fixed.rfind("},")
+            last_close = fixed.rfind("}")
+
+            if last_complete > 0 and "elements" in fixed:
+                # Cut after last complete element, close array and object
+                salvaged = fixed[:last_complete + 1] + "]}"
+                try:
+                    result = json.loads(salvaged)
+                    logger.warning("Fixed truncated JSON by cutting at last complete element")
+                    return result
+                except json.JSONDecodeError:
+                    pass
+
+            # Simpler: just close unclosed braces
+            open_braces = fixed.count("{")
+            close_braces = fixed.count("}")
+            open_brackets = fixed.count("[")
+            close_brackets = fixed.count("]")
+            if open_braces > close_braces or open_brackets > close_brackets:
+                fixed += "]" * (open_brackets - close_brackets)
+                fixed += "}" * (open_braces - close_braces)
+                logger.warning("Fixed truncated JSON by closing braces")
+
+        elif trimmed.startswith("[") and not trimmed.endswith("]"):
             last_obj = fixed.rfind("}")
             if last_obj > 0:
                 fixed = fixed[:last_obj + 1] + "]"
                 logger.warning("Fixed truncated JSON array")
-        elif trimmed.startswith("{") and not trimmed.endswith("}"):
-            open_braces = fixed.count("{")
-            close_braces = fixed.count("}")
-            if open_braces > close_braces:
-                fixed += "}" * (open_braces - close_braces)
-                logger.warning("Fixed truncated JSON object")
 
         return json.loads(fixed)
     except json.JSONDecodeError:
