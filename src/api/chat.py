@@ -229,12 +229,15 @@ async def export_pptx(session_id: str):
 
     buf = await asyncio.to_thread(export_slides_to_pptx, slides)
     topic = state.get("topic", "lesson")
+    # URL-encode filename for non-ASCII characters (RFC 5987)
+    from urllib.parse import quote
     filename = f"{topic}.pptx"
+    encoded = quote(filename)
 
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
     )
 
 
