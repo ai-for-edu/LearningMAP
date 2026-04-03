@@ -191,18 +191,41 @@ class HTMLTextParser(HTMLParser):
         return result
 
 
+def _has_cjk(text: str) -> bool:
+    """Check if text contains CJK (Chinese/Japanese/Korean) characters."""
+    for ch in text:
+        if "\u4e00" <= ch <= "\u9fff" or "\u3400" <= ch <= "\u4dbf":
+            return True
+    return False
+
+
 def _render_latex_to_image(latex: str) -> io.BytesIO | None:
-    """Render LaTeX formula to PNG image using matplotlib."""
+    """Render LaTeX formula to PNG image using matplotlib.
+
+    If the LaTeX contains Chinese characters, falls back to plain text
+    rendering since matplotlib's mathtext doesn't support CJK.
+    """
     try:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots(figsize=(6, 1.5))
-        ax.text(
-            0.5, 0.5, f"${latex}$", fontsize=20,
-            ha="center", va="center", transform=ax.transAxes,
-        )
+
+        if _has_cjk(latex):
+            # Chinese in LaTeX: render as plain text with a CJK font
+            ax.text(
+                0.5, 0.5, latex, fontsize=18,
+                ha="center", va="center", transform=ax.transAxes,
+                fontfamily=["Microsoft YaHei", "SimHei", "Arial Unicode MS", "sans-serif"],
+            )
+        else:
+            # Pure math: use matplotlib's mathtext
+            ax.text(
+                0.5, 0.5, f"${latex}$", fontsize=20,
+                ha="center", va="center", transform=ax.transAxes,
+            )
+
         ax.axis("off")
         buf = io.BytesIO()
         fig.savefig(

@@ -260,12 +260,15 @@ def _fix_element_defaults(elements: list[dict]) -> list[dict]:
     return fixed
 
 
+def _has_cjk(text: str) -> bool:
+    """Check if text contains CJK characters."""
+    return any("\u4e00" <= ch <= "\u9fff" or "\u3400" <= ch <= "\u4dbf" for ch in text)
+
+
 def _process_latex_elements(elements: list[dict]) -> list[dict]:
-    """Validate LaTeX elements. Remove ones with missing/empty latex string.
+    """Validate LaTeX elements. Convert CJK-containing ones to TextElement.
 
     Adapted from OpenMAIC's processLatexElements().
-    Note: Unlike OpenMAIC (which renders KaTeX server-side), we validate
-    and let the frontend render with KaTeX.
     """
     result = []
     for el in elements:
@@ -278,11 +281,26 @@ def _process_latex_elements(elements: list[dict]) -> list[dict]:
             logger.warning("LaTeX element missing latex string, removing: %s", el.get("id", "?"))
             continue
 
-        # Set fixedRatio
-        el["fixedRatio"] = True
+        latex_str = latex_str.strip()
 
-        # Validate: basic sanity check (has at least one math-like character)
-        el["latex"] = latex_str.strip()
+        # If LaTeX contains CJK characters, convert to TextElement
+        # (KaTeX/matplotlib can't render Chinese in math mode)
+        if _has_cjk(latex_str):
+            logger.warning("LaTeX contains CJK, converting to text: %s", el.get("id", "?"))
+            el["type"] = "text"
+            el["content"] = f'<p style="font-size: 18px;">{latex_str}</p>'
+            el["defaultFontName"] = "Microsoft YaHei"
+            el["defaultColor"] = el.get("color", "#333333")
+            el.pop("latex", None)
+            el.pop("fixedRatio", None)
+            el.pop("align", None)
+            el.pop("color", None)
+            result.append(el)
+            continue
+
+        # Pure math LaTeX
+        el["fixedRatio"] = True
+        el["latex"] = latex_str
         result.append(el)
 
     return result
