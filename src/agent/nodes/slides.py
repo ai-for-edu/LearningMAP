@@ -101,8 +101,44 @@ Name: 小智老师
 请根据这位老师的风格来设计幻灯片内容和排版。"""
 
 
+def _generate_content_draft(outline: SlideOutline) -> str:
+    """Stage 2a: Generate detailed teaching content for one slide.
+
+    This simulates having PDF source material — gives the layout LLM
+    rich content to work with instead of just 3 brief keyPoints.
+    """
+    draft_prompt = render_prompt(
+        "slide_content_draft",
+        title=outline.title,
+        description=outline.description,
+        key_points=outline.keyPoints,
+        teacher_context=TEACHER_CONTEXT,
+    )
+
+    try:
+        client = get_raw_client()
+        response = client.chat.completions.create(
+            model=get_model_name(),
+            max_tokens=2048,
+            messages=[{"role": "user", "content": draft_prompt}],
+        )
+        draft = response.choices[0].message.content.strip()
+        logger.debug("Content draft for '%s': %d chars", outline.title, len(draft))
+        return draft
+    except Exception:
+        logger.exception("Content draft generation failed for: %s", outline.title)
+        return ""
+
+
 def generate_slide_content(outline: SlideOutline) -> SlideData | None:
-    """Generate single slide content from outline with full post-processing."""
+    """Generate single slide content with two-stage pipeline:
+    Stage 2a: Generate detailed teaching content draft
+    Stage 2b: Layout the content into slide JSON
+    """
+    # Stage 2a: Generate rich content draft
+    content_draft = _generate_content_draft(outline)
+
+    # Stage 2b: Layout into slide JSON
     system_prompt = render_prompt("slide_content_system")
     user_prompt = render_prompt(
         "slide_content_user",
@@ -110,6 +146,7 @@ def generate_slide_content(outline: SlideOutline) -> SlideData | None:
         description=outline.description,
         key_points=outline.keyPoints,
         teacher_context=TEACHER_CONTEXT,
+        content_draft=content_draft,
     )
 
     try:

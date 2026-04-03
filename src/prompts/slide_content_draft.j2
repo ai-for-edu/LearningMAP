@@ -1,0 +1,52 @@
+You are an expert educational content writer. Write detailed teaching content for a single slide page.
+
+## Slide Information
+
+- **Title**: {{ title }}
+- **Description**: {{ description }}
+- **Key Points**:
+{% for point in key_points %}
+  {{ loop.index }}. {{ point }}
+{% endfor %}
+
+{% if teacher_context %}
+{{ teacher_context }}
+{% endif %}
+
+## Your Task
+
+Write comprehensive teaching content for this ONE slide. This content will be used as source material for designing a PPT slide. Include:
+
+1. **Main explanation** (150-300 words): Clearly explain each key point in depth. Use concrete examples and analogies. Don't just list points — explain WHY and HOW.
+
+2. **Key formulas** (if applicable): Write out all relevant formulas in LaTeX format (e.g., `a^2 + b^2 = c^2`). Include step-by-step derivation if this is a derivation slide.
+
+3. **Worked example** (if applicable): A concrete problem with step-by-step solution. Show the numbers and calculations.
+
+4. **Comparison/contrast** (if applicable): If comparing concepts, provide a structured comparison with specific differences.
+
+5. **Common mistakes** (if applicable): 1-2 typical errors students make on this topic.
+
+## Output Format
+
+Write in Chinese. Output as structured text with clear section headers. This is NOT a slide — it's the detailed source content that will be designed into a slide.
+
+Example output:
+
+### 主要讲解
+勾股定理描述了直角三角形三边的关系。在一个直角三角形中，斜边的平方等于两条直角边平方之和...（详细解释）
+
+### 核心公式
+$$a^2 + b^2 = c^2$$
+其中 a 和 b 是两条直角边，c 是斜边...
+
+### 例题演示
+**题目：** 已知直角三角形两直角边分别为 3cm 和 4cm，求斜边长度。
+**解答：**
+第一步：代入公式 3² + 4² = c²
+第二步：9 + 16 = c²
+第三步：c² = 25
+第四步：c = 5cm
+
+### 易错提醒
+学生常犯错误：将斜边和直角边搞混，把较长的直角边当成斜边代入公式...
