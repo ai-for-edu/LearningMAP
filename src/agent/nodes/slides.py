@@ -13,6 +13,7 @@ import uuid
 
 from src.llm.client import get_llm_client, get_model_name, get_raw_client
 from src.llm.slide_schemas import (
+    ChartElement,
     ImageElement,
     LatexElement,
     LineElement,
@@ -20,6 +21,7 @@ from src.llm.slide_schemas import (
     ShapeElement,
     SlideData,
     SlideOutline,
+    TableElement,
     TextElement,
 )
 from src.prompts.loader import render_prompt
@@ -301,6 +303,12 @@ def _to_pydantic_elements(elements: list[dict]) -> list[PPTElement]:
                 result.append(LineElement(**d))
             elif el_type == "image":
                 result.append(ImageElement(**d))
+            elif el_type == "chart":
+                d.pop("rotate", None)
+                result.append(ChartElement(**d))
+            elif el_type == "table":
+                d.pop("rotate", None)
+                result.append(TableElement(**d))
             else:
                 logger.warning("Unknown element type: %s", el_type)
         except Exception:

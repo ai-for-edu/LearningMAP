@@ -259,6 +259,10 @@ def export_slides_to_pptx(slides: list[dict]) -> io.BytesIO:
                     _add_latex_element(slide, el)
                 elif el_type == "image":
                     _add_image_placeholder(slide, el)
+                elif el_type == "chart":
+                    _add_chart_placeholder(slide, el)
+                elif el_type == "table":
+                    _add_table_element(slide, el)
             except Exception:
                 logger.warning("Failed to export element: %s", el.get("id", "?"))
 
@@ -442,3 +446,118 @@ def _add_image_placeholder(slide, el: dict) -> None:
     run.text = f"[Image: {el.get('src', 'placeholder')}]"
     run.font.size = Pt(12)
     run.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+
+
+def _add_chart_placeholder(slide, el: dict) -> None:
+    """Add chart as a placeholder box (python-pptx chart API is complex).
+
+    For MVP, render as a labeled box. Full chart support would require
+    python-pptx's chart API which needs significant mapping work.
+    """
+    shape = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE,
+        left=px(el["left"]), top=px(el["top"]),
+        width=px(el["width"]), height=px(el["height"]),
+    )
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = RGBColor(0xF0, 0xF4, 0xF8)
+    shape.line.fill.background()
+
+    tf = shape.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.CENTER
+    run = p.add_run()
+    chart_type = el.get("chartType", "bar")
+    data = el.get("data", {})
+    labels = data.get("labels", [])
+    run.text = f"[{chart_type.upper()} Chart: {', '.join(labels[:5])}]"
+    run.font.size = Pt(14)
+    run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+
+
+def _add_table_element(slide, el: dict) -> None:
+    """Add a table with styled cells."""
+    data = el.get("data", [])
+    if not data:
+        return
+
+    rows = len(data)
+    cols = max(len(row) for row in data) if data else 0
+    if cols == 0:
+        return
+
+    col_widths = el.get("colWidths", [1.0 / cols] * cols)
+    total_width = el.get("width", 800)
+
+    table_shape = slide.shapes.add_table(
+        rows, cols,
+        left=px(el["left"]), top=px(el["top"]),
+        width=px(total_width), height=px(el.get("height", 200)),
+    )
+    table = table_shape.table
+
+    # Set column widths
+    for i, cw in enumerate(col_widths):
+        if i < len(table.columns):
+            table.columns[i].width = px(total_width * cw)
+
+    # Populate cells
+    outline = el.get("outline", {})
+    for ri, row in enumerate(data):
+        for ci, cell_data in enumerate(row):
+            if ri >= rows or ci >= cols:
+                continue
+            cell = table.cell(ri, ci)
+
+            # Merge cells
+            colspan = cell_data.get("colspan", 1)
+            rowspan = cell_data.get("rowspan", 1)
+            if colspan > 1 or rowspan > 1:
+                end_ri = min(ri + rowspan - 1, rows - 1)
+                end_ci = min(ci + colspan - 1, cols - 1)
+                try:
+                    cell.merge(table.cell(end_ri, end_ci))
+                except Exception:
+                    pass
+
+            # Text
+            text = cell_data.get("text", "")
+            tf = cell.text_frame
+            tf.word_wrap = True
+            p = tf.paragraphs[0]
+            run = p.add_run()
+            run.text = text
+
+            # Style
+            style = cell_data.get("style", {}) or {}
+            font_size = 14
+            if style.get("fontsize"):
+                try:
+                    font_size = int(re.sub(r"[^\d]", "", style["fontsize"]) or "14")
+                except ValueError:
+                    pass
+            run.font.size = Pt(font_size)
+
+            if style.get("bold"):
+                run.font.bold = True
+            if style.get("em"):
+                run.font.italic = True
+            if style.get("color"):
+                try:
+                    run.font.color.rgb = hex_to_rgb(style["color"])
+                except (ValueError, IndexError):
+                    pass
+
+            # Cell background
+            if style.get("backcolor"):
+                try:
+                    cell.fill.solid()
+                    cell.fill.fore_color.rgb = hex_to_rgb(style["backcolor"])
+                except (ValueError, IndexError):
+                    pass
+
+            # Alignment
+            align = style.get("align", "left")
+            if align in ALIGN_MAP:
+                p.alignment = ALIGN_MAP[align]

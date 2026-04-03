@@ -81,7 +81,72 @@ class ImageElement(BaseModel):
     fixedRatio: bool = True
 
 
-PPTElement = Union[TextElement, LatexElement, ShapeElement, LineElement, ImageElement]
+class ChartData(BaseModel):
+    """Chart data structure."""
+
+    labels: list[str]
+    legends: list[str]
+    series: list[list[float]]
+
+
+class ChartElement(BaseModel):
+    """Chart element for PPT slides (bar, line, pie, etc.)."""
+
+    id: str
+    type: Literal["chart"]
+    left: float
+    top: float
+    width: float
+    height: float
+    chartType: str  # bar, column, line, pie, ring, area, radar, scatter
+    data: ChartData
+    themeColors: list[str] = Field(default_factory=lambda: ["#5b9bd5", "#ed7d31"])
+    fill: str | None = None
+    textColor: str | None = None
+    lineColor: str | None = None
+
+
+class TableCellStyle(BaseModel):
+    """Table cell styling."""
+
+    bold: bool | None = None
+    em: bool | None = None
+    underline: bool | None = None
+    strikethrough: bool | None = None
+    color: str | None = None
+    backcolor: str | None = None
+    fontsize: str | None = None
+    fontname: str | None = None
+    align: str | None = None
+
+
+class TableCell(BaseModel):
+    """Single table cell."""
+
+    id: str
+    colspan: int = 1
+    rowspan: int = 1
+    text: str = ""
+    style: TableCellStyle | None = None
+
+
+class TableElement(BaseModel):
+    """Table element for PPT slides."""
+
+    id: str
+    type: Literal["table"]
+    left: float
+    top: float
+    width: float
+    height: float
+    colWidths: list[float]
+    data: list[list[TableCell]]
+    outline: dict | None = None
+    cellMinHeight: float = 36
+    theme: dict | None = None
+
+
+PPTElement = Union[TextElement, LatexElement, ShapeElement, LineElement, ImageElement, ChartElement, TableElement]
 
 
 class SlideData(BaseModel):

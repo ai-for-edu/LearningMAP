@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script>
@@ -374,10 +375,145 @@ function renderSlide(container, slideData) {
         lsvg.appendChild(ln);
         div.appendChild(lsvg);
         break;
+
+      case 'chart':
+        if (typeof echarts !== 'undefined') {
+          var chartDiv = document.createElement('div');
+          chartDiv.style.width = '100%';
+          chartDiv.style.height = '100%';
+          div.appendChild(chartDiv);
+          setTimeout(function() {
+            var chart = echarts.init(chartDiv, null, { renderer: 'svg' });
+            var option = buildChartOption(el);
+            if (option) chart.setOption(option, true);
+          }, 100);
+        } else {
+          div.textContent = '[Chart: ' + (el.chartType || 'bar') + ']';
+          div.style.display = 'flex';
+          div.style.alignItems = 'center';
+          div.style.justifyContent = 'center';
+          div.style.background = '#f0f0f0';
+          div.style.color = '#999';
+        }
+        break;
+
+      case 'table':
+        var table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.height = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.style.tableLayout = 'fixed';
+        var outline = el.outline || {};
+        var borderStyle = outline.width ? (outline.width + 'px ' + (outline.style || 'solid') + ' ' + (outline.color || '#eeece1')) : '1px solid #ddd';
+        var colWidths = el.colWidths || [];
+        // Build hidden cells set
+        var hiddenCells = {};
+        if (el.data) {
+          for (var ri = 0; ri < el.data.length; ri++) {
+            for (var ci = 0; ci < el.data[ri].length; ci++) {
+              var cell = el.data[ri][ci];
+              if (cell.colspan > 1 || cell.rowspan > 1) {
+                for (var rr = ri; rr < ri + cell.rowspan; rr++) {
+                  for (var cc = (rr === ri ? ci + 1 : ci); cc < ci + cell.colspan; cc++) {
+                    hiddenCells[rr + '_' + cc] = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+        // Render rows
+        var tbody = document.createElement('tbody');
+        if (el.data) {
+          for (var ri2 = 0; ri2 < el.data.length; ri2++) {
+            var tr = document.createElement('tr');
+            for (var ci2 = 0; ci2 < el.data[ri2].length; ci2++) {
+              if (hiddenCells[ri2 + '_' + ci2]) continue;
+              var td = document.createElement('td');
+              var cellData = el.data[ri2][ci2];
+              td.style.border = borderStyle;
+              td.style.padding = '5px';
+              td.style.verticalAlign = 'middle';
+              td.style.wordBreak = 'break-word';
+              td.style.fontSize = '14px';
+              if (cellData.colspan > 1) td.colSpan = cellData.colspan;
+              if (cellData.rowspan > 1) td.rowSpan = cellData.rowspan;
+              if (cellData.style) {
+                if (cellData.style.bold) td.style.fontWeight = 'bold';
+                if (cellData.style.em) td.style.fontStyle = 'italic';
+                if (cellData.style.color) td.style.color = cellData.style.color;
+                if (cellData.style.backcolor) td.style.backgroundColor = cellData.style.backcolor;
+                if (cellData.style.fontsize) td.style.fontSize = cellData.style.fontsize;
+                if (cellData.style.align) td.style.textAlign = cellData.style.align;
+              }
+              td.innerHTML = (cellData.text || '').replace(/\n/g, '<br/>');
+              tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+          }
+        }
+        table.appendChild(tbody);
+        div.appendChild(table);
+        break;
     }
 
     container.appendChild(div);
   }
+}
+
+function buildChartOption(el) {
+  var d = el.data || {};
+  var labels = d.labels || [];
+  var legends = d.legends || [];
+  var series = d.series || [];
+  var colors = el.themeColors || ['#5b9bd5','#ed7d31','#a5a5a5','#ffc000','#4472c4'];
+  var textColor = el.textColor || '#333';
+  var t = el.chartType || 'bar';
+
+  var legend = series.length > 1 || t === 'pie' || t === 'ring'
+    ? { top: 'bottom', textStyle: { color: textColor } } : undefined;
+
+  if (t === 'bar') {
+    return { color: colors, legend: legend,
+      xAxis: { type: 'category', data: labels, axisLabel: { color: textColor } },
+      yAxis: { type: 'value', axisLabel: { color: textColor } },
+      series: series.map(function(s, i) { return { data: s, name: legends[i]||'', type: 'bar', label: { show: true }, itemStyle: { borderRadius: [2,2,0,0] } }; }) };
+  }
+  if (t === 'column') {
+    return { color: colors, legend: legend,
+      yAxis: { type: 'category', data: labels },
+      xAxis: { type: 'value' },
+      series: series.map(function(s, i) { return { data: s, name: legends[i]||'', type: 'bar' }; }) };
+  }
+  if (t === 'line') {
+    return { color: colors, legend: legend,
+      xAxis: { type: 'category', data: labels },
+      yAxis: { type: 'value' },
+      series: series.map(function(s, i) { return { data: s, name: legends[i]||'', type: 'line', smooth: el.options?.lineSmooth, label: { show: true } }; }) };
+  }
+  if (t === 'pie' || t === 'ring') {
+    return { color: colors, legend: { top: 'bottom', textStyle: { color: textColor } },
+      series: [{ type: 'pie', radius: t === 'ring' ? ['40%','70%'] : '70%',
+        data: (series[0]||[]).map(function(v, i) { return { value: v, name: labels[i] }; }),
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.5)' } } }] };
+  }
+  if (t === 'area') {
+    return { color: colors, legend: legend,
+      xAxis: { type: 'category', boundaryGap: false, data: labels },
+      yAxis: { type: 'value' },
+      series: series.map(function(s, i) { return { data: s, name: legends[i]||'', type: 'line', areaStyle: {} }; }) };
+  }
+  if (t === 'radar') {
+    return { color: colors, legend: legend,
+      radar: { indicator: labels.map(function(l) { return { name: l }; }) },
+      series: [{ type: 'radar', data: series.map(function(s, i) { return { value: s, name: legends[i]||'' }; }) }] };
+  }
+  if (t === 'scatter') {
+    var sd = [];
+    for (var i = 0; i < (series[0]||[]).length; i++) { sd.push([series[0][i], series[1] ? series[1][i] : series[0][i]]); }
+    return { color: colors, xAxis: {}, yAxis: {}, series: [{ type: 'scatter', symbolSize: 12, data: sd }] };
+  }
+  return null;
 }
 
 function exportPptx() {
