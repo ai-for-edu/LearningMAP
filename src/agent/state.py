@@ -19,3 +19,8 @@ class LearningState(MessagesState):
 
     # Lesson
     lesson_content: str | None
+
+    # Slides
+    slide_outlines: list | None
+    slide_contents: list | None
+    lesson_format: str | None  # "markdown" | "slides"

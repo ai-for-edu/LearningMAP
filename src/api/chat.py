@@ -36,6 +36,9 @@ _DEFAULT_STATE = {
     "answers": [],
     "diagnosis_result": None,
     "lesson_content": None,
+    "slide_outlines": None,
+    "slide_contents": None,
+    "lesson_format": None,
 }
 
 
@@ -172,6 +175,41 @@ async def generate_lesson(session_id: str) -> dict:
     return {
         "session_id": session_id,
         "lesson_content": state.get("lesson_content", ""),
+    }
+
+
+@router.post("/chat/{session_id}/generate-slides")
+async def generate_slides(session_id: str) -> dict:
+    """Generate slide outlines + all slide contents."""
+    state = _get_session(session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    from src.agent.nodes.slides import generate_slide_content, generate_slide_outlines
+
+    # Stage 1: Generate outlines
+    outlines = await asyncio.to_thread(generate_slide_outlines, state)
+    if not outlines:
+        return {"session_id": session_id, "error": "Failed to generate outlines"}
+
+    # Stage 2: Generate content for each slide
+    slides: list[dict | None] = []
+    for outline in outlines:
+        slide = await asyncio.to_thread(generate_slide_content, outline)
+        if slide:
+            slides.append(slide.model_dump())
+        else:
+            slides.append(None)
+
+    state["slide_outlines"] = [o.model_dump() for o in outlines]
+    state["slide_contents"] = slides
+    state["lesson_format"] = "slides"
+    _save(session_id, state)
+
+    return {
+        "session_id": session_id,
+        "outlines": [o.model_dump() for o in outlines],
+        "slides": slides,
     }
 
 
