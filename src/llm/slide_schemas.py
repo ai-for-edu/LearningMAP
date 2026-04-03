@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TextElement(BaseModel):
@@ -65,7 +65,7 @@ class LineElement(BaseModel):
     end: list[float]
     style: str = "solid"
     color: str = "#333333"
-    points: list[str] = ["", ""]
+    points: list[str] = Field(default_factory=lambda: ["", ""])
 
 
 class ImageElement(BaseModel):
@@ -88,7 +88,7 @@ class SlideData(BaseModel):
     """Single slide containing background and elements."""
 
     background: dict | None = None
-    elements: list[PPTElement] = []
+    elements: list[PPTElement] = Field(default_factory=list)
 
 
 class SlideOutline(BaseModel):
