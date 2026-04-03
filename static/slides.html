@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OpenAILearning - Slides</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#005da7",
+        "on-primary": "#ffffff",
+        "surface": "#f7f9fb",
+        "on-surface": "#191c1e",
+        "on-surface-variant": "#414751",
+        "surface-container": "#eceef0",
+        "secondary": "#3c692b",
+        "error": "#ba1a1a",
+      },
+      fontFamily: {
+        "headline": ["Manrope"],
+        "body": ["Inter"],
+      },
+    },
+  },
+}
+</script>
+<style>
+.slide-canvas {
+  width: 1000px;
+  height: 562.5px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+}
+.slide-canvas * {
+  box-sizing: border-box;
+}
+</style>
+</head>
+<body class="bg-surface font-body text-on-surface">
+
+<!-- Top Nav -->
+<nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 flex justify-between items-center px-6 py-3">
+  <div class="flex items-center gap-4">
+    <span class="text-xl font-extrabold tracking-tighter text-blue-800">OpenAILearning</span>
+    <span class="text-slate-300">|</span>
+    <span class="font-headline font-bold text-sm text-on-surface-variant">Slide Mode</span>
+  </div>
+  <a id="backLink" href="/" class="flex items-center gap-1 text-sm text-slate-500 hover:text-primary transition-colors">
+    <span class="material-symbols-outlined text-lg">arrow_back</span>
+    <span class="font-medium">Back to Chat</span>
+  </a>
+</nav>
+
+<!-- Main Content -->
+<main class="pt-[70px] min-h-screen flex flex-col items-center justify-center px-6 pb-24">
+  <!-- Loading -->
+  <div id="loadingView" class="flex flex-col items-center justify-center py-20">
+    <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+    </svg>
+    <p class="font-headline font-bold text-lg text-on-surface">正在生成幻灯片</p>
+    <p class="font-body text-sm text-on-surface-variant mt-2">AI 正在制作 PPT 教案，请稍候...</p>
+  </div>
+
+  <!-- Slide Viewer (hidden until loaded) -->
+  <div id="slideViewer" class="hidden w-full flex flex-col items-center">
+    <!-- Slide title -->
+    <p id="slideTitle" class="font-headline font-bold text-lg text-on-surface mb-4"></p>
+
+    <!-- Canvas wrapper for scaling -->
+    <div id="canvasWrapper" class="relative">
+      <div id="slideCanvas" class="slide-canvas bg-white"></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="flex items-center gap-6 mt-6">
+      <button id="prevBtn" onclick="goSlide(-1)" class="flex items-center gap-1 px-5 py-2.5 rounded-xl bg-surface-container text-on-surface-variant font-headline font-bold text-sm hover:bg-slate-200 transition-all disabled:opacity-30" disabled>
+        <span class="material-symbols-outlined text-lg">arrow_back</span> Previous
+      </button>
+      <span id="pageIndicator" class="font-headline font-bold text-sm text-on-surface-variant">1 / 1</span>
+      <button id="nextBtn" onclick="goSlide(1)" class="flex items-center gap-1 px-5 py-2.5 rounded-xl bg-primary text-white font-headline font-bold text-sm hover:bg-primary/90 transition-all disabled:opacity-30">
+        Next <span class="material-symbols-outlined text-lg">arrow_forward</span>
+      </button>
+    </div>
+
+    <!-- Thumbnail strip -->
+    <div id="thumbnailStrip" class="flex gap-3 mt-6 overflow-x-auto pb-2 max-w-[90vw]"></div>
+
+    <!-- Finish button -->
+    <div class="mt-8">
+      <a id="finishBtn" href="/" class="inline-flex items-center gap-2 bg-secondary text-white py-3 px-8 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">
+        <span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+        Finish Learning
+      </a>
+    </div>
+  </div>
+</main>
+
+<script src="api.js?v=3"></script>
+<script>
+var sessionId = getSessionId();
+var allSlides = [];
+var currentSlideIndex = 0;
+
+// Update back/finish links
+if (sessionId) {
+  document.getElementById('backLink').href = '/?session_id=' + sessionId + '&show=results';
+  document.getElementById('finishBtn').href = '/?session_id=' + sessionId + '&show=lesson';
+}
+
+async function init() {
+  if (!sessionId) { window.location.href = '/'; return; }
+
+  // Check if slides already generated
+  var state = await getSessionState(sessionId);
+  if (state.slide_contents && state.slide_contents.length > 0) {
+    allSlides = state.slide_contents;
+    showSlideViewer();
+    return;
+  }
+
+  // Generate slides
+  try {
+    var resp = await fetch('/api/chat/' + sessionId + '/generate-slides', { method: 'POST' });
+    if (!resp.ok) throw new Error('API error: ' + resp.status);
+    var data = await resp.json();
+    if (data.slides && data.slides.length > 0) {
+      allSlides = data.slides;
+      showSlideViewer();
+    } else {
+      document.getElementById('loadingView').innerHTML =
+        '<p class="text-error font-headline font-bold">幻灯片生成失败，请返回重试。</p>';
+    }
+  } catch (err) {
+    document.getElementById('loadingView').innerHTML =
+      '<p class="text-error font-headline font-bold">生成失败: ' + escapeHtml(err.message) + '</p>';
+  }
+}
+
+function showSlideViewer() {
+  document.getElementById('loadingView').classList.add('hidden');
+  document.getElementById('slideViewer').classList.remove('hidden');
+  buildThumbnails();
+  showSlide(0);
+  scaleCanvas();
+  window.addEventListener('resize', scaleCanvas);
+  // Keyboard navigation
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight' || e.key === ' ') goSlide(1);
+    if (e.key === 'ArrowLeft') goSlide(-1);
+  });
+}
+
+function scaleCanvas() {
+  var wrapper = document.getElementById('canvasWrapper');
+  var maxW = Math.min(window.innerWidth - 48, 1000);
+  var maxH = window.innerHeight - 280;
+  var scale = Math.min(maxW / 1000, maxH / 562.5, 1);
+  wrapper.style.width = (1000 * scale) + 'px';
+  wrapper.style.height = (562.5 * scale) + 'px';
+  var canvas = document.getElementById('slideCanvas');
+  canvas.style.transform = 'scale(' + scale + ')';
+  canvas.style.transformOrigin = 'top left';
+}
+
+function showSlide(index) {
+  currentSlideIndex = index;
+  var slide = allSlides[index];
+  var canvas = document.getElementById('slideCanvas');
+  renderSlide(canvas, slide);
+
+  // Update controls
+  document.getElementById('pageIndicator').textContent = (index + 1) + ' / ' + allSlides.length;
+  document.getElementById('prevBtn').disabled = index === 0;
+  document.getElementById('nextBtn').disabled = index === allSlides.length - 1;
+
+  // Update thumbnail highlight
+  document.querySelectorAll('.thumb').forEach(function(t, i) {
+    t.style.borderColor = i === index ? '#005da7' : '#e6e8ea';
+    t.style.opacity = i === index ? '1' : '0.6';
+  });
+}
+
+function goSlide(delta) {
+  var next = currentSlideIndex + delta;
+  if (next >= 0 && next < allSlides.length) showSlide(next);
+}
+
+function buildThumbnails() {
+  var strip = document.getElementById('thumbnailStrip');
+  strip.innerHTML = '';
+  allSlides.forEach(function(slide, i) {
+    var thumb = document.createElement('button');
+    thumb.className = 'thumb flex-shrink-0 rounded-lg border-2 overflow-hidden bg-white';
+    thumb.style.width = '120px';
+    thumb.style.height = '67.5px';
+    thumb.style.borderColor = '#e6e8ea';
+    thumb.style.opacity = '0.6';
+    thumb.style.position = 'relative';
+    thumb.onclick = function() { showSlide(i); };
+
+    // Mini render
+    var mini = document.createElement('div');
+    mini.style.width = '1000px';
+    mini.style.height = '562.5px';
+    mini.style.position = 'relative';
+    mini.style.transform = 'scale(0.12)';
+    mini.style.transformOrigin = 'top left';
+    mini.style.pointerEvents = 'none';
+    if (slide && slide.background && slide.background.color) {
+      mini.style.background = slide.background.color;
+    }
+    // Only render text and shape elements for thumbnails (lightweight)
+    if (slide && slide.elements) {
+      for (var j = 0; j < slide.elements.length; j++) {
+        var el = slide.elements[j];
+        if (el.type === 'text') {
+          var d = document.createElement('div');
+          d.style.position = 'absolute';
+          d.style.left = el.left + 'px';
+          d.style.top = el.top + 'px';
+          d.style.width = el.width + 'px';
+          d.style.height = el.height + 'px';
+          d.style.padding = '10px';
+          d.style.color = el.defaultColor || '#333';
+          d.style.overflow = 'hidden';
+          d.innerHTML = el.content || '';
+          mini.appendChild(d);
+        } else if (el.type === 'shape') {
+          var d2 = document.createElement('div');
+          d2.style.position = 'absolute';
+          d2.style.left = el.left + 'px';
+          d2.style.top = el.top + 'px';
+          d2.style.width = el.width + 'px';
+          d2.style.height = el.height + 'px';
+          d2.style.backgroundColor = el.fill || '#5b9bd5';
+          mini.appendChild(d2);
+        }
+      }
+    }
+    thumb.appendChild(mini);
+
+    // Page number overlay
+    var num = document.createElement('span');
+    num.className = 'absolute bottom-0 right-0 bg-black/50 text-white text-[8px] px-1 rounded-tl';
+    num.textContent = i + 1;
+    thumb.appendChild(num);
+
+    strip.appendChild(thumb);
+  });
+}
+
+// Main render function
+function renderSlide(container, slideData) {
+  container.innerHTML = '';
+  if (!slideData) {
+    container.innerHTML = '<div class="flex items-center justify-center h-full text-on-surface-variant">此页生成失败</div>';
+    return;
+  }
+
+  var bg = slideData.background;
+  container.style.background = (bg && bg.color) ? bg.color : '#ffffff';
+
+  for (var idx = 0; idx < (slideData.elements || []).length; idx++) {
+    var el = slideData.elements[idx];
+    var div = document.createElement('div');
+    div.style.position = 'absolute';
+    div.style.left = el.left + 'px';
+    div.style.top = el.top + 'px';
+    div.style.width = el.width + 'px';
+    div.style.height = el.height + 'px';
+    if (el.rotate) div.style.transform = 'rotate(' + el.rotate + 'deg)';
+
+    switch (el.type) {
+      case 'text':
+        div.style.padding = '10px';
+        div.style.lineHeight = String(el.lineHeight || 1.5);
+        div.style.color = el.defaultColor || '#333';
+        div.style.fontFamily = el.defaultFontName || 'Inter, "Microsoft YaHei", sans-serif';
+        if (el.fill) div.style.backgroundColor = el.fill;
+        if (el.opacity !== undefined && el.opacity !== 1) div.style.opacity = el.opacity;
+        div.innerHTML = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(el.content) : el.content;
+        break;
+
+      case 'latex':
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.justifyContent = el.align || 'center';
+        div.style.color = el.color || '#000';
+        try {
+          if (typeof katex !== 'undefined') {
+            div.innerHTML = katex.renderToString(el.latex, {
+              throwOnError: false, displayMode: true, output: 'html'
+            });
+          } else {
+            div.textContent = el.latex;
+          }
+        } catch (e) {
+          div.textContent = el.latex;
+        }
+        break;
+
+      case 'shape':
+        var ns = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(ns, 'svg');
+        var vb = el.viewBox || [1, 1];
+        svg.setAttribute('viewBox', '0 0 ' + vb[0] + ' ' + vb[1]);
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.style.width = '100%';
+        svg.style.height = '100%';
+        var p = document.createElementNS(ns, 'path');
+        p.setAttribute('d', el.path);
+        p.setAttribute('fill', el.fill || '#5b9bd5');
+        svg.appendChild(p);
+        div.appendChild(svg);
+        break;
+
+      case 'line':
+        var lns = 'http://www.w3.org/2000/svg';
+        var s = el.start || [0, 0];
+        var e = el.end || [100, 0];
+        var lsvg = document.createElementNS(lns, 'svg');
+        lsvg.style.overflow = 'visible';
+        lsvg.style.position = 'absolute';
+        lsvg.style.left = '0';
+        lsvg.style.top = '0';
+        lsvg.style.width = '100%';
+        lsvg.style.height = '100%';
+
+        if (el.points && (el.points[0] === 'arrow' || el.points[1] === 'arrow')) {
+          var defs = document.createElementNS(lns, 'defs');
+          var marker = document.createElementNS(lns, 'marker');
+          marker.setAttribute('id', 'arr-' + el.id);
+          marker.setAttribute('viewBox', '0 0 10 10');
+          marker.setAttribute('refX', '10');
+          marker.setAttribute('refY', '5');
+          marker.setAttribute('markerWidth', '6');
+          marker.setAttribute('markerHeight', '6');
+          marker.setAttribute('orient', 'auto-start-reverse');
+          var ap = document.createElementNS(lns, 'path');
+          ap.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+          ap.setAttribute('fill', el.color || '#333');
+          marker.appendChild(ap);
+          defs.appendChild(marker);
+          lsvg.appendChild(defs);
+        }
+
+        var ln = document.createElementNS(lns, 'line');
+        ln.setAttribute('x1', s[0]);
+        ln.setAttribute('y1', s[1]);
+        ln.setAttribute('x2', e[0]);
+        ln.setAttribute('y2', e[1]);
+        ln.setAttribute('stroke', el.color || '#333');
+        ln.setAttribute('stroke-width', el.width || 2);
+        if (el.style === 'dashed') ln.setAttribute('stroke-dasharray', '8,4');
+        if (el.style === 'dotted') ln.setAttribute('stroke-dasharray', '2,4');
+        if (el.points && el.points[1] === 'arrow') ln.setAttribute('marker-end', 'url(#arr-' + el.id + ')');
+        if (el.points && el.points[0] === 'arrow') ln.setAttribute('marker-start', 'url(#arr-' + el.id + ')');
+        lsvg.appendChild(ln);
+        div.appendChild(lsvg);
+        break;
+    }
+
+    container.appendChild(div);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
