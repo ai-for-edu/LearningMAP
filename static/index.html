@@ -371,9 +371,9 @@ function renderDiagnosisResults(r, sessionId) {
           </div>
         </div>` : ''}
         <div class="text-center pt-2">
-          <a href="lesson.html?session_id=${sessionId}" class="inline-flex items-center gap-2 bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg hover:bg-primary-container transition-all">
+          <button onclick="showLessonFormatChoice('${sessionId}')" class="inline-flex items-center gap-2 bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg hover:bg-primary-container transition-all">
             <span class="material-symbols-outlined text-lg">school</span>Start Learning
-          </a>
+          </button>
         </div>
       </div>
     </div>`;
@@ -393,6 +393,41 @@ function renderLessonButton(sessionId) {
         </a>
       </div>
     </div>`;
+}
+
+function showLessonFormatChoice(sid) {
+  const overlay = document.createElement('div');
+  overlay.className = 'fixed inset-0 bg-black/30 flex items-center justify-center z-[100]';
+  overlay.innerHTML = `
+    <div class="bg-white rounded-3xl p-8 max-w-md mx-4 shadow-xl">
+      <h3 class="font-headline font-bold text-lg text-on-surface mb-2">选择学习方式</h3>
+      <p class="font-body text-sm text-on-surface-variant mb-6">选择教案格式：</p>
+      <div class="flex gap-4">
+        <button id="chooseMarkdown" class="flex-1 flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-slate-200 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">
+          <span class="material-symbols-outlined text-3xl text-primary">article</span>
+          <span class="font-headline font-bold text-sm">Markdown</span>
+          <span class="text-xs text-on-surface-variant">文字教案，支持笔记</span>
+        </button>
+        <button id="chooseSlides" class="flex-1 flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-slate-200 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">
+          <span class="material-symbols-outlined text-3xl text-primary">slideshow</span>
+          <span class="font-headline font-bold text-sm">PPT 幻灯片</span>
+          <span class="text-xs text-on-surface-variant">演示文稿式教案</span>
+        </button>
+      </div>
+      <button id="cancelFormatChoice" class="w-full mt-4 text-sm text-on-surface-variant hover:bg-slate-100 py-2.5 rounded-xl transition-colors">Cancel</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('cancelFormatChoice').addEventListener('click', function() { overlay.remove(); });
+  document.getElementById('chooseMarkdown').addEventListener('click', function() {
+    overlay.remove();
+    window.location.href = 'lesson.html?session_id=' + sid;
+  });
+  document.getElementById('chooseSlides').addEventListener('click', function() {
+    overlay.remove();
+    window.location.href = 'slides.html?session_id=' + sid;
+  });
 }
 
 // On load: always rebuild conversation from state when session_id exists
