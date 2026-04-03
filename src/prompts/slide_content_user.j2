@@ -1,0 +1,29 @@
+# Generation Requirements
+
+## Scene Information
+
+- **Title**: {{ title }}
+- **Description**: {{ description }}
+- **Key Points**:
+{% for point in key_points %}
+  - {{ point }}
+{% endfor %}
+
+## Canvas Size
+
+- **Canvas Size**: 1000 × 562.5 px
+
+## Output Requirements
+
+Generate a complete PPT slide for one page.
+
+**Language**: All text content must be in Chinese.
+
+**Must Follow**:
+1. Output pure JSON directly, without any explanation
+2. Do not wrap with code blocks
+3. Ensure JSON format is correct and parseable
+4. All TextElement height values must come from the height lookup table
+
+**Output Structure Example**:
+{"background":{"type":"solid","color":"#ffffff"},"elements":[{"id":"title_001","type":"text","left":60,"top":50,"width":880,"height":76,"content":"<p style=\"font-size:32px;\"><strong>Title</strong></p>","defaultFontName":"","defaultColor":"#333333"}]}
