@@ -2,7 +2,7 @@
 
 ## 概述
 
-全栈 AI 教育助手。学生输入学习主题，系统自动生成知识图谱、进行自适应诊断测验、分析结果并生成针对薄弱知识点的个性化教案。
+全栈 AI 教育助手。学生输入学习主题，系统自动生成知识图谱、进行自适应诊断测验、分析结果并生成针对薄弱知识点的个性化教案（Markdown 或 PPT 幻灯片）。
 
 ```
 浏览器 (HTML/JS)  ←→  FastAPI (Python)  ←→  LLM (OpenAI 兼容 API)
@@ -18,7 +18,8 @@
 | 后端 | FastAPI + LangGraph |
 | 大模型 | OpenAI 兼容 API（通过 Instructor 实现结构化输出） |
 | 持久化 | SQLite（会话状态）+ localStorage（侧边栏） |
-| 可视化 | vis.js Network（知识图谱）、marked.js + DOMPurify（Markdown 渲染） |
+| 可视化 | vis.js Network（知识图谱）、ECharts（图表）、KaTeX（公式）、marked.js + DOMPurify（Markdown） |
+| 导出 | python-pptx（PPTX 导出）、matplotlib（LaTeX 公式渲染） |
 
 ---
 
@@ -35,17 +36,24 @@ openail/
 │   ├── agent/
 │   │   ├── state.py              # LearningState 状态定义
 │   │   ├── graph.py              # LangGraph 状态机编排
-│   │   └── nodes/                # 7 个图节点
+│   │   └── nodes/                # 图节点
 │   │       ├── intent.py         # 意图识别
-│   │       ├── chat.py           # 通用对话
+│   │       ├── chat.py           # 通用对话（含学习上下文注入）
 │   │       ├── knowledge_graph.py # 知识图谱生成
 │   │       ├── quiz.py           # 诊断出题
 │   │       ├── grading.py        # 答案判定
 │   │       ├── diagnosis.py      # 诊断分析
-│   │       └── lesson.py         # 教案生成
+│   │       ├── lesson.py         # Markdown 教案生成
+│   │       └── slides.py         # PPT 幻灯片生成（两阶段管线）
 │   ├── llm/
 │   │   ├── client.py             # OpenAI + Instructor 客户端封装
-│   │   └── schemas.py            # Pydantic 数据模型
+│   │   ├── schemas.py            # 核心 Pydantic 数据模型
+│   │   └── slide_schemas.py      # PPT 元素模型（Text/LaTeX/Shape/Line/Chart/Table）
+│   ├── export/
+│   │   └── pptx_export.py        # PPTX 文件导出（python-pptx）
+│   ├── utils/
+│   │   ├── json_repair.py        # JSON 解析修复（4 策略）
+│   │   └── text.py               # 文本工具（CJK 检测等）
 │   └── prompts/
 │       ├── loader.py             # Jinja2 模板加载器
 │       ├── intent.j2             # 意图分类提示词
@@ -53,17 +61,24 @@ openail/
 │       ├── quiz_generate.j2      # 出题提示词
 │       ├── grading.j2            # 判题提示词
 │       ├── lesson_plan.j2        # 薄弱知识点教案提示词
-│       └── lesson_review.j2      # 全部掌握时复习教案提示词
+│       ├── lesson_review.j2      # 全部掌握时复习教案提示词
+│       ├── slide_outline.j2      # 幻灯片大纲提示词
+│       ├── slide_content_system.j2  # 幻灯片排版系统提示词（961 行，源自 OpenMAIC）
+│       ├── slide_content_user.j2    # 幻灯片排版用户提示词
+│       └── slide_content_draft.j2   # 幻灯片内容草稿提示词
 ├── static/
 │   ├── index.html                # 主聊天页面
 │   ├── diagnosis.html            # 诊断答题页面
 │   ├── results.html              # 结果展示页面
-│   ├── lesson.html               # 教案学习页面
-│   ├── api.js                    # API 客户端 + XSS 防护工具
-│   └── sidebar.js                # 会话管理侧边栏
+│   ├── lesson.html               # Markdown 教案学习页面
+│   ├── slides.html               # PPT 幻灯片查看页面
+│   ├── api.js                    # API 客户端 + XSS 防护 + 导出工具
+│   └── sidebar.js                # 会话管理侧边栏（Rename / Export / Delete）
 ├── tests/
 │   ├── test_api.py               # API 接口测试
 │   ├── test_schemas.py           # 数据模型测试
+│   ├── test_slide_schemas.py     # PPT 元素模型测试
+│   ├── test_json_repair.py       # JSON 修复测试
 │   ├── test_prompts.py           # 提示词模板测试
 │   ├── test_graph.py             # 状态机结构测试
 │   ├── test_llm_client.py        # LLM 客户端测试
@@ -105,7 +120,7 @@ openail/
 │  6. 提交：POST /api/chat/{id}/submit-quiz {answers: [...]}   │
 │     └─► diagnosis_node → 生成 DiagnosisResult                │
 │                                                             │
-│  7. 跳转回 /?session_id=xxx&show=results                     │
+│  7. 跳转回 /?session_id=xxx                                  │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -115,27 +130,78 @@ openail/
 │  8. 从后端状态重建完整对话：                                     │
 │     - 用户消息 + 知识图谱                                      │
 │     - 诊断结果卡片（正确率环形图、知识点分析）                      │
-│     - [开始学习] 按钮                                         │
+│     - [开始学习] 按钮 → 弹窗选择 Markdown 或 PPT               │
 │                                                             │
-│  9. 用户点击"开始学习"                                         │
-│     └─► 跳转至 lesson.html?session_id=xxx                    │
+│  9. 用户选择格式：                                             │
+│     ├── Markdown → lesson.html?session_id=xxx               │
+│     └── PPT 幻灯片 → slides.html?session_id=xxx             │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  lesson.html（教案学习页）                      │
-│                                                             │
-│  10. 页面加载：POST /api/chat/{id}/generate-lesson            │
-│      └─► lesson_node → 生成 Markdown 教案内容                 │
-│      - 蓝色加载动画等待生成                                     │
-│      - 使用 marked.js + DOMPurify 渲染                       │
-│      - 左侧：目录导航                                         │
-│      - 右侧：知识图谱（薄弱点标红）                              │
-│                                                             │
-│  11. 点击"完成学习" → 回到对话页                                │
-│      显示 [Review Lesson] 按钮                                │
-└─────────────────────────────────────────────────────────────┘
+                         ┌────┴────┐
+                         ▼         ▼
+┌──────────────────────────┐  ┌──────────────────────────────┐
+│  lesson.html（Markdown）  │  │  slides.html（PPT 幻灯片）    │
+│                          │  │                              │
+│  POST generate-lesson    │  │  POST generate-slides        │
+│  └─► Markdown 教案       │  │  └─► 两阶段生成：              │
+│  marked.js 渲染          │  │     阶段 1：大纲（8-15 页）     │
+│  左侧目录 + 右侧知识图谱  │  │     阶段 2a：内容草稿（~500字） │
+│                          │  │     阶段 2b：排版 JSON         │
+│                          │  │  ECharts 图表 + KaTeX 公式    │
+│                          │  │  翻页导航 + 缩略图             │
+│                          │  │  [Export PPTX] 下载按钮        │
+│                          │  │                              │
+│  完成 → 回到对话          │  │  完成 → 回到对话               │
+└──────────────────────────┘  └──────────────────────────────┘
 ```
+
+---
+
+## PPT 幻灯片生成管线（参考 OpenMAIC）
+
+### 两阶段生成架构
+
+```
+用户点击 Start Learning → 选 PPT 幻灯片
+  │
+  ├── 阶段 1：大纲生成
+  │   POST /api/chat/{id}/generate-slides
+  │   LLM → [{title, description, keyPoints}, ...] （8-15 页）
+  │
+  └── 阶段 2：逐页生成（每页两次 LLM 调用）
+      │
+      ├── 2a：内容草稿
+      │   LLM → 详细教学内容（~500 字，含讲解、公式、例题）
+      │   模拟 OpenMAIC 的 PDF 教材内容输入
+      │
+      └── 2b：排版 JSON
+          LLM → {background, elements: [TextElement, LatexElement, ...]}
+          使用 OpenMAIC 的 961 行 system prompt
+```
+
+### 后处理管线（适配自 OpenMAIC scene-generator.ts）
+
+```
+LLM 原始输出
+  ↓ parse_json_response()     # JSON 修复（代码块、LaTeX 转义、截断修复）
+  ↓ _fix_element_defaults()   # 元素默认值（line/text/shape/image）
+  ↓ _process_latex_elements() # LaTeX 验证（CJK 转文本、空值移除）
+  ↓ _enforce_canvas_bounds()  # 画布边界裁剪（1000×562.5）
+  ↓ _assign_ids_and_rotation()# UUID ID + rotate=0
+  ↓ _to_pydantic_elements()   # 转 Pydantic 模型
+  ↓ SlideData
+```
+
+### 支持的 PPT 元素类型
+
+| 元素 | 前端渲染 | PPTX 导出 |
+|------|---------|----------|
+| TextElement | HTML + DOMPurify | python-pptx TextBox（完整 HTML 样式解析） |
+| LatexElement | KaTeX | matplotlib 渲染为 PNG |
+| ShapeElement | SVG path | Rectangle / Oval / RoundedRect |
+| LineElement | SVG + arrow markers | Connector + 虚线样式 |
+| ChartElement | ECharts（8 种图表） | 占位框 |
+| TableElement | HTML table（合并单元格 + 样式） | python-pptx Table |
+| ImageElement | 暂不支持 | 灰色占位框 |
 
 ---
 
@@ -179,19 +245,27 @@ openail/
 | 节点 | 输入 | 是否调用 LLM | 输出 |
 |------|------|-------------|------|
 | **intent** 意图识别 | 用户消息 | 是（结构化：IntentResult） | mode, topic |
-| **chat** 通用对话 | 消息历史 | 是（原始对话补全） | AI 回复 |
+| **chat** 通用对话 | 消息历史 + 学习上下文摘要 | 是（原始对话补全） | AI 回复 |
 | **knowledge_graph** 知识图谱 | 主题字符串 | 是（结构化：KnowledgeGraph） | 带节点和边的图谱 |
 | **quiz** 出题 | 知识图谱 | 是（结构化：list[QuizQuestion]） | 约 10 道选择题 |
 | **grading** 判题 | 答案 + 题目 | 否（本地比对） | 对/错 + 下一题索引 |
 | **diagnosis** 诊断 | 所有答案 | 否（本地计算） | 分数、知识点分析、薄弱点 |
 | **lesson** 教案 | 薄弱点 + 图谱 | 是（原始对话补全） | Markdown 教案内容 |
+| **slides** 幻灯片 | 大纲 + 内容草稿 | 是（两阶段调用） | SlideData JSON |
 
-### 路由逻辑
+### 对话上下文注入
 
-- **意图识别之后**：根据 `mode` 字段路由 → 对话 / 知识图谱 / 出题 / 判题 / 诊断 / 教案
-- **判题之后**：如果全部作答完 → 诊断；否则 → 出题（下一题）
-- **诊断之后**：固定跳转 → 教案
-- **快捷路径**：如果 `mode="quiz"` 且已有题目，直接进入判题
+chat 节点每次调 LLM 前，从 session state 提取关键数据组装摘要（~200 tokens），注入 system prompt：
+
+```
+当前学习上下文：
+- 学习主题：勾股定理
+- 知识图谱：直角三角形(前置)、勾股定理(核心)、平方根(前置)
+- 诊断结果：70%（7/10），薄弱：平方根、坐标距离
+- 教案：已生成
+```
+
+这样用户在对话中问"我哪里比较弱"时 AI 能回答。
 
 ---
 
@@ -201,19 +275,11 @@ openail/
 |------|------|------|--------|------|
 | POST | `/api/chat` | 发送消息，运行状态机 | `{session_id?, message}` | `{session_id, mode, message, data}` |
 | POST | `/api/chat/{id}/submit-quiz` | 提交答题答案，运行诊断 | `{answers: [int]}` | `{session_id, diagnosis_result}` |
-| POST | `/api/chat/{id}/generate-lesson` | 生成个性化教案 | — | `{session_id, lesson_content}` |
-| GET | `/api/chat/{id}/state` | 获取会话完整状态（含导出数据） | — | 图谱、结果、教案、题目、答案、消息历史 |
+| POST | `/api/chat/{id}/generate-lesson` | 生成 Markdown 教案 | — | `{session_id, lesson_content}` |
+| POST | `/api/chat/{id}/generate-slides` | 生成 PPT 幻灯片（大纲+逐页） | — | `{session_id, outlines, slides}` |
+| GET | `/api/chat/{id}/export-pptx` | 下载 PPTX 文件 | — | .pptx 文件流 |
+| GET | `/api/chat/{id}/state` | 获取会话完整状态 | — | 图谱、结果、教案、幻灯片、题目、答案、消息 |
 | GET | `/health` | 健康检查 | — | `{status: "ok"}` |
-
-### 响应 `mode` 取值
-
-| Mode | 含义 | `data` 字段 |
-|------|------|------------|
-| `chat` | 通用对话 | — |
-| `graph` | 知识图谱已生成 | `{graph: KnowledgeGraph}` |
-| `quiz` | 题目已就绪 | `{questions: [QuizQuestion]}` |
-| `result` | 诊断完成 | `{result: DiagnosisResult}` |
-| `lesson` | 教案已生成 | `{lesson: string}` |
 
 ---
 
@@ -221,33 +287,32 @@ openail/
 
 ```
 KnowledgeGraph 知识图谱
-├── topic: str                          # 学习主题
-├── nodes: [KnowledgeNode]              # 知识点节点
-│   ├── id: str                         # 节点 ID
-│   ├── name: str                       # 知识点名称
-│   ├── description: str                # 描述
-│   └── level: "prerequisite"|"core"|"extension"  # 层级
-└── edges: [KnowledgeEdge]              # 关联边
-    ├── source: str                     # 源节点 ID
-    ├── target: str                     # 目标节点 ID
-    └── relation: str                   # 关系类型
+├── topic: str
+├── nodes: [KnowledgeNode]
+│   ├── id, name, description, level
+└── edges: [KnowledgeEdge]
+    ├── source, target, relation
 
 QuizQuestion 诊断题目
-├── id: str                             # 题目 ID
-├── knowledge_point: str                # 对应知识点
-├── question: str                       # 题目内容
-├── options: [str]                      # 4 个选项
-└── answer: int                         # 正确答案索引（0-3）
+├── id, knowledge_point, question, options, answer
 
 DiagnosisResult 诊断结果
-├── score: int                          # 正确率百分比
-├── total: int                          # 总题数
-├── correct: int                        # 答对数
-├── incorrect: int                      # 答错数
-└── breakdown: [DiagnosisBreakdown]     # 各知识点分析
-    ├── name: str                       # 知识点名称
-    ├── status: "mastered"|"weak"|"skipped"  # 掌握状态
-    └── detail: str                     # 详情描述
+├── score, total, correct, incorrect
+└── breakdown: [DiagnosisBreakdown]
+    ├── name, status, detail
+
+SlideData 幻灯片页面
+├── background: {type, color}
+└── elements: [PPTElement]
+    ├── TextElement: id, type, left, top, width, height, content, defaultColor
+    ├── LatexElement: id, type, left, top, width, height, latex, color
+    ├── ShapeElement: id, type, left, top, width, height, path, viewBox, fill
+    ├── LineElement: id, type, left, top, width, start, end, style, color, points
+    ├── ChartElement: id, type, left, top, width, height, chartType, data, themeColors
+    └── TableElement: id, type, left, top, width, height, colWidths, data, outline
+
+SlideOutline 幻灯片大纲
+├── title, description, keyPoints
 ```
 
 ---
@@ -274,8 +339,9 @@ DiagnosisResult 诊断结果
 
 - **内存缓存**：`_sessions` 字典，快速读取
 - **SQLite 持久化**：`sessions.db`，表结构 `(id TEXT, data TEXT)`
-- **序列化**：消息 → `{type, content}` 字典，Pydantic 模型 → `.model_dump()`，整体 JSON 编码
-- **反序列化**：重建 `AIMessage`/`HumanMessage` 消息对象，重建 Pydantic 模型实例
+- **序列化**：消息 → `{type, content}`，Pydantic → `.model_dump()`，JSON 编码
+- **反序列化**：重建 Message 对象和 Pydantic 模型
+- **会话恢复**：前端从 state API 重建完整对话（结构化内容 + 后续聊天消息）
 
 ---
 
@@ -284,8 +350,9 @@ DiagnosisResult 诊断结果
 ### 页面跳转流程
 
 ```
-index.html ──► diagnosis.html ──► index.html（结果） ──► lesson.html ──► index.html
-  主对话          答题诊断           显示诊断结果          学习教案         回到对话
+index.html ──► diagnosis.html ──► index.html（结果）──┬── lesson.html ──► index.html
+  主对话          答题诊断           显示诊断结果       └── slides.html ──► index.html
+                                  选择教案格式            PPT 幻灯片       回到对话
 ```
 
 ### 脚本依赖
@@ -295,6 +362,8 @@ CDN 库：
 ├── Tailwind CSS          # 样式
 ├── Google Material Icons # 图标
 ├── vis.js Network        # 知识图谱可视化
+├── ECharts               # 图表渲染（slides.html）
+├── KaTeX                 # LaTeX 公式渲染（slides.html）
 ├── marked.js             # Markdown 渲染
 └── DOMPurify             # XSS 消毒
 
@@ -309,15 +378,14 @@ CDN 库：
 
 | 格式 | 说明 | 内容 |
 |------|------|------|
-| **Markdown** | 学习报告，适合阅读和分享 | 对话记录 → 知识图谱表格 → 诊断题目（含学生答案/正确答案）→ 诊断结果 → 个性化教案 |
-| **JSON** | 结构化数据，适合程序处理 | state API 返回的完整原始数据 |
-
-导出在浏览器端完成，不需要额外后端接口。从 `GET /api/chat/{id}/state` 获取数据，前端组装后触发文件下载。
+| **Markdown** | 学习报告 | 对话记录 → 知识图谱 → 诊断题目 → 诊断结果 → 教案 |
+| **JSON** | 结构化数据 | state API 完整原始数据 |
+| **PPTX** | PPT 文件 | slides.html 页面的 Export PPTX 按钮 |
 
 ### 会话命名策略
 
 - **新建会话**：侧边栏显示"未命名"
-- **自动命名**：当 LLM 返回主题时（知识图谱生成），自动以主题命名
+- **自动命名**：当 LLM 返回主题时自动以主题命名
 - **兜底策略**：对话 3 轮以上后，取用户消息前 15 字符
 - **手动修改**：三点菜单中点击 Rename 行内编辑
 
@@ -327,14 +395,15 @@ CDN 库：
 
 | 威胁 | 防护手段 |
 |------|---------|
-| XSS 跨站脚本 | 所有用户内容使用 `escapeHtml()` 转义，Markdown 使用 DOMPurify 消毒 |
-| CORS 跨域 | 通过 `ALLOWED_ORIGINS` 环境变量配置，默认允许所有（开发），生产可限定域名 |
+| XSS 跨站脚本 | 所有 innerHTML 使用 `escapeHtml()` 或 DOMPurify 消毒 |
+| CORS 跨域 | 通过 `ALLOWED_ORIGINS` 环境变量配置 |
 | 输入验证 | 消息最长 5000 字符，答案索引限制 0-3 |
 | SQL 注入 | 使用 `?` 参数化查询 |
 | 阻塞 I/O | LLM 调用通过 `asyncio.to_thread` 异步化 |
-| 错误处理 | 所有 LLM 节点包含 try/except + 日志记录 |
+| 错误处理 | 所有 LLM 节点包含 try/except + 日志 |
 | 资源泄漏 | SQLite 使用 `with` 上下文管理器 |
-| 会话错误 | 会话不存在时返回 HTTP 404（`HTTPException`） |
+| JSON 损坏 | 4 策略修复（代码块、LaTeX 转义、截断、控制字符） |
+| 中文 LaTeX | 自动检测 CJK 并转为 TextElement |
 
 ---
 
@@ -345,7 +414,7 @@ CDN 库：
 - **Python 3.11+**（项目通过 `.python-version` 锁定 3.11）
 - **uv**（Python 包管理器，替代 pip + venv）
 - **Git**
-- 一个 OpenAI 兼容的 API Key（支持 OpenAI、Anthropic 代理、DeepSeek 等）
+- 一个 OpenAI 兼容的 API Key
 
 如果没有 uv，先安装：
 
@@ -353,41 +422,29 @@ CDN 库：
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-安装后重启终端，或执行 `source ~/.zshrc`（macOS）/ `source ~/.bashrc`（Linux）使 `uv` 命令生效。
-
 ### 2. 克隆 + 安装依赖
 
 ```bash
 git clone <仓库地址>
 cd openail
-
-# uv 会自动安装 Python 3.11（如果本地没有）并创建虚拟环境
 uv sync
 ```
 
-执行完成后，项目根目录下会出现 `.venv/` 虚拟环境目录，所有依赖已安装。
-
 ### 3. 配置 .env
-
-在项目根目录创建 `.env` 文件（已被 `.gitignore` 忽略，不会提交到 Git）：
 
 ```bash
 # .env
 OPENAI_API_KEY=你的API密钥
 OPENAI_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=gpt-4o
-# ALLOWED_ORIGINS=https://yourdomain.com  # 可选，生产环境限定 CORS 来源
+# ALLOWED_ORIGINS=https://yourdomain.com  # 可选
 ```
-
-**不同 API 提供商的配置示例：**
 
 | 提供商 | OPENAI_BASE_URL | LLM_MODEL |
 |--------|----------------|-----------|
 | OpenAI 官方 | `https://api.openai.com/v1` | `gpt-4o` |
 | DeepSeek | `https://api.deepseek.com/v1` | `deepseek-chat` |
-| 第三方代理 | `https://你的代理地址/v1` | 代理支持的模型名 |
-
-> 只要 API 兼容 OpenAI 的 `/v1/chat/completions` 接口格式即可。
+| 第三方代理 | `https://代理地址/v1` | 代理支持的模型名 |
 
 ### 4. 启动 + 访问
 
@@ -395,16 +452,9 @@ LLM_MODEL=gpt-4o
 uv run python run/serve.py
 ```
 
-看到以下输出表示启动成功：
-
-```
-INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
-```
-
-打开浏览器访问 **http://localhost:8080**，即可使用。
-
-**运行测试（可选）：**
+打开 **http://localhost:8080** 即可使用。
 
 ```bash
+# 运行测试
 uv run python -m pytest tests/ -v
 ```
