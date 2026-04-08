@@ -5,6 +5,7 @@ from src.agent.nodes.quiz import quiz_node
 from src.agent.nodes.grading import grading_node
 from src.agent.nodes.diagnosis import diagnosis_node
 from src.agent.nodes.lesson import lesson_node
+from src.agent.nodes.slides import generate_slide_content, generate_slide_outlines
 
 __all__ = [
     "intent_node",
@@ -14,4 +15,6 @@ __all__ = [
     "grading_node",
     "diagnosis_node",
     "lesson_node",
+    "generate_slide_outlines",
+    "generate_slide_content",
 ]

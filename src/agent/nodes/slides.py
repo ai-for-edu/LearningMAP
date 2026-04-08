@@ -26,6 +26,7 @@ from src.llm.slide_schemas import (
 )
 from src.prompts.loader import render_prompt
 from src.utils.json_repair import parse_json_response
+from src.utils.text import has_cjk
 
 logger = logging.getLogger(__name__)
 
@@ -260,11 +261,6 @@ def _fix_element_defaults(elements: list[dict]) -> list[dict]:
     return fixed
 
 
-def _has_cjk(text: str) -> bool:
-    """Check if text contains CJK characters."""
-    return any("\u4e00" <= ch <= "\u9fff" or "\u3400" <= ch <= "\u4dbf" for ch in text)
-
-
 def _process_latex_elements(elements: list[dict]) -> list[dict]:
     """Validate LaTeX elements. Convert CJK-containing ones to TextElement.
 
@@ -285,7 +281,7 @@ def _process_latex_elements(elements: list[dict]) -> list[dict]:
 
         # If LaTeX contains CJK characters, convert to TextElement
         # (KaTeX/matplotlib can't render Chinese in math mode)
-        if _has_cjk(latex_str):
+        if has_cjk(latex_str):
             logger.warning("LaTeX contains CJK, converting to text: %s", el.get("id", "?"))
             el["type"] = "text"
             el["content"] = f'<p style="font-size: 18px;">{latex_str}</p>'

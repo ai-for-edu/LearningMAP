@@ -240,7 +240,7 @@ function buildThumbnails() {
           d.style.padding = '10px';
           d.style.color = el.defaultColor || '#333';
           d.style.overflow = 'hidden';
-          d.innerHTML = el.content || '';
+          d.innerHTML = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(el.content || '') : '';
           mini.appendChild(d);
         } else if (el.type === 'shape') {
           var d2 = document.createElement('div');
@@ -446,7 +446,7 @@ function renderSlide(container, slideData) {
                 if (cellData.style.fontsize) td.style.fontSize = cellData.style.fontsize;
                 if (cellData.style.align) td.style.textAlign = cellData.style.align;
               }
-              td.innerHTML = (cellData.text || '').replace(/\n/g, '<br/>');
+              td.innerHTML = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize((cellData.text || '').replace(/\n/g, '<br/>')) : escapeHtml(cellData.text || '');
               tr.appendChild(td);
             }
             tbody.appendChild(tr);

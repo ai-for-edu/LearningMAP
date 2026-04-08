@@ -20,6 +20,8 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Emu, Pt
 
+from src.utils.text import has_cjk
+
 logger = logging.getLogger(__name__)
 
 # Canvas: 1000 x 562.5 px → 16:9 slide (13.333 x 7.5 inches)
@@ -191,14 +193,6 @@ class HTMLTextParser(HTMLParser):
         return result
 
 
-def _has_cjk(text: str) -> bool:
-    """Check if text contains CJK (Chinese/Japanese/Korean) characters."""
-    for ch in text:
-        if "\u4e00" <= ch <= "\u9fff" or "\u3400" <= ch <= "\u4dbf":
-            return True
-    return False
-
-
 def _render_latex_to_image(latex: str) -> io.BytesIO | None:
     """Render LaTeX formula to PNG image using matplotlib.
 
@@ -212,7 +206,7 @@ def _render_latex_to_image(latex: str) -> io.BytesIO | None:
 
         fig, ax = plt.subplots(figsize=(6, 1.5))
 
-        if _has_cjk(latex):
+        if has_cjk(latex):
             # Chinese in LaTeX: render as plain text with a CJK font
             ax.text(
                 0.5, 0.5, latex, fontsize=18,

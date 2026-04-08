@@ -190,7 +190,7 @@ async def generate_slides(session_id: str) -> dict:
     # Stage 1: Generate outlines
     outlines = await asyncio.to_thread(generate_slide_outlines, state)
     if not outlines:
-        return {"session_id": session_id, "error": "Failed to generate outlines"}
+        raise HTTPException(status_code=502, detail="Failed to generate slide outlines")
 
     # Stage 2: Generate content for each slide
     slides: list[dict | None] = []
