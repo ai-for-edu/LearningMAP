@@ -465,6 +465,49 @@ function showLessonFormatChoice(sid) {
   if (state.has_lesson) {
     renderLessonButton(sid);
   }
+
+  // Render remaining chat messages (after the structured flow)
+  // Find messages that came AFTER the learning flow
+  if (state.messages && state.messages.length > 0) {
+    // Skip messages that are part of the structured flow (topic request, graph response, etc.)
+    // Heuristic: find the last "system" message (graph/quiz/diagnosis/lesson related),
+    // then render all messages after it
+    let startIdx = 0;
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      const msg = state.messages[i];
+      if (msg.role === 'ai') {
+        const content = msg.content || '';
+        // Check if this is a structured response (knowledge graph, quiz, diagnosis, lesson)
+        if (content.includes('知识图谱') || content.includes('开始作答') ||
+            content.includes('诊断完成') || content.includes('已掌握') ||
+            content.length > 1000) {
+          startIdx = i + 1;
+          break;
+        }
+      }
+    }
+
+    // Render chat messages from startIdx onwards
+    for (let i = startIdx; i < state.messages.length; i++) {
+      const msg = state.messages[i];
+      if (msg.role === 'user') {
+        chatHistory.innerHTML += `
+          <div class="flex justify-end">
+            <div class="bg-surface-container-low px-6 py-4 rounded-3xl rounded-tr-none max-w-[85%] text-on-surface shadow-sm">
+              <p class="font-body leading-relaxed">${escapeHtml(msg.content)}</p>
+            </div>
+          </div>`;
+      } else if (msg.role === 'ai') {
+        chatHistory.innerHTML += `
+          <div class="flex gap-4">
+            <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+            </div>
+            <div class="flex-grow prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${safeMarkdown(msg.content)}</div>
+          </div>`;
+      }
+    }
+  }
 })();
 </script>
 
