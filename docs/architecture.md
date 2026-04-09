@@ -432,13 +432,17 @@ uv sync
 
 ### 3. 配置 .env
 
+编辑项目根目录的 `.env` 文件，填入你的 API 密钥：
+
 ```bash
 # .env
 OPENAI_API_KEY=你的API密钥
 OPENAI_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=gpt-4o
-# ALLOWED_ORIGINS=https://yourdomain.com  # 可选
+# ALLOWED_ORIGINS=https://yourdomain.com  # 可选，生产环境限定 CORS 来源
 ```
+
+> 注意：如果是公开仓库，请勿将真实 API Key 提交到 Git。可将 `.env` 加入 `.gitignore`。
 
 | 提供商 | OPENAI_BASE_URL | LLM_MODEL |
 |--------|----------------|-----------|
