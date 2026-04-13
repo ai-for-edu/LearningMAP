@@ -139,7 +139,7 @@
   </div>
 </main>
 
-<script src="api.js?v=3"></script>
+<script src="api.js?v=6"></script>
 <script>
 let sessionId = getSessionId();
 let allQuestions = [];
@@ -147,103 +147,169 @@ let currentIndex = 0;
 let answers = [];
 let selectedOption = -1;
 
+function buildQuizUI() {
+  document.querySelector('main').innerHTML = `
+    <div class="max-w-6xl mx-auto w-full flex gap-8">
+      <div class="flex-1 flex flex-col">
+        <div class="bg-white rounded-3xl border border-slate-100 p-10 flex-grow shadow-sm">
+          <div class="mb-6 flex items-center gap-3">
+            <span class="inline-flex items-center gap-1.5 bg-primary-fixed text-primary px-3 py-1 rounded-full text-xs font-headline font-bold">
+              <span class="material-symbols-outlined text-sm">label</span>
+              <span id="knowledgeTagText"></span>
+            </span>
+            <span class="text-xs text-slate-400" id="loadingHint"></span>
+          </div>
+          <p class="font-headline text-xl font-bold text-on-surface leading-relaxed mb-2" id="questionText"></p>
+          <p class="font-body text-sm text-on-surface-variant">Select one answer</p>
+        </div>
+      </div>
+      <div class="w-[420px] flex flex-col gap-4">
+        <div class="flex flex-col gap-3" id="optionsContainer">
+          <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 0)">
+            <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">A</span>
+            <span class="font-body text-sm leading-relaxed text-on-surface" id="optA"></span>
+          </button>
+          <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 1)">
+            <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">B</span>
+            <span class="font-body text-sm leading-relaxed text-on-surface" id="optB"></span>
+          </button>
+          <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 2)">
+            <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">C</span>
+            <span class="font-body text-sm leading-relaxed text-on-surface" id="optC"></span>
+          </button>
+          <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 3)">
+            <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">D</span>
+            <span class="font-body text-sm leading-relaxed text-on-surface" id="optD"></span>
+          </button>
+        </div>
+        <div class="flex gap-3 mt-2">
+          <button class="flex-1 bg-surface-container-high text-on-surface-variant py-4 px-6 rounded-2xl font-headline font-bold text-sm hover:bg-surface-container-highest transition-all disabled:opacity-30 disabled:cursor-not-allowed" id="prevBtn" disabled onclick="prevQuestion()">
+            <span class="material-symbols-outlined text-lg align-middle mr-1">arrow_back</span>
+            <span>Previous</span>
+          </button>
+          <button class="flex-1 bg-primary text-white py-4 px-6 rounded-2xl font-headline font-bold text-sm shadow-sm hover:shadow-md hover:bg-primary-container transition-all disabled:opacity-40 disabled:cursor-not-allowed" id="nextBtn" disabled onclick="nextQuestion()">
+            <span id="nextBtnText">Next Question</span>
+            <span class="material-symbols-outlined text-lg align-middle ml-1">arrow_forward</span>
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+let quizFullyLoaded = false;
+
 async function initDiagnosis() {
   if (!sessionId) {
     alert('请先从主页选择学习主题');
     window.location.href = '/';
     return;
   }
-  try {
-    // Show full-screen loading spinner
-    document.querySelector('main').innerHTML = `
-      <div class="max-w-6xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh]">
-        <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-        </svg>
-        <p class="font-headline font-bold text-lg text-on-surface">正在生成诊断题目</p>
-        <p class="font-body text-sm text-on-surface-variant mt-2">AI 正在根据知识图谱出题，请稍候...</p>
-      </div>`;
-    document.getElementById('progressText').textContent = 'Loading...';
-    document.getElementById('progressBar').style.width = '0%';
 
-    const data = await sendMessage('开始诊断', sessionId);
-    sessionId = data.session_id;
-    if (data.mode === 'quiz' && data.data?.questions) {
-      allQuestions = data.data.questions;
-      currentIndex = 0;
-      answers = [];
-      // Restore quiz UI
-      document.querySelector('main').innerHTML = `
-        <div class="max-w-6xl mx-auto w-full flex gap-8">
-          <div class="flex-1 flex flex-col">
-            <div class="bg-white rounded-3xl border border-slate-100 p-10 flex-grow shadow-sm">
-              <div class="mb-6">
-                <span class="inline-flex items-center gap-1.5 bg-primary-fixed text-primary px-3 py-1 rounded-full text-xs font-headline font-bold">
-                  <span class="material-symbols-outlined text-sm">label</span>
-                  <span id="knowledgeTagText"></span>
-                </span>
-              </div>
-              <p class="font-headline text-xl font-bold text-on-surface leading-relaxed mb-2" id="questionText"></p>
-              <p class="font-body text-sm text-on-surface-variant">Select one answer</p>
-            </div>
-          </div>
-          <div class="w-[420px] flex flex-col gap-4">
-            <div class="flex flex-col gap-3" id="optionsContainer">
-              <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 0)">
-                <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">A</span>
-                <span class="font-body text-sm leading-relaxed text-on-surface" id="optA"></span>
-              </button>
-              <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 1)">
-                <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">B</span>
-                <span class="font-body text-sm leading-relaxed text-on-surface" id="optB"></span>
-              </button>
-              <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 2)">
-                <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">C</span>
-                <span class="font-body text-sm leading-relaxed text-on-surface" id="optC"></span>
-              </button>
-              <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 3)">
-                <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">D</span>
-                <span class="font-body text-sm leading-relaxed text-on-surface" id="optD"></span>
-              </button>
-            </div>
-            <div class="flex gap-3 mt-2">
-              <button class="flex-1 bg-surface-container-high text-on-surface-variant py-4 px-6 rounded-2xl font-headline font-bold text-sm hover:bg-surface-container-highest transition-all disabled:opacity-30 disabled:cursor-not-allowed" id="prevBtn" disabled onclick="prevQuestion()">
-                <span class="material-symbols-outlined text-lg align-middle mr-1">arrow_back</span>
-                <span>Previous</span>
-              </button>
-              <button class="flex-1 bg-primary text-white py-4 px-6 rounded-2xl font-headline font-bold text-sm shadow-sm hover:shadow-md hover:bg-primary-container transition-all disabled:opacity-40 disabled:cursor-not-allowed" id="nextBtn" disabled onclick="nextQuestion()">
-                <span id="nextBtnText">Next Question</span>
-                <span class="material-symbols-outlined text-lg align-middle ml-1">arrow_forward</span>
-              </button>
-            </div>
-          </div>
-        </div>`;
-      showQuestion();
-    }
+  // Show loading while first questions generate
+  document.querySelector('main').innerHTML = `
+    <div class="max-w-6xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh]">
+      <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      <p class="font-headline font-bold text-lg text-on-surface">正在生成诊断题目</p>
+      <p class="font-body text-sm text-on-surface-variant mt-2" id="genProgress">AI 正在根据知识图谱出题...</p>
+    </div>`;
+  document.getElementById('progressText').textContent = 'Generating...';
+  document.getElementById('progressBar').style.width = '0%';
+
+  let uiBuilt = false;
+
+  try {
+    await streamSSE(`/api/chat/${sessionId}/generate-quiz/stream`, null, {
+      start(d) {
+        // total_points available
+      },
+      questions(d) {
+        // Append new questions
+        allQuestions.push(...d.batch);
+
+        // Build quiz UI on first batch
+        if (!uiBuilt) {
+          uiBuilt = true;
+          buildQuizUI();
+          showQuestion();
+        }
+
+        // Update progress
+        const pct = Math.round((d.point_index / d.total_points) * 100);
+        document.getElementById('progressBar').style.width = pct + '%';
+        document.getElementById('progressText').textContent =
+          `Question ${currentIndex + 1} / ${allQuestions.length}${d.point_index < d.total_points ? '+' : ''}`;
+
+        // Show loading hint if still generating
+        const hint = document.getElementById('loadingHint');
+        if (hint && d.point_index < d.total_points) {
+          hint.innerHTML = `<span class="animate-pulse">出题中 ${d.point_index}/${d.total_points}...</span>`;
+        } else if (hint) {
+          hint.textContent = '';
+        }
+      },
+      done(d) {
+        quizFullyLoaded = true;
+        const hint = document.getElementById('loadingHint');
+        if (hint) hint.textContent = '';
+        if (uiBuilt) {
+          document.getElementById('progressText').textContent =
+            `Question ${currentIndex + 1} / ${allQuestions.length}`;
+        }
+      },
+      error(d) {
+        document.querySelector('main').innerHTML = `
+          <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
+            <span class="material-symbols-outlined text-4xl text-error mb-4">error</span>
+            <p class="font-headline font-bold text-on-surface mb-2">出题失败</p>
+            <a href="/" class="text-primary font-headline font-bold text-sm hover:underline">返回主页</a>
+          </div>`;
+      },
+    });
   } catch (err) {
-    document.querySelector('main').innerHTML = `
-      <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <span class="material-symbols-outlined text-4xl text-error mb-4">error</span>
-        <p class="font-headline font-bold text-on-surface mb-2">加载失败</p>
-        <p class="font-body text-sm text-on-surface-variant mb-6">${escapeHtml(err.message)}</p>
-        <a href="/" class="text-primary font-headline font-bold text-sm hover:underline">返回主页</a>
-      </div>`;
+    if (!uiBuilt) {
+      document.querySelector('main').innerHTML = `
+        <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
+          <span class="material-symbols-outlined text-4xl text-error mb-4">error</span>
+          <p class="font-headline font-bold text-on-surface mb-2">加载失败</p>
+          <p class="font-body text-sm text-on-surface-variant mb-6">${escapeHtml(err.message)}</p>
+          <a href="/" class="text-primary font-headline font-bold text-sm hover:underline">返回主页</a>
+        </div>`;
+    }
   }
 }
 
 function showQuestion() {
+  // If student is ahead of loaded questions, show waiting state
+  if (currentIndex >= allQuestions.length) {
+    document.getElementById('questionText').textContent = '正在生成下一道题...';
+    document.getElementById('knowledgeTagText').textContent = '';
+    document.querySelectorAll('.option-btn').forEach(b => { b.style.display = 'none'; });
+    document.getElementById('nextBtn').disabled = true;
+    document.getElementById('nextBtnText').textContent = '等待出题...';
+    // Retry when new questions arrive
+    const check = setInterval(() => {
+      if (currentIndex < allQuestions.length) { clearInterval(check); showQuestion(); }
+    }, 300);
+    return;
+  }
+
+  document.querySelectorAll('.option-btn').forEach(b => { b.style.display = ''; });
+
   const q = allQuestions[currentIndex];
-  const total = allQuestions.length;
-  document.getElementById('progressText').textContent = `Question ${currentIndex + 1} / ${total}`;
-  document.getElementById('progressBar').style.width = `${((currentIndex + 1) / total) * 100}%`;
+  const totalLabel = quizFullyLoaded ? allQuestions.length : allQuestions.length + '+';
+  document.getElementById('progressText').textContent = `Question ${currentIndex + 1} / ${totalLabel}`;
+  document.getElementById('progressBar').style.width = `${((currentIndex + 1) / allQuestions.length) * 100}%`;
   document.getElementById('knowledgeTagText').textContent = q.knowledge_point;
   document.getElementById('questionText').textContent = q.question;
   document.getElementById('optA').textContent = q.options[0];
   document.getElementById('optB').textContent = q.options[1];
   document.getElementById('optC').textContent = q.options[2];
   document.getElementById('optD').textContent = q.options[3];
-  document.getElementById('nextBtnText').textContent = (currentIndex >= total - 1) ? 'Finish' : 'Next Question';
+  const isLast = quizFullyLoaded && currentIndex >= allQuestions.length - 1;
+  document.getElementById('nextBtnText').textContent = isLast ? 'Finish' : 'Next Question';
 
   // Previous button
   const prevBtn = document.getElementById('prevBtn');
@@ -288,7 +354,7 @@ async function nextQuestion() {
   }
   currentIndex++;
 
-  if (currentIndex < allQuestions.length) {
+  if (currentIndex < allQuestions.length || !quizFullyLoaded) {
     showQuestion();
     return;
   }

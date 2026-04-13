@@ -272,6 +272,51 @@ async def generate_lesson_stream(session_id: str):
     return StreamingResponse(stream_sse(), media_type="text/event-stream")
 
 
+@router.post("/chat/{session_id}/generate-quiz/stream")
+async def generate_quiz_stream(session_id: str):
+    """SSE endpoint — generates quiz questions progressively per knowledge point."""
+    from src.agent.nodes.quiz import quiz_generate_progressive
+
+    state = _get_session(session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    graph = state.get("knowledge_graph")
+    if not graph:
+        raise HTTPException(status_code=400, detail="No knowledge graph — learn a topic first")
+
+    nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
+    total_points = len(nodes)
+
+    async def stream_sse():
+        yield _sse_event({"type": "start", "total_points": total_points})
+
+        all_questions = []
+        point_idx = 0
+
+        for batch in quiz_generate_progressive(state):
+            questions_data = [q.model_dump() for q in batch]
+            all_questions.extend(batch)
+            point_idx += 1
+            yield _sse_event({
+                "type": "questions",
+                "batch": questions_data,
+                "point_index": point_idx,
+                "total_points": total_points,
+            })
+
+        # Save all questions to state
+        state["questions"] = all_questions
+        state["current_question_index"] = 0
+        state["answers"] = []
+        state["mode"] = "quiz"
+        _save(session_id, state)
+
+        yield _sse_event({"type": "done", "total_questions": len(all_questions)})
+
+    return StreamingResponse(stream_sse(), media_type="text/event-stream")
+
+
 class SubmitQuizRequest(BaseModel):
     answers: list[int] = Field(..., min_length=1, max_length=50)
 

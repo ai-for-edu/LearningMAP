@@ -64,3 +64,41 @@ def quiz_node(state: LearningState) -> dict:
 
     # All done
     return {"mode": "result"}
+
+
+def quiz_generate_progressive(state: dict):
+    """Generate quiz questions one knowledge point at a time.
+
+    Yields list[QuizQuestion] batches (one batch per knowledge point).
+    Used by the SSE endpoint for progressive quiz loading.
+    """
+    graph = state.get("knowledge_graph")
+    if not graph:
+        return
+
+    nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
+    skill_instructions = get_skill_section(state, "quiz")
+    client = get_llm_client()
+
+    for node in nodes:
+        name = node.name if hasattr(node, "name") else node["name"]
+        desc = node.description if hasattr(node, "description") else node.get("description", "")
+        point = {"name": name, "description": desc}
+
+        prompt = render_prompt(
+            "quiz_generate",
+            knowledge_points=[point],
+            questions_per_point=QUESTIONS_PER_POINT,
+            skill_instructions=skill_instructions,
+        )
+
+        try:
+            batch = client.chat.completions.create(
+                model=get_model_name(),
+                max_tokens=2048,
+                messages=[{"role": "user", "content": prompt}],
+                response_model=list[QuizQuestion],
+            )
+            yield batch
+        except Exception:
+            logger.exception("Failed to generate quiz for knowledge point: %s", name)

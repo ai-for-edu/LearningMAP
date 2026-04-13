@@ -121,6 +121,9 @@
         .msg-wrapper:hover .msg-actions { display: flex; }
         .msg-action { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; border-radius: 6px; color: #94a3b8; transition: all 0.15s; }
         .msg-action:hover { background: #f1f5f9; color: #475569; }
+        /* Streaming cursor */
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        .stream-cursor { display: inline-block; width: 2px; height: 1em; background: #005da7; margin-left: 2px; vertical-align: text-bottom; animation: blink 0.8s step-end infinite; }
     </style>
 </head>
 <body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
@@ -428,7 +431,7 @@ async function handleSend(text) {
         <div class="flex-grow">
           <div class="stream-badge"></div>
           <div class="stream-content prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">
-            <span class="animate-pulse text-slate-400">▌</span>
+            <span class="stream-cursor"></span>
           </div>
         </div>
       </div>`;
@@ -455,7 +458,7 @@ async function handleSend(text) {
       },
       token(d) {
         streamText += d.content;
-        contentEl.innerHTML = safeMarkdown(streamText) + '<span class="animate-pulse text-slate-400">▌</span>';
+        contentEl.innerHTML = safeMarkdown(streamText) + '<span class="stream-cursor"></span>';
         chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
       },
       done(d) {
