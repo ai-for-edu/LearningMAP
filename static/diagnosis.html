@@ -154,6 +154,11 @@ let currentIndex = 0;
 let answers = [];
 let selectedOption = -1;
 
+// Set exit link immediately so ✕ always returns to correct session
+if (sessionId) {
+  document.getElementById('navExitBtn').href = '/?session_id=' + sessionId;
+}
+
 function buildQuizUI() {
   document.querySelector('main').innerHTML = `
     <div class="max-w-6xl mx-auto w-full flex gap-8">
@@ -256,8 +261,6 @@ async function initDiagnosis() {
 function updateNavButtons() {
   const stop = document.getElementById('navStopBtn');
   const regen = document.getElementById('navRegenBtn');
-  const exit = document.getElementById('navExitBtn');
-  if (exit) exit.href = sessionId ? '/?session_id=' + sessionId : '/';
   if (quizFullyLoaded) {
     if (stop) stop.style.display = 'none';
     if (regen) regen.style.display = '';

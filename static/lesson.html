@@ -263,6 +263,9 @@
   const sessionId = getSessionId();
   if (!sessionId) { window.location.href = '/'; return; }
 
+  // Set exit link immediately
+  document.getElementById('backLink').href = '/?session_id=' + sessionId;
+
   // Update back link
   document.getElementById('backLink').href = '/?session_id=' + sessionId + '&show=results';
   document.getElementById('finishBtn').href = '/?session_id=' + sessionId + '&show=lesson';
