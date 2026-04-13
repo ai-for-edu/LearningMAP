@@ -236,11 +236,8 @@ async function initDiagnosis() {
           showQuestion();
         }
 
-        // Update progress
-        const pct = Math.round((d.point_index / d.total_points) * 100);
-        document.getElementById('progressBar').style.width = pct + '%';
-        document.getElementById('progressText').textContent =
-          `Question ${currentIndex + 1} / ${allQuestions.length}${d.point_index < d.total_points ? '+' : ''}`;
+        // Update answer progress (not loading progress)
+        if (uiBuilt) showQuestion();
 
         // Show loading hint if still generating
         const hint = document.getElementById('loadingHint');
