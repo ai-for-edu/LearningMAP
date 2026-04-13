@@ -98,18 +98,24 @@
         .prose strong { color: #191c1e; }
         .prose code { background: #eceef0; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em; }
         .prose blockquote { border-left: 3px solid #005da7; padding-left: 1rem; color: #414751; margin: 0.5rem 0; }
-        /* Skill popup */
+        /* Skill popup list */
         .skill-popup { position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 8px; max-height: 360px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); z-index: 200; }
-        .skill-item { padding: 12px 16px; cursor: pointer; transition: background 0.15s; position: relative; }
+        .skill-item { padding: 12px 16px; display: flex; align-items: flex-start; gap: 10px; transition: background 0.15s; }
         .skill-item:hover { background: #f1f5f9; }
         .skill-item:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
-        .skill-preview { display: none; margin-top: 8px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; line-height: 1.7; white-space: pre-wrap; color: #475569; max-height: 260px; overflow-y: auto; }
-        .skill-item:hover .skill-preview { display: block; }
+        .skill-item-main { flex: 1; cursor: pointer; }
+        .skill-item-actions { display: flex; gap: 2px; flex-shrink: 0; padding-top: 2px; }
+        .skill-action-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; border: none; background: transparent; cursor: pointer; color: #94a3b8; transition: all 0.15s; }
+        .skill-action-btn:hover { background: #e2e8f0; color: #475569; }
         /* Skill badge on AI messages */
-        .skill-badge { display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; cursor: pointer; position: relative; transition: background 0.15s; }
+        .skill-badge { display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; cursor: pointer; transition: background 0.15s; }
         .skill-badge:hover { background: #dbeafe; }
-        .skill-badge-tooltip { display: none; position: absolute; bottom: 100%; left: 0; margin-bottom: 8px; width: 360px; max-height: 360px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 16px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: #334155; font-weight: 400; z-index: 200; }
-        .skill-badge:hover .skill-badge-tooltip { display: block; }
+        /* Skill detail modal */
+        .skill-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 300; }
+        .skill-modal { background: white; border-radius: 20px; padding: 0; max-width: 560px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .skill-modal-header { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+        .skill-modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; color: #334155; }
+        .skill-modal-body .section-hl { background: #dbeafe; border-radius: 4px; padding: 2px 6px; font-weight: 700; color: #1d4ed8; display: inline-block; margin-top: 14px; }
     </style>
 </head>
 <body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
@@ -133,7 +139,7 @@
 </button>
 </aside>
 <script src="sidebar.js?v=2"></script>
-<script src="api.js?v=4"></script>
+<script src="api.js?v=5"></script>
 <!-- Main Content -->
 <main id="mainContent" class="ml-64 pt-24 pb-32 px-6 min-h-screen flex flex-col transition-all duration-300">
 <div class="max-w-4xl mx-auto w-full">
@@ -178,19 +184,30 @@ async function handleInputChange(e) {
       popup.innerHTML = '<div class="p-4 text-sm text-slate-400">暂无可用的教学方法</div>';
     } else {
       popup.innerHTML = _cachedSkills.map(s => `
-        <div class="skill-item" data-skill="${escapeHtml(s.name)}" onclick="selectSkill('${escapeHtml(s.name)}')">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary text-base">psychology</span>
-            <span class="font-headline font-bold text-sm text-on-surface">${escapeHtml(s.display_name)}</span>
+        <div class="skill-item">
+          <div class="skill-item-main" onclick="selectSkill('${escapeHtml(s.name)}')">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary text-base">psychology</span>
+              <span class="font-headline font-bold text-sm text-on-surface">${escapeHtml(s.display_name)}</span>
+            </div>
+            <p class="text-xs text-on-surface-variant mt-1 line-clamp-2">${escapeHtml(s.description)}</p>
           </div>
-          <p class="text-xs text-on-surface-variant mt-1 line-clamp-2">${escapeHtml(s.description)}</p>
-          <div class="skill-preview">${formatSkillBody(s.body, null)}</div>
+          <div class="skill-item-actions">
+            <button class="skill-action-btn" onclick="event.stopPropagation();showSkillModal('${escapeHtml(s.name)}')" title="查看详情">
+              <span class="material-symbols-outlined" style="font-size:16px;">info</span>
+            </button>
+            <button class="skill-action-btn" onclick="event.stopPropagation();deleteSkillFile('${escapeHtml(s.name)}')" title="删除">
+              <span class="material-symbols-outlined" style="font-size:16px;">delete</span>
+            </button>
+          </div>
         </div>
       `).join('') + `
-        <div class="skill-item" onclick="clearSkill()" style="border-top:1px solid #e2e8f0;">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-slate-400 text-base">close</span>
-            <span class="font-body text-sm text-slate-500">清除教学方法（恢复默认）</span>
+        <div class="skill-item" style="border-top:1px solid #e2e8f0;">
+          <div class="skill-item-main" onclick="clearSkill()">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-slate-400 text-base">close</span>
+              <span class="font-body text-sm text-slate-500">清除教学方法（恢复默认）</span>
+            </div>
           </div>
         </div>`;
     }
@@ -201,16 +218,58 @@ async function handleInputChange(e) {
 }
 
 function formatSkillBody(body, activeSection) {
-  // Split body into sections and highlight the active one
-  return body.split(/^(## \S+)/gm).map(part => {
-    const headerMatch = part.match(/^## (\S+)/);
-    if (headerMatch) {
-      const sectionName = headerMatch[1].toLowerCase();
-      const isActive = activeSection && sectionName === activeSection;
-      return `<div style="margin-top:12px;font-weight:700;color:${isActive ? '#1d4ed8' : '#334155'};${isActive ? 'background:#dbeafe;padding:2px 6px;border-radius:4px;display:inline-block;' : ''}">${escapeHtml(part)}</div>`;
+  const lines = body.split('\n');
+  let html = '';
+  for (const line of lines) {
+    const hm = line.match(/^## (\S+)/);
+    if (hm) {
+      const sn = hm[1].toLowerCase();
+      const isActive = activeSection && sn === activeSection;
+      html += isActive
+        ? `<div class="section-hl">${escapeHtml(line)}</div>`
+        : `<div style="margin-top:14px;font-weight:700;color:#334155;">${escapeHtml(line)}</div>`;
+    } else {
+      html += escapeHtml(line) + '\n';
     }
-    return escapeHtml(part);
-  }).join('');
+  }
+  return html;
+}
+
+function showSkillModal(nameOrInfo, highlightSection) {
+  let skill;
+  if (typeof nameOrInfo === 'string') {
+    skill = (_cachedSkills || []).find(s => s.name === nameOrInfo);
+  } else {
+    skill = nameOrInfo;
+  }
+  if (!skill) return;
+
+  const body = formatSkillBody(skill.body || '', highlightSection || null);
+  const overlay = document.createElement('div');
+  overlay.className = 'skill-modal-overlay';
+  overlay.innerHTML = `
+    <div class="skill-modal">
+      <div class="skill-modal-header">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">psychology</span>
+            <span class="font-headline font-bold text-lg text-on-surface">${escapeHtml(skill.display_name || skill.name)}</span>
+          </div>
+          <p class="text-xs text-on-surface-variant mt-1">${escapeHtml(skill.description || '')}</p>
+        </div>
+        <button onclick="this.closest('.skill-modal-overlay').remove()" class="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+          <span class="material-symbols-outlined text-slate-400">close</span>
+        </button>
+      </div>
+      <div class="skill-modal-body">${body}</div>
+    </div>`;
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function deleteSkillFile(name) {
+  // Skills are file-based, cannot delete via API in MVP
+  alert(`Skill "${name}" 是文件系统中的 SKILL.md，请在服务器上手动删除 skills/${name}/SKILL.md`);
 }
 
 async function selectSkill(name) {
@@ -218,14 +277,12 @@ async function selectSkill(name) {
   const input = document.getElementById('chatInput');
   popup.style.display = 'none';
 
-  // Fill input with /skill <name> prefix, user continues typing
   _pendingSkill = name;
   _activeSkillInfo = (_cachedSkills || []).find(s => s.name === name) || null;
   input.value = `/skill ${name} `;
   input.focus();
 }
 
-// Track pending skill to apply when message is sent
 let _pendingSkill = null;
 
 async function clearSkill() {
@@ -235,11 +292,8 @@ async function clearSkill() {
   input.value = '';
 
   if (currentSessionId) {
-    try {
-      await setSkill(currentSessionId, null);
-    } catch (err) { /* ignore */ }
+    try { await setSkill(currentSessionId, null); } catch (err) { /* ignore */ }
   }
-
   _activeSkillInfo = null;
   _pendingSkill = null;
   input.focus();
@@ -248,15 +302,20 @@ async function clearSkill() {
 function buildSkillBadge(skillInfo) {
   if (!skillInfo) return '';
   const displayName = skillInfo.display_name || skillInfo.name || '';
-  const body = skillInfo.body || '';
   if (!displayName) return '';
-  const rendered = body ? formatSkillBody(body, skillInfo.current_section) : escapeHtml(displayName);
+  const section = skillInfo.current_section || null;
+  const sName = escapeHtml(skillInfo.name || '');
+  const sSection = section ? escapeHtml(section) : '';
   return `
-    <div class="skill-badge" style="margin-bottom:8px;">
+    <div class="skill-badge" onclick="openSkillDetail('${sName}', '${sSection}')" style="margin-bottom:8px;">
       <span class="material-symbols-outlined" style="font-size:14px;">psychology</span>
       ${escapeHtml(displayName)}
-      ${body ? `<div class="skill-badge-tooltip">${rendered}</div>` : ''}
     </div>`;
+}
+
+function openSkillDetail(name, section) {
+  const skill = (_cachedSkills || []).find(s => s.name === name) || _activeSkillInfo || {name, display_name: name, body: '', description: ''};
+  showSkillModal(skill, section || null);
 }
 
 async function handleSend(text) {
@@ -487,6 +546,7 @@ function renderDiagnosisResults(r, sessionId) {
         <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
       </div>
       <div class="flex-grow space-y-6">
+        ${buildSkillBadge(_activeSkillInfo ? {..._activeSkillInfo, current_section: 'quiz'} : null)}
         <div class="prose prose-slate max-w-none">
           <p class="font-headline text-2xl font-bold tracking-tight text-primary">诊断结果</p>
         </div>
@@ -539,6 +599,7 @@ function renderLessonButton(sessionId) {
         <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
       </div>
       <div class="flex-grow">
+        ${buildSkillBadge(_activeSkillInfo ? {..._activeSkillInfo, current_section: 'lesson'} : null)}
         <p class="font-body text-on-surface-variant mb-4">教案学习完成！你可以随时回顾。</p>
         <a href="lesson.html?session_id=${sessionId}" class="inline-flex items-center gap-2 bg-primary/10 text-primary py-3 px-6 rounded-2xl font-headline font-bold text-sm hover:bg-primary/20 transition-all">
           <span class="material-symbols-outlined text-lg">school</span>Review Lesson
