@@ -114,8 +114,7 @@
         .skill-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 300; }
         .skill-modal { background: white; border-radius: 20px; padding: 0; max-width: 560px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
         .skill-modal-header { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
-        .skill-modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; color: #334155; }
-        .skill-modal-body .section-hl { background: #dbeafe; border-radius: 4px; padding: 2px 6px; font-weight: 700; color: #1d4ed8; display: inline-block; margin-top: 14px; }
+        .skill-modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; color: #334155; }
         /* Message action buttons */
         .msg-wrapper { position: relative; }
         .msg-actions { display: none; position: absolute; bottom: -4px; right: 0; transform: translateY(100%); background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 2px; gap: 2px; z-index: 10; }
@@ -247,21 +246,15 @@ async function handleInputChange(e) {
 }
 
 function formatSkillBody(body, activeSection) {
-  const lines = body.split('\n');
-  let html = '';
-  for (const line of lines) {
-    const hm = line.match(/^## (\S+)/);
-    if (hm) {
-      const sn = hm[1].toLowerCase();
-      const isActive = activeSection && sn === activeSection;
-      html += isActive
-        ? `<div class="section-hl">${escapeHtml(line)}</div>`
-        : `<div style="margin-top:14px;font-weight:700;color:#334155;">${escapeHtml(line)}</div>`;
-    } else {
-      html += escapeHtml(line) + '\n';
+  // Pre-process: mark active section header, then render as markdown
+  const processed = body.split('\n').map(line => {
+    const hm = line.match(/^## (.+)/);
+    if (hm && activeSection && hm[1].trim().toLowerCase().replace(/\s+/g, '_') === activeSection) {
+      return `## 🔵 ${hm[1]}`;
     }
-  }
-  return html;
+    return line;
+  }).join('\n');
+  return safeMarkdown(processed);
 }
 
 function showSkillModal(nameOrInfo, highlightSection) {
@@ -295,7 +288,7 @@ function showSkillModal(nameOrInfo, highlightSection) {
           <span class="material-symbols-outlined text-slate-400">close</span>
         </button>
       </div>
-      <div class="skill-modal-body">${body}</div>
+      <div class="skill-modal-body prose prose-slate max-w-none">${body}</div>
     </div>`;
 
   // Close handlers
