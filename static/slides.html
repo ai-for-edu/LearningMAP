@@ -240,15 +240,15 @@ function startSlidePolling() {
   );
 }
 
-async function cancelSlides() {
-  try { await cancelGeneration(sessionId, 'slides'); } catch(e) {}
+function cancelSlides() {
   if (_slidePoller) _slidePoller.stop();
+  cancelGeneration(sessionId, 'slides').catch(function(){});
   window.location.href = '/?session_id=' + sessionId;
 }
 
-async function regenSlides() {
-  try { await cancelGeneration(sessionId, 'slides'); } catch(e) {}
+function regenSlides() {
   if (_slidePoller) _slidePoller.stop();
+  cancelGeneration(sessionId, 'slides').catch(function(){});
   window.location.href = 'slides.html?session_id=' + sessionId + '&regen=1';
 }
 

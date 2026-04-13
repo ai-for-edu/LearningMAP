@@ -861,7 +861,8 @@ async function showLessonFormatChoice(sid) {
 
   // Initialize all knowledge graph vis.js instances AFTER all innerHTML is done
   // Use setTimeout to ensure DOM has fully updated after innerHTML operations
-  setTimeout(initAllGraphs, 200);
+  // 500ms ensures all async state fetches and DOM updates are complete
+  setTimeout(initAllGraphs, 500);
 })();
 </script>
 

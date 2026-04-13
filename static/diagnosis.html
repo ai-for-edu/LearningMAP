@@ -337,9 +337,10 @@ async function retryQuiz() {
 
 let _forceRegen = false;
 
-async function stopQuiz() {
-  try { await cancelGeneration(sessionId, 'quiz'); } catch(e) {}
+function stopQuiz() {
   if (_poller) _poller.stop();
+  // Fire cancel in background, navigate immediately (don't wait)
+  cancelGeneration(sessionId, 'quiz').catch(function(){});
   window.location.href = '/?session_id=' + sessionId;
 }
 

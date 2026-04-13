@@ -292,8 +292,8 @@
 
     // Show stop button in nav during generation
     document.getElementById('navStopBtn').style.display = '';
-    document.getElementById('navStopBtn').onclick = async function() {
-      try { await cancelGeneration(sessionId, 'lesson'); } catch(e) {}
+    document.getElementById('navStopBtn').onclick = function() {
+      cancelGeneration(sessionId, 'lesson').catch(function(){});
       window.location.href = '/?session_id=' + sessionId;
     };
 
