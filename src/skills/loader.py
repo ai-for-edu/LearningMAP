@@ -12,16 +12,14 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _SKILLS_DIR = Path(__file__).resolve().parent.parent.parent / "skills"
-
-# Module-level registry, populated by load_skills()
-_registry: dict[str, SkillMeta] = {}
 
 
 @dataclass(frozen=True)
@@ -31,9 +29,13 @@ class SkillMeta:
     name: str
     display_name: str
     description: str
-    affects: list[str]
-    sections: dict[str, str]
+    affects: tuple[str, ...]
+    sections: MappingProxyType  # str → str, truly immutable
     raw_body: str
+
+
+# Module-level registry, populated by load_skills()
+_registry: dict[str, SkillMeta] = {}
 
 
 def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
@@ -42,39 +44,28 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     Returns (frontmatter_dict, body_str). If no frontmatter found,
     returns ({}, full_text).
     """
-    match = re.match(r"^---\s*\n(.*?)\n---\s*\n(.*)$", text, re.DOTALL)
+    match = re.match(r"^---\s*\n(.*?)\n---\s*(?:\n(.*))?$", text, re.DOTALL)
     if not match:
         return {}, text
 
-    yaml_str, body = match.group(1), match.group(2)
+    yaml_str = match.group(1)
+    body = match.group(2) or ""
 
-    # Minimal YAML parser (avoid adding PyYAML dependency)
+    # Minimal single-pass YAML parser (avoids PyYAML dependency)
     fm: dict[str, Any] = {}
-    for line in yaml_str.strip().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if ":" not in line:
-            continue
-        key, _, value = line.partition(":")
-        key = key.strip()
-        value = value.strip()
-        # Handle list values like "  - chat"
-        if not value:
-            # Might be a list — collect subsequent "  - xxx" lines
-            continue
-        fm[key] = value
-
-    # Second pass for list fields (affects, etc.)
     current_list_key: str | None = None
     current_list: list[str] = []
+
     for line in yaml_str.strip().splitlines():
         stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
         if stripped.startswith("- "):
             if current_list_key:
                 current_list.append(stripped[2:].strip())
-        elif ":" in stripped:
-            # Save previous list
+            continue
+        if ":" in stripped:
+            # Flush previous list
             if current_list_key and current_list:
                 fm[current_list_key] = current_list
             key, _, value = stripped.partition(":")
@@ -87,7 +78,8 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
                 current_list_key = None
                 current_list = []
                 fm[key] = value
-    # Save last list
+
+    # Flush last list
     if current_list_key and current_list:
         fm[current_list_key] = current_list
 
@@ -105,12 +97,13 @@ def _parse_sections(body: str) -> dict[str, str]:
     current_lines: list[str] = []
 
     for line in body.splitlines():
-        header_match = re.match(r"^##\s+(\S+)\s*$", line)
+        header_match = re.match(r"^##\s+(.+?)\s*$", line)
         if header_match:
             # Save previous section
             if current_name is not None:
                 sections[current_name] = "\n".join(current_lines).strip()
-            current_name = header_match.group(1).lower()
+            # Normalize: "Knowledge Graph" → "knowledge_graph"
+            current_name = header_match.group(1).strip().lower().replace(" ", "_")
             current_lines = []
         elif current_name is not None:
             current_lines.append(line)
@@ -142,14 +135,17 @@ def _load_one(skill_dir: Path) -> SkillMeta | None:
     description = fm.get("description", "")
 
     # Auto-infer affects from actual sections
-    affects = list(sections.keys())
+    affects = tuple(sections.keys())
+
+    if not sections:
+        logger.warning("Skill %s has no ## sections, it will have no effect", name)
 
     return SkillMeta(
         name=name,
         display_name=display_name,
         description=description,
         affects=affects,
-        sections=sections,
+        sections=MappingProxyType(sections),
         raw_body=body.strip(),
     )
 
@@ -195,7 +191,7 @@ def list_skills() -> list[dict[str, Any]]:
             "name": s.name,
             "display_name": s.display_name,
             "description": s.description,
-            "sections": s.affects,
+            "sections": list(s.affects),
             "body": s.raw_body,
         }
         for s in _registry.values()

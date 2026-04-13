@@ -364,7 +364,7 @@ async def set_skill(session_id: str, req: SetSkillRequest) -> dict:
         raise HTTPException(status_code=404, detail=f"Skill '{req.skill}' not found")
 
     state["active_skill"] = skill_meta.name
-    state["active_skill_content"] = skill_meta.sections
+    state["active_skill_content"] = dict(skill_meta.sections)
     _save(session_id, state)
 
     return {

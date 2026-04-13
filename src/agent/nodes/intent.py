@@ -59,7 +59,7 @@ def intent_node(state: LearningState) -> dict:
             skill_meta = get_skill(matched_skill_name)
             if skill_meta:
                 updates["active_skill"] = skill_meta.name
-                updates["active_skill_content"] = skill_meta.sections
+                updates["active_skill_content"] = dict(skill_meta.sections)
                 logger.info("Skill matched: %s", skill_meta.name)
             else:
                 logger.warning("LLM returned unknown skill: %s", matched_skill_name)

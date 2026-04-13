@@ -94,7 +94,7 @@ def _make_state(
         skill_meta = get_skill(skill_name)
         if skill_meta:
             state["active_skill"] = skill_meta.name
-            state["active_skill_content"] = skill_meta.sections
+            state["active_skill_content"] = dict(skill_meta.sections)
 
     return state
 

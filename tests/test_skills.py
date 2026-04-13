@@ -149,7 +149,7 @@ class TestLoadSkills:
         assert "chat" in feynman.sections
         assert "quiz" in feynman.sections
         assert "lesson" in feynman.sections
-        assert feynman.affects == ["chat", "quiz", "lesson"]
+        assert feynman.affects == ("chat", "quiz", "lesson")
 
     def test_socratic_has_knowledge_graph_section(self) -> None:
         skills_dir = Path(__file__).resolve().parent.parent / "skills"
@@ -199,7 +199,7 @@ class TestLoadSkills:
         assert "my_skill" in skills
         s = skills["my_skill"]
         assert s.display_name == "我的教学法"
-        assert s.affects == ["chat", "lesson"]
+        assert s.affects == ("chat", "lesson")
         assert "自定义对话指令" in s.sections["chat"]
         assert "quiz" not in s.sections  # 缺省：没写就没有
 
