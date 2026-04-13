@@ -116,6 +116,12 @@
         .skill-modal-header { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
         .skill-modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; color: #334155; }
         .skill-modal-body .section-hl { background: #dbeafe; border-radius: 4px; padding: 2px 6px; font-weight: 700; color: #1d4ed8; display: inline-block; margin-top: 14px; }
+        /* Message action buttons */
+        .msg-wrapper { position: relative; }
+        .msg-actions { display: none; position: absolute; bottom: -4px; right: 0; transform: translateY(100%); background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 2px; gap: 2px; z-index: 10; }
+        .msg-wrapper:hover .msg-actions { display: flex; }
+        .msg-action { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; border-radius: 6px; color: #94a3b8; transition: all 0.15s; }
+        .msg-action:hover { background: #f1f5f9; color: #475569; }
     </style>
 </head>
 <body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
@@ -149,7 +155,7 @@
 <!-- Chat Input Fixed Bottom -->
 <div id="bottomBar" class="fixed bottom-0 left-64 right-0 p-6 bg-surface/80 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 transition-all duration-300">
 <div class="max-w-[720px] mx-auto relative">
-<input id="chatInput" onkeydown="handleInputKeydown(event)" oninput="handleInputChange(event)" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-6 pr-14 focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-body text-on-surface shadow-sm" placeholder="输入学习主题，例如：我想学习勾股定理 · 输入 /skill 选择教学方法" type="text"/>
+<textarea id="chatInput" onkeydown="handleInputKeydown(event)" oninput="handleInputChange(event)" rows="1" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-6 pr-14 focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-body text-on-surface shadow-sm resize-none overflow-hidden" placeholder="输入学习主题，例如：我想学习勾股定理 · 输入 /skill 选择教学方法" style="min-height:56px;max-height:160px;"></textarea>
 <div id="skillPopup" class="skill-popup" style="display:none;"></div>
 <button onclick="handleSend()" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-primary text-white rounded-xl shadow-sm hover:shadow-md hover:bg-primary-container transition-all">
 <span class="material-symbols-outlined text-xl">arrow_upward</span>
@@ -166,15 +172,27 @@ let _activeSkillInfo = null; // {name, display_name, body, current_section}
 // Input handler: detect /skill and show popup
 function handleInputKeydown(e) {
   const popup = document.getElementById('skillPopup');
-  if (e.key === 'Enter') {
-    if (popup.style.display !== 'none') return; // don't send when popup open
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    if (popup.style.display !== 'none') return;
     handleSend();
   } else if (e.key === 'Escape') {
     popup.style.display = 'none';
   }
+  // Auto-resize textarea
+  requestAnimationFrame(() => {
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+  });
 }
 
 async function handleInputChange(e) {
+  // Auto-resize textarea
+  const el = e.target;
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+
   const val = e.target.value;
   const popup = document.getElementById('skillPopup');
 
@@ -347,6 +365,7 @@ async function handleSend(text) {
   const rawMessage = text || input.value.trim();
   if (!rawMessage) return;
   input.value = '';
+  input.style.height = '56px'; // reset to single line
 
   // Handle /skill <name> prefix: extract skill, set it, send the rest as message
   let message = rawMessage;
@@ -373,9 +392,13 @@ async function handleSend(text) {
   const chatHistory = document.getElementById('chatHistory');
 
   // Show user message (display full text including /skill prefix)
-  const userBubbleContent = rawMessage !== message
-    ? `<span class="skill-badge" style="margin-right:6px;font-size:11px;vertical-align:middle;"><span class="material-symbols-outlined" style="font-size:12px;">psychology</span>${escapeHtml(_activeSkillInfo?.display_name || skillMatch?.[1] || '')}</span>${escapeHtml(message)}`
-    : escapeHtml(rawMessage);
+  let userBubbleContent;
+  if (rawMessage !== message && _activeSkillInfo) {
+    const badgeHtml = buildSkillBadge({..._activeSkillInfo, current_section: null});
+    userBubbleContent = `<span style="vertical-align:middle;margin-right:4px;">${badgeHtml}</span>${escapeHtml(message)}`;
+  } else {
+    userBubbleContent = escapeHtml(rawMessage);
+  }
 
   chatHistory.innerHTML += `
     <div class="flex justify-end">
@@ -431,14 +454,24 @@ async function handleSend(text) {
       renderKnowledgeGraph(data);
     } else {
       const badge = buildSkillBadge(data.active_skill);
+      const msgIdx = _msgStore.length;
+      _msgStore.push({ text: data.message, raw: message });
       chatHistory.innerHTML += `
-        <div class="flex gap-4">
+        <div class="flex gap-4 msg-wrapper">
           <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
             <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
           </div>
           <div class="flex-grow">
             ${badge}
             <div class="prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${safeMarkdown(data.message)}</div>
+          </div>
+          <div class="msg-actions">
+            <button class="msg-action" data-copy-idx="${msgIdx}" title="复制">
+              <span class="material-symbols-outlined" style="font-size:16px;">content_copy</span>
+            </button>
+            <button class="msg-action" data-regen-idx="${msgIdx}" title="重新生成">
+              <span class="material-symbols-outlined" style="font-size:16px;">refresh</span>
+            </button>
           </div>
         </div>`;
     }
@@ -749,6 +782,31 @@ function showLessonFormatChoice(sid) {
 </script>
 
 <script>
+// Message store for copy/regenerate
+const _msgStore = [];
+
+// Copy + regenerate handlers (delegated)
+document.addEventListener('click', function(e) {
+  const copyBtn = e.target.closest('[data-copy-idx]');
+  if (copyBtn) {
+    const msg = _msgStore[+copyBtn.dataset.copyIdx];
+    if (msg) {
+      navigator.clipboard.writeText(msg.text).then(() => {
+        const icon = copyBtn.querySelector('.material-symbols-outlined');
+        icon.textContent = 'check';
+        setTimeout(() => { icon.textContent = 'content_copy'; }, 1500);
+      });
+    }
+    return;
+  }
+  const regenBtn = e.target.closest('[data-regen-idx]');
+  if (regenBtn) {
+    const msg = _msgStore[+regenBtn.dataset.regenIdx];
+    if (msg && msg.raw) handleSend(msg.raw);
+    return;
+  }
+});
+
 // Close skill popup when clicking outside
 document.addEventListener('click', function(e) {
   const popup = document.getElementById('skillPopup');
