@@ -3,3 +3,4 @@ __pycache__/
 *.db
 .ruff_cache/
 openail.egg-info/
+student_memory/data/

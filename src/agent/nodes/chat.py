@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from src.agent.state import LearningState
 from src.llm.client import get_raw_client, get_model_name
+from src.memory_client import retrieve_memory, DEFAULT_USER_ID
 from langchain_core.messages import AIMessage
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,12 @@ def chat_node(state: LearningState) -> dict:
     system_prompt = _BASE_SYSTEM_PROMPT
     if context:
         system_prompt += f"\n\n{context}"
+
+    # Retrieve past learning memory (graceful — empty string on failure)
+    user_msg = messages[-1].content if messages else ""
+    memory_context = retrieve_memory(DEFAULT_USER_ID, user_msg)
+    if memory_context:
+        system_prompt += f"\n\n## 历史学习记忆\n{memory_context}\n\n参考以上历史记录回答，但不要直接复述。"
 
     # Convert to OpenAI format
     api_messages = [{"role": "system", "content": system_prompt}]

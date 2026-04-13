@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 from langchain_core.messages import HumanMessage
 from src.agent.graph import build_graph
 from src.api.store import load_session, save_session
+from src.memory_client import ingest_session, DEFAULT_USER_ID
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -151,6 +152,11 @@ async def submit_quiz(session_id: str, req: SubmitQuizRequest) -> dict:
     diag_result = await asyncio.to_thread(diagnosis_node, state)
     state.update(diag_result)
     _save(session_id, state)
+
+    # Persist to student_memory service (background, non-blocking)
+    asyncio.get_event_loop().run_in_executor(
+        None, ingest_session, DEFAULT_USER_ID, session_id, state
+    )
 
     dr = state.get("diagnosis_result")
     return {
