@@ -88,17 +88,20 @@ class TaskManager:
         return key
 
     def cancel(self, session_id: str, task_type: str) -> bool:
-        """Cancel a running task. Returns True if cancelled."""
+        """Cancel a running task and remove from registry.
+
+        Removing from registry ensures start() can create a new task
+        immediately, without waiting for the old one to finish dying.
+        """
         key = self._key(session_id, task_type)
-        task = self._tasks.get(key)
+        task = self._tasks.pop(key, None)
         if not task:
             return False
         task.cancelled = True
         if task.asyncio_task and not task.asyncio_task.done():
             task.asyncio_task.cancel()
-            logger.info("Cancelled task: %s", key)
-            return True
-        return False
+        logger.info("Cancelled task: %s", key)
+        return True
 
     def cancel_all(self, session_id: str) -> None:
         """Cancel all tasks for a session (called when session is deleted)."""
