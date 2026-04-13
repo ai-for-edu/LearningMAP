@@ -75,6 +75,23 @@ async function exportSession(sessionId, format) {
   URL.revokeObjectURL(url);
 }
 
+// Skill API helpers
+async function fetchSkills() {
+  const resp = await fetch(`${API_BASE}/skills`);
+  if (!resp.ok) return [];
+  return resp.json();
+}
+
+async function setSkill(sessionId, skillName) {
+  const resp = await fetch(`${API_BASE}/chat/${sessionId}/set-skill`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skill: skillName }),
+  });
+  if (!resp.ok) throw new Error(`Set skill failed: ${resp.status}`);
+  return resp.json();
+}
+
 function buildMarkdownReport(state) {
   const topic = state.topic || '未命名主题';
   let md = `# 学习报告：${topic}\n\n`;

@@ -98,6 +98,19 @@
         .prose strong { color: #191c1e; }
         .prose code { background: #eceef0; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em; }
         .prose blockquote { border-left: 3px solid #005da7; padding-left: 1rem; color: #414751; margin: 0.5rem 0; }
+        /* Skill popup */
+        .skill-popup { position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 8px; max-height: 360px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); z-index: 200; }
+        .skill-item { padding: 12px 16px; cursor: pointer; transition: background 0.15s; position: relative; }
+        .skill-item:hover { background: #f1f5f9; }
+        .skill-item:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
+        .skill-preview { display: none; position: absolute; left: 100%; top: 0; width: 380px; max-height: 400px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 16px; margin-left: 8px; z-index: 210; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+        .skill-item:hover .skill-preview { display: block; }
+        .skill-preview .section-active { background: #dbeafe; border-radius: 4px; padding: 2px 4px; font-weight: 600; }
+        /* Skill badge on AI messages */
+        .skill-badge { display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; cursor: pointer; position: relative; transition: background 0.15s; }
+        .skill-badge:hover { background: #dbeafe; }
+        .skill-badge-tooltip { display: none; position: absolute; bottom: 100%; left: 0; margin-bottom: 8px; width: 360px; max-height: 360px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 16px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: #334155; font-weight: 400; z-index: 200; }
+        .skill-badge:hover .skill-badge-tooltip { display: block; }
     </style>
 </head>
 <body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
@@ -131,7 +144,8 @@
 <!-- Chat Input Fixed Bottom -->
 <div id="bottomBar" class="fixed bottom-0 left-64 right-0 p-6 bg-surface/80 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 transition-all duration-300">
 <div class="max-w-[720px] mx-auto relative">
-<input id="chatInput" onkeydown="if(event.key==='Enter')handleSend()" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-6 pr-14 focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-body text-on-surface shadow-sm" placeholder="输入学习主题，例如：我想学习勾股定理" type="text"/>
+<input id="chatInput" onkeydown="handleInputKeydown(event)" oninput="handleInputChange(event)" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-6 pr-14 focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-body text-on-surface shadow-sm" placeholder="输入学习主题，例如：我想学习勾股定理 · 输入 /skill 选择教学方法" type="text"/>
+<div id="skillPopup" class="skill-popup" style="display:none;"></div>
 <button onclick="handleSend()" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-primary text-white rounded-xl shadow-sm hover:shadow-md hover:bg-primary-container transition-all">
 <span class="material-symbols-outlined text-xl">arrow_upward</span>
 </button>
@@ -141,6 +155,130 @@
 <script>
 let currentSessionId = getSessionId();
 let messageCount = 0;
+let _cachedSkills = null;
+let _activeSkillInfo = null; // {name, display_name, body, current_section}
+
+// Input handler: detect /skill and show popup
+function handleInputKeydown(e) {
+  const popup = document.getElementById('skillPopup');
+  if (e.key === 'Enter') {
+    if (popup.style.display !== 'none') return; // don't send when popup open
+    handleSend();
+  } else if (e.key === 'Escape') {
+    popup.style.display = 'none';
+  }
+}
+
+async function handleInputChange(e) {
+  const val = e.target.value;
+  const popup = document.getElementById('skillPopup');
+
+  if (val.trim() === '/skill') {
+    if (!_cachedSkills) _cachedSkills = await fetchSkills();
+    if (_cachedSkills.length === 0) {
+      popup.innerHTML = '<div class="p-4 text-sm text-slate-400">暂无可用的教学方法</div>';
+    } else {
+      popup.innerHTML = _cachedSkills.map(s => `
+        <div class="skill-item" data-skill="${escapeHtml(s.name)}" onclick="selectSkill('${escapeHtml(s.name)}')">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-base">psychology</span>
+            <span class="font-headline font-bold text-sm text-on-surface">${escapeHtml(s.display_name)}</span>
+          </div>
+          <p class="text-xs text-on-surface-variant mt-1 line-clamp-2">${escapeHtml(s.description)}</p>
+          <div class="skill-preview">${formatSkillBody(s.body, null)}</div>
+        </div>
+      `).join('') + `
+        <div class="skill-item" onclick="clearSkill()" style="border-top:1px solid #e2e8f0;">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-slate-400 text-base">close</span>
+            <span class="font-body text-sm text-slate-500">清除教学方法（恢复默认）</span>
+          </div>
+        </div>`;
+    }
+    popup.style.display = 'block';
+  } else {
+    popup.style.display = 'none';
+  }
+}
+
+function formatSkillBody(body, activeSection) {
+  // Split body into sections and highlight the active one
+  return body.split(/^(## \S+)/gm).map(part => {
+    const headerMatch = part.match(/^## (\S+)/);
+    if (headerMatch) {
+      const sectionName = headerMatch[1].toLowerCase();
+      const isActive = activeSection && sectionName === activeSection;
+      return `<div style="margin-top:12px;font-weight:700;color:${isActive ? '#1d4ed8' : '#334155'};${isActive ? 'background:#dbeafe;padding:2px 6px;border-radius:4px;display:inline-block;' : ''}">${escapeHtml(part)}</div>`;
+    }
+    return escapeHtml(part);
+  }).join('');
+}
+
+async function selectSkill(name) {
+  const popup = document.getElementById('skillPopup');
+  const input = document.getElementById('chatInput');
+  popup.style.display = 'none';
+  input.value = '';
+
+  // Ensure session exists
+  if (!currentSessionId) {
+    currentSessionId = crypto.randomUUID();
+    setSessionId(currentSessionId);
+  }
+
+  try {
+    const result = await setSkill(currentSessionId, name);
+    _activeSkillInfo = _cachedSkills.find(s => s.name === name) || null;
+
+    const chatHistory = document.getElementById('chatHistory');
+    const displayName = _activeSkillInfo ? _activeSkillInfo.display_name : name;
+    chatHistory.innerHTML += `
+      <div class="flex justify-center">
+        <div class="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2">
+          <span class="material-symbols-outlined text-base">psychology</span>
+          已切换教学方法：<strong>${escapeHtml(displayName)}</strong>
+        </div>
+      </div>`;
+  } catch (err) {
+    alert('设置教学方法失败: ' + err.message);
+  }
+}
+
+async function clearSkill() {
+  const popup = document.getElementById('skillPopup');
+  const input = document.getElementById('chatInput');
+  popup.style.display = 'none';
+  input.value = '';
+
+  if (!currentSessionId) return;
+
+  try {
+    await setSkill(currentSessionId, null);
+    _activeSkillInfo = null;
+
+    const chatHistory = document.getElementById('chatHistory');
+    chatHistory.innerHTML += `
+      <div class="flex justify-center">
+        <div class="bg-slate-100 text-slate-600 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2">
+          <span class="material-symbols-outlined text-base">close</span>
+          已清除教学方法，恢复默认模式
+        </div>
+      </div>`;
+  } catch (err) {
+    alert('清除失败: ' + err.message);
+  }
+}
+
+function buildSkillBadge(skillInfo) {
+  if (!skillInfo) return '';
+  const body = formatSkillBody(skillInfo.body || '', skillInfo.current_section);
+  return `
+    <div class="skill-badge" style="margin-bottom:8px;">
+      <span class="material-symbols-outlined" style="font-size:14px;">psychology</span>
+      ${escapeHtml(skillInfo.display_name)}
+      <div class="skill-badge-tooltip">${body}</div>
+    </div>`;
+}
 
 async function handleSend(text) {
   const input = document.getElementById('chatInput');
@@ -198,15 +336,22 @@ async function handleSend(text) {
     }
     document.getElementById('loading')?.remove();
 
+    // Track active skill from response
+    if (data.active_skill) _activeSkillInfo = data.active_skill;
+
     if (data.mode === 'graph' && data.data?.graph) {
       renderKnowledgeGraph(data);
     } else {
+      const badge = buildSkillBadge(data.active_skill);
       chatHistory.innerHTML += `
         <div class="flex gap-4">
           <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
             <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
           </div>
-          <div class="flex-grow prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${safeMarkdown(data.message)}</div>
+          <div class="flex-grow">
+            ${badge}
+            <div class="prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${safeMarkdown(data.message)}</div>
+          </div>
         </div>`;
     }
   } catch (err) {
@@ -512,6 +657,15 @@ function showLessonFormatChoice(sid) {
 </script>
 
 <script>
+// Close skill popup when clicking outside
+document.addEventListener('click', function(e) {
+  const popup = document.getElementById('skillPopup');
+  const input = document.getElementById('chatInput');
+  if (popup && !popup.contains(e.target) && e.target !== input) {
+    popup.style.display = 'none';
+  }
+});
+
 let sidebarOpen = true;
 function toggleSidebar() {
   sidebarOpen = !sidebarOpen;
