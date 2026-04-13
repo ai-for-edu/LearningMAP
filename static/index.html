@@ -570,10 +570,19 @@ function renderKnowledgeGraph(data) {
       </div>
     </div>`;
 
-  // Build vis.js data after DOM is ready
-  setTimeout(() => {
+  // Queue vis.js initialization (must run after all innerHTML operations are done)
+  _pendingGraphInits.push({ containerId, graphNodes, graphEdges, levelStyles });
+  // Try to init immediately (works for live chat); for init() reconstruction, initAllGraphs() is called at the end
+  setTimeout(() => initGraph(containerId, graphNodes, graphEdges, levelStyles), 50);
+}
+
+const _pendingGraphInits = [];
+
+function initGraph(containerId, graphNodes, graphEdges, levelStyles) {
     const container = document.getElementById(containerId);
     if (!container || typeof vis === 'undefined') return;
+    // Skip if already initialized (has canvas children)
+    if (container.querySelector('canvas')) return;
 
     const visNodes = new vis.DataSet(graphNodes.map(n => {
       const style = levelStyles[n.level] || levelStyles.prerequisite;
@@ -626,7 +635,12 @@ function renderKnowledgeGraph(data) {
       },
       layout: { improvedLayout: true },
     });
-  }, 50);
+}
+
+function initAllGraphs() {
+  for (const g of _pendingGraphInits) {
+    initGraph(g.containerId, g.graphNodes, g.graphEdges, g.levelStyles);
+  }
 }
 
 function renderDiagnosisResults(r, sessionId) {
@@ -839,6 +853,9 @@ function showLessonFormatChoice(sid) {
       }
     }
   }
+
+  // Initialize all knowledge graph vis.js instances AFTER all innerHTML is done
+  initAllGraphs();
 })();
 </script>
 
