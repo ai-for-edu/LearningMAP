@@ -157,7 +157,7 @@ async function init() {
         // Update the thumbnail
         updateThumbnail(d.index);
         // If user is viewing this slide, re-render it
-        if (currentSlide === d.index) {
+        if (currentSlideIndex === d.index) {
           showSlide(d.index);
         }
         updateLoadingProgress(d.index + 1, d.total);
@@ -199,34 +199,14 @@ function updateLoadingProgress(current, total) {
 }
 
 function updateThumbnail(index) {
-  var strip = document.getElementById('thumbnailStrip');
-  if (!strip) return;
-  var thumbs = strip.querySelectorAll('.thumb');
-  if (index < thumbs.length) {
-    // Re-build this specific thumbnail
-    var slide = allSlides[index];
-    var thumb = thumbs[index];
-    // Clear spinner
-    var spinner = thumb.querySelector('.thumb-spinner');
-    if (spinner) spinner.remove();
-    // Re-render mini content
-    if (slide && slide.elements) {
-      var mini = thumb.querySelector('div');
-      if (mini) {
-        mini.innerHTML = '';
-        if (slide.background && slide.background.color) mini.style.background = slide.background.color;
-        for (var j = 0; j < Math.min(slide.elements.length, 5); j++) {
-          var el = slide.elements[j];
-          if (el.type === 'text') {
-            var d = document.createElement('div');
-            d.style.cssText = 'position:absolute;left:' + el.left + 'px;top:' + el.top + 'px;width:' + el.width + 'px;font-size:10px;color:#333;overflow:hidden;';
-            d.textContent = (el.content || '').replace(/<[^>]+>/g, '').substring(0, 50);
-            mini.appendChild(d);
-          }
-        }
-      }
-    }
-  }
+  // Simply rebuild all thumbnails — simpler and more reliable
+  buildThumbnails();
+  // Re-highlight current
+  var thumbs = document.querySelectorAll('.thumb');
+  thumbs.forEach(function(t, i) {
+    t.style.borderColor = i === currentSlideIndex ? '#005da7' : '#e6e8ea';
+    t.style.opacity = i === currentSlideIndex ? '1' : '0.6';
+  });
 }
 
 function showSlideViewer() {
