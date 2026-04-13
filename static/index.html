@@ -714,12 +714,20 @@ function showLessonFormatChoice(sid) {
   currentSessionId = sid;
   const state = await getSessionState(sid);
 
+  // Restore active skill from state (so badges render during reconstruction)
+  if (state.active_skill) {
+    if (!_cachedSkills) _cachedSkills = await fetchSkills();
+    _activeSkillInfo = (_cachedSkills || []).find(s => s.name === state.active_skill) || null;
+  }
+
   // Rebuild conversation: topic → graph → diagnosis → lesson button
   if (state.topic) {
+    // User message with skill badge if active
+    const userBadge = _activeSkillInfo ? buildSkillBadge({..._activeSkillInfo, current_section: null}) : '';
     chatHistory.innerHTML += `
       <div class="flex justify-end">
         <div class="bg-surface-container-low px-6 py-4 rounded-3xl rounded-tr-none max-w-[85%] text-on-surface shadow-sm">
-          <p class="font-body leading-relaxed">我想学习${escapeHtml(state.topic)}</p>
+          <p class="font-body leading-relaxed">${userBadge ? `<span style="vertical-align:middle;margin-right:4px;">${userBadge}</span>` : ''}我想学习${escapeHtml(state.topic)}</p>
         </div>
       </div>`;
 
@@ -736,18 +744,13 @@ function showLessonFormatChoice(sid) {
     renderLessonButton(sid);
   }
 
-  // Render remaining chat messages (after the structured flow)
-  // Find messages that came AFTER the learning flow
+  // Render remaining chat messages
   if (state.messages && state.messages.length > 0) {
-    // Skip messages that are part of the structured flow (topic request, graph response, etc.)
-    // Heuristic: find the last "system" message (graph/quiz/diagnosis/lesson related),
-    // then render all messages after it
     let startIdx = 0;
     for (let i = state.messages.length - 1; i >= 0; i--) {
       const msg = state.messages[i];
       if (msg.role === 'ai') {
         const content = msg.content || '';
-        // Check if this is a structured response (knowledge graph, quiz, diagnosis, lesson)
         if (content.includes('知识图谱') || content.includes('开始作答') ||
             content.includes('诊断完成') || content.includes('已掌握') ||
             content.length > 1000) {
@@ -757,7 +760,6 @@ function showLessonFormatChoice(sid) {
       }
     }
 
-    // Render chat messages from startIdx onwards
     for (let i = startIdx; i < state.messages.length; i++) {
       const msg = state.messages[i];
       if (msg.role === 'user') {
@@ -768,12 +770,23 @@ function showLessonFormatChoice(sid) {
             </div>
           </div>`;
       } else if (msg.role === 'ai') {
+        const badge = buildSkillBadge(_activeSkillInfo ? {..._activeSkillInfo, current_section: 'chat'} : null);
+        const msgIdx = _msgStore.length;
+        _msgStore.push({ text: msg.content, raw: null });
         chatHistory.innerHTML += `
-          <div class="flex gap-4">
+          <div class="flex gap-4 msg-wrapper">
             <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
               <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
             </div>
-            <div class="flex-grow prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${safeMarkdown(msg.content)}</div>
+            <div class="flex-grow">
+              ${badge}
+              <div class="prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${safeMarkdown(msg.content)}</div>
+            </div>
+            <div class="msg-actions">
+              <button class="msg-action" data-copy-idx="${msgIdx}" title="复制">
+                <span class="material-symbols-outlined" style="font-size:16px;">content_copy</span>
+              </button>
+            </div>
           </div>`;
       }
     }
