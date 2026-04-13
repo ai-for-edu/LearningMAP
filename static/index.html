@@ -144,7 +144,7 @@
 </button>
 </aside>
 <script src="sidebar.js?v=2"></script>
-<script src="api.js?v=5"></script>
+<script src="api.js?v=6"></script>
 <!-- Main Content -->
 <main id="mainContent" class="ml-64 pt-24 pb-32 px-6 min-h-screen flex flex-col transition-all duration-300">
 <div class="max-w-4xl mx-auto w-full">
@@ -412,11 +412,96 @@ async function handleSend(text) {
 
   try {
     messageCount++;
-    const data = await sendMessage(message, currentSessionId);
-    currentSessionId = data.session_id;
-    setSessionId(currentSessionId);
+    document.getElementById('loading')?.remove();
 
-    // Sync sidebar: ensure session exists
+    // Prepare streaming response container
+    const responseId = 'stream-resp-' + Date.now();
+    let streamText = '';
+    let streamBadge = '';
+    let streamMode = 'chat';
+
+    chatHistory.innerHTML += `
+      <div class="flex gap-4 msg-wrapper" id="${responseId}">
+        <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+        </div>
+        <div class="flex-grow">
+          <div class="stream-badge"></div>
+          <div class="stream-content prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">
+            <span class="animate-pulse text-slate-400">▌</span>
+          </div>
+        </div>
+      </div>`;
+
+    const respEl = document.getElementById(responseId);
+    const contentEl = respEl.querySelector('.stream-content');
+    const badgeEl = respEl.querySelector('.stream-badge');
+
+    const body = { message };
+    if (currentSessionId) body.session_id = currentSessionId;
+
+    await streamSSE(`${API_BASE}/chat/stream`, body, {
+      skill(d) {
+        _activeSkillInfo = d;
+        if (!_cachedSkills) _cachedSkills = [];
+        if (!_cachedSkills.find(s => s.name === d.name)) _cachedSkills.push(d);
+        badgeEl.innerHTML = buildSkillBadge(d);
+      },
+      start(d) {
+        if (d.session_id) {
+          currentSessionId = d.session_id;
+          setSessionId(currentSessionId);
+        }
+      },
+      token(d) {
+        streamText += d.content;
+        contentEl.innerHTML = safeMarkdown(streamText) + '<span class="animate-pulse text-slate-400">▌</span>';
+        chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      },
+      done(d) {
+        if (d.session_id) {
+          currentSessionId = d.session_id;
+          setSessionId(currentSessionId);
+        }
+        // Final render (remove cursor)
+        contentEl.innerHTML = safeMarkdown(streamText);
+        // Add message actions
+        const msgIdx = _msgStore.length;
+        _msgStore.push({ text: streamText, raw: message });
+        respEl.insertAdjacentHTML('beforeend', `
+          <div class="msg-actions">
+            <button class="msg-action" data-copy-idx="${msgIdx}" title="复制">
+              <span class="material-symbols-outlined" style="font-size:16px;">content_copy</span>
+            </button>
+            <button class="msg-action" data-regen-idx="${msgIdx}" title="重新生成">
+              <span class="material-symbols-outlined" style="font-size:16px;">refresh</span>
+            </button>
+          </div>`);
+      },
+      complete(d) {
+        // Non-chat mode (graph, quiz, etc.) — full response at once
+        streamMode = d.mode || 'chat';
+        respEl.remove();
+        if (d.mode === 'graph' && d.data?.graph) {
+          currentSessionId = d.session_id;
+          setSessionId(currentSessionId);
+          renderKnowledgeGraph({ data: d.data, message: d.message, session_id: d.session_id, active_skill: _activeSkillInfo });
+        } else {
+          chatHistory.innerHTML += `
+            <div class="flex gap-4">
+              <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+              </div>
+              <div class="flex-grow prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${safeMarkdown(d.message || '')}</div>
+            </div>`;
+        }
+      },
+      error(d) {
+        contentEl.innerHTML = `<span class="text-error">${escapeHtml(d.message || '请求失败')}</span>`;
+      },
+    });
+
+    // Sync sidebar
     const sessions = JSON.parse(localStorage.getItem('openail_sessions') || '[]');
     const currentKey = localStorage.getItem('openail_current_session');
     const existing = sessions.find(s => s.id === currentKey || s.id === currentSessionId);
@@ -429,44 +514,11 @@ async function handleSend(text) {
     }
     localStorage.setItem('openail_current_session', currentSessionId);
 
-    // Auto-rename: only after 3+ rounds or when topic/graph is detected
-    const sessionStillUnnamed = existing ? existing.name === '未命名' : true;
-    if (sessionStillUnnamed && typeof renameCurrentSession === 'function') {
-      if (data.data?.graph?.topic) {
-        renameCurrentSession(data.data.graph.topic);
-      } else if (messageCount >= 3) {
+    if (typeof renameCurrentSession === 'function') {
+      const sessionStillUnnamed = existing ? existing.name === '未命名' : true;
+      if (sessionStillUnnamed && messageCount >= 3) {
         renameCurrentSession(message.substring(0, 15));
       }
-    }
-    document.getElementById('loading')?.remove();
-
-    // Track active skill from response
-    if (data.active_skill) _activeSkillInfo = data.active_skill;
-
-    if (data.mode === 'graph' && data.data?.graph) {
-      renderKnowledgeGraph(data);
-    } else {
-      const badge = buildSkillBadge(data.active_skill);
-      const msgIdx = _msgStore.length;
-      _msgStore.push({ text: data.message, raw: message });
-      chatHistory.innerHTML += `
-        <div class="flex gap-4 msg-wrapper">
-          <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
-            <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
-          </div>
-          <div class="flex-grow">
-            ${badge}
-            <div class="prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${safeMarkdown(data.message)}</div>
-          </div>
-          <div class="msg-actions">
-            <button class="msg-action" data-copy-idx="${msgIdx}" title="复制">
-              <span class="material-symbols-outlined" style="font-size:16px;">content_copy</span>
-            </button>
-            <button class="msg-action" data-regen-idx="${msgIdx}" title="重新生成">
-              <span class="material-symbols-outlined" style="font-size:16px;">refresh</span>
-            </button>
-          </div>
-        </div>`;
     }
   } catch (err) {
     document.getElementById('loading')?.remove();

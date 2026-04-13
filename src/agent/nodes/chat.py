@@ -111,3 +111,46 @@ def chat_node(state: LearningState) -> dict:
         logger.exception("LLM call failed in chat_node")
         reply = "抱歉，AI 服务暂时不可用，请稍后再试。"
     return {"messages": [AIMessage(content=reply)], "mode": "chat"}
+
+
+def chat_node_stream(state: dict):
+    """Streaming version of chat_node. Yields token strings.
+
+    Not called by LangGraph — used directly by the SSE endpoint.
+    """
+    messages = state.get("messages", [])
+
+    system_prompt = _BASE_SYSTEM_PROMPT
+
+    skill_text = get_skill_section(state, "chat")
+    if skill_text:
+        system_prompt += f"\n\n## 教学方法\n{skill_text}"
+
+    context = _build_context_summary(state)
+    if context:
+        system_prompt += f"\n\n{context}"
+
+    user_msg = messages[-1].content if messages and hasattr(messages[-1], "content") else ""
+    memory_context = retrieve_memory(DEFAULT_USER_ID, user_msg)
+    if memory_context:
+        system_prompt += f"\n\n## 历史学习记忆\n{memory_context}\n\n参考以上历史记录回答，但不要直接复述。"
+
+    api_messages = [{"role": "system", "content": system_prompt}]
+    for msg in messages:
+        if hasattr(msg, "type"):
+            role = "assistant" if msg.type == "ai" else "user"
+            api_messages.append({"role": role, "content": msg.content})
+        elif isinstance(msg, dict):
+            api_messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+
+    client = get_raw_client()
+    stream = client.chat.completions.create(
+        model=get_model_name(),
+        max_tokens=4096,
+        messages=api_messages,
+        stream=True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta
+        if delta.content:
+            yield delta.content

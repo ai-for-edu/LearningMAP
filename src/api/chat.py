@@ -5,9 +5,12 @@ import logging
 import uuid
 from typing import Any
 
+import json
+
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from src.agent.graph import build_graph
 from src.api.store import load_session, save_session
 from src.memory_client import ingest_session, DEFAULT_USER_ID
@@ -150,6 +153,123 @@ async def chat(req: ChatRequest) -> ChatResponse:
         data=data,
         active_skill=skill_info,
     )
+
+
+def _sse_event(data: dict) -> str:
+    """Format a dict as an SSE data line."""
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@router.post("/chat/stream")
+async def chat_stream(req: ChatRequest):
+    """SSE endpoint — streams chat tokens in real time."""
+    from src.agent.nodes.chat import chat_node_stream
+    from src.agent.nodes.intent import intent_node
+
+    session_id = req.session_id or str(uuid.uuid4())
+    state = _get_session(session_id) or dict(_DEFAULT_STATE)
+
+    state["messages"] = list(state.get("messages", []))
+    state["messages"].append(HumanMessage(content=req.message))
+
+    # Run intent classification (non-streaming, fast)
+    intent_result = await asyncio.to_thread(intent_node, state)
+    state.update(intent_result)
+
+    mode = state.get("mode", "chat")
+
+    # Only stream for chat mode; others fall back to normal response
+    if mode != "chat":
+        _save(session_id, state)
+        # Run the full graph for non-chat modes
+        graph = _get_graph()
+        result = await asyncio.to_thread(graph.invoke, state)
+        _save(session_id, result)
+
+        messages = result.get("messages", [])
+        last_msg = ""
+        for msg in reversed(messages):
+            if hasattr(msg, "type") and msg.type == "ai":
+                last_msg = msg.content
+                break
+
+        async def non_stream_sse():
+            m = result.get("mode", mode)
+            data: dict | None = None
+            if m == "graph" and result.get("knowledge_graph"):
+                kg = result["knowledge_graph"]
+                data = {"graph": kg.model_dump() if hasattr(kg, "model_dump") else kg}
+            yield _sse_event({"type": "complete", "mode": m, "message": last_msg, "data": data, "session_id": session_id})
+
+        return StreamingResponse(non_stream_sse(), media_type="text/event-stream")
+
+    # Stream chat tokens
+    async def stream_sse():
+        # Send skill info first
+        skill_name = state.get("active_skill")
+        if skill_name:
+            skill_meta = get_skill(skill_name)
+            if skill_meta:
+                yield _sse_event({"type": "skill", "name": skill_meta.name, "display_name": skill_meta.display_name, "body": skill_meta.raw_body, "current_section": "chat"})
+
+        yield _sse_event({"type": "start", "session_id": session_id})
+
+        full_text = ""
+        try:
+            for token in chat_node_stream(state):
+                full_text += token
+                yield _sse_event({"type": "token", "content": token})
+        except Exception:
+            logger.exception("Stream error in chat")
+            yield _sse_event({"type": "error", "message": "AI 服务暂时不可用"})
+            return
+
+        # Save complete message to state
+        state["messages"].append(AIMessage(content=full_text))
+        state["mode"] = "chat"
+        _save(session_id, state)
+
+        yield _sse_event({"type": "done", "session_id": session_id})
+
+    return StreamingResponse(stream_sse(), media_type="text/event-stream")
+
+
+@router.post("/chat/{session_id}/generate-lesson/stream")
+async def generate_lesson_stream(session_id: str):
+    """SSE endpoint — streams lesson content tokens."""
+    from src.agent.nodes.lesson import lesson_node_stream
+
+    state = _get_session(session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    async def stream_sse():
+        skill_name = state.get("active_skill")
+        if skill_name:
+            skill_meta = get_skill(skill_name)
+            if skill_meta:
+                yield _sse_event({"type": "skill", "name": skill_meta.name, "display_name": skill_meta.display_name, "body": skill_meta.raw_body, "current_section": "lesson"})
+
+        yield _sse_event({"type": "start"})
+
+        full_text = ""
+        try:
+            for token in lesson_node_stream(state):
+                full_text += token
+                yield _sse_event({"type": "token", "content": token})
+        except Exception:
+            logger.exception("Stream error in lesson")
+            yield _sse_event({"type": "error", "message": "课程生成失败"})
+            return
+
+        state["lesson_content"] = full_text
+        state["mode"] = "lesson"
+        state["lesson_format"] = "markdown"
+        _save(session_id, state)
+
+        yield _sse_event({"type": "done", "session_id": session_id})
+
+    return StreamingResponse(stream_sse(), media_type="text/event-stream")
 
 
 class SubmitQuizRequest(BaseModel):

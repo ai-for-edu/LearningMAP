@@ -28,7 +28,7 @@ function setSessionId(id) {
   window.history.replaceState({}, '', url);
 }
 
-// 发送聊天消息
+// 发送聊天消息 (non-streaming fallback)
 async function sendMessage(message, sessionId) {
   const body = { message };
   if (sessionId) body.session_id = sessionId;
@@ -41,6 +41,39 @@ async function sendMessage(message, sessionId) {
 
   if (!resp.ok) throw new Error(`API error: ${resp.status}`);
   return resp.json();
+}
+
+// SSE streaming helper: POST request, parse SSE events, call handlers
+async function streamSSE(url, body, handlers) {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (handlers[data.type]) handlers[data.type](data);
+        } catch (e) { /* skip parse errors */ }
+      }
+    }
+  }
 }
 
 // 获取会话状态
