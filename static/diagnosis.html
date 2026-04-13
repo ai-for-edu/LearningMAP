@@ -340,11 +340,7 @@ let _forceRegen = false;
 async function stopQuiz() {
   try { await cancelGeneration(sessionId, 'quiz'); } catch(e) {}
   if (_poller) _poller.stop();
-  quizFullyLoaded = true;
-  updateNavButtons();
-  const hint = document.getElementById('loadingHint');
-  if (hint) hint.textContent = 'Stopped';
-  showQuestion();
+  window.location.href = '/?session_id=' + sessionId;
 }
 
 function showQuestion() {

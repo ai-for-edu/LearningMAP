@@ -237,7 +237,7 @@
 
       <!-- Finish Button -->
       <div class="text-center py-10">
-        <a id="finishBtn" href="/" class="inline-flex items-center gap-2 bg-secondary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">
+        <a id="finishBtn" href="/" class="inline-flex items-center gap-2 bg-secondary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all" style="display:none;">
           <span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
           Finish Learning
         </a>
@@ -290,6 +290,13 @@
       </div>`;
     document.getElementById('lessonSections').innerHTML = '';
 
+    // Show stop button in nav during generation
+    document.getElementById('navStopBtn').style.display = '';
+    document.getElementById('navStopBtn').onclick = async function() {
+      try { await cancelGeneration(sessionId, 'lesson'); } catch(e) {}
+      window.location.href = '/?session_id=' + sessionId;
+    };
+
     // Trigger generation if not already running
     if (!isRunning) {
       try { await startGeneration(sessionId, 'lesson'); } catch(e) {}
@@ -320,31 +327,15 @@
     if (!lessonContent) return;
   }
 
-  // Wire up nav buttons
+  // Show Finish Learning button + regenerate
+  document.getElementById('finishBtn').style.display = '';
+  document.getElementById('finishBtn').href = '/?session_id=' + sessionId;
   document.getElementById('navStopBtn').style.display = 'none';
   document.getElementById('navRegenBtn').style.display = '';
   document.getElementById('navRegenBtn').onclick = async function() {
-    // Cancel existing, clear content, re-trigger
     try { await cancelGeneration(sessionId, 'lesson'); } catch(e) {}
-    // Clear lesson_content from state so page re-generates
-    try {
-      const s = await getSessionState(sessionId);
-      // We can't directly clear state — just cancel and set status to null
-      // The page reload will see no content and trigger generation
-    } catch(e) {}
-    // Force regeneration by adding ?regen param
     window.location.href = 'lesson.html?session_id=' + sessionId + '&regen=1';
   };
-
-  // Show stop during generation
-  if (!lessonContent) {
-    document.getElementById('navStopBtn').style.display = '';
-    document.getElementById('navRegenBtn').style.display = 'none';
-    document.getElementById('navStopBtn').onclick = async function() {
-      try { await cancelGeneration(sessionId, 'lesson'); } catch(e) {}
-      window.location.href = '/?session_id=' + sessionId;
-    };
-  }
 
   // Render lesson as plain text (LLM returns markdown-like text)
   const weakPoints = state.diagnosis_result?.breakdown?.filter(b => b.status === 'weak').map(b => b.name) || [];
