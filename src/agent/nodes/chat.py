@@ -4,6 +4,7 @@ import logging
 from src.agent.state import LearningState
 from src.llm.client import get_raw_client, get_model_name
 from src.memory_client import retrieve_memory, DEFAULT_USER_ID
+from src.skills.loader import get_skill_section
 from langchain_core.messages import AIMessage
 
 logger = logging.getLogger(__name__)
@@ -71,12 +72,19 @@ def chat_node(state: LearningState) -> dict:
     messages = state.get("messages", [])
 
     # Build system prompt with context summary
-    context = _build_context_summary(state)
     system_prompt = _BASE_SYSTEM_PROMPT
+
+    # ② Skill teaching method
+    skill_text = get_skill_section(state, "chat")
+    if skill_text:
+        system_prompt += f"\n\n## 教学方法\n{skill_text}"
+
+    # ③ Current session context
+    context = _build_context_summary(state)
     if context:
         system_prompt += f"\n\n{context}"
 
-    # Retrieve past learning memory (graceful — empty string on failure)
+    # ④ Retrieve past learning memory (graceful — empty string on failure)
     user_msg = messages[-1].content if messages else ""
     memory_context = retrieve_memory(DEFAULT_USER_ID, user_msg)
     if memory_context:

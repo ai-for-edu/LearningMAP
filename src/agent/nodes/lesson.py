@@ -4,6 +4,7 @@ import logging
 from src.agent.state import LearningState
 from src.llm.client import get_raw_client, get_model_name
 from src.prompts.loader import render_prompt
+from src.skills.loader import get_skill_section
 from langchain_core.messages import AIMessage
 
 logger = logging.getLogger(__name__)
@@ -26,12 +27,14 @@ def lesson_node(state: LearningState) -> dict:
     nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
     node_map = {(n.name if hasattr(n, "name") else n["name"]): n for n in nodes}
 
+    skill_instructions = get_skill_section(state, "lesson")
+
     if not weak_items:
         # All mastered — generate review/consolidation lesson
         all_points = [{"name": n.name if hasattr(n, "name") else n["name"],
                        "description": n.description if hasattr(n, "description") else n.get("description", "")}
                       for n in nodes]
-        prompt = render_prompt("lesson_review", topic=topic, points=all_points)
+        prompt = render_prompt("lesson_review", topic=topic, points=all_points, skill_instructions=skill_instructions)
     else:
         # Has weak points — generate targeted lesson
         weak_points = []
@@ -43,7 +46,7 @@ def lesson_node(state: LearningState) -> dict:
                 weak_points.append({"name": name, "description": desc})
             else:
                 weak_points.append({"name": name, "description": ""})
-        prompt = render_prompt("lesson_plan", topic=topic, weak_points=weak_points)
+        prompt = render_prompt("lesson_plan", topic=topic, weak_points=weak_points, skill_instructions=skill_instructions)
 
     client = get_raw_client()
     response = client.chat.completions.create(

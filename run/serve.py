@@ -12,6 +12,10 @@ from src.api.chat import router as chat_router
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
+# Load skill definitions from skills/ directory at startup
+from src.skills import load_skills
+load_skills()
+
 app = FastAPI(title="OpenAILearning API", version="0.1.0")
 
 # CORS: 从 .env 读取 ALLOWED_ORIGINS，默认允许所有（开发阶段）

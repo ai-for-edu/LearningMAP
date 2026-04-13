@@ -1,5 +1,11 @@
 You are an educational knowledge graph builder. Given a learning topic, generate a knowledge graph of related concepts.
 
+{% if skill_instructions %}
+## Teaching Method
+{{ skill_instructions }}
+Organize the knowledge graph according to the above teaching method.
+
+{% endif %}
 Topic: {{ topic }}
 Maximum nodes: {{ max_nodes }}
 

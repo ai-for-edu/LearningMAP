@@ -5,6 +5,7 @@ from src.agent.state import LearningState
 from src.llm.client import get_llm_client, get_model_name
 from src.llm.schemas import QuizQuestion
 from src.prompts.loader import render_prompt
+from src.skills.loader import get_skill_section
 from langchain_core.messages import AIMessage
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,13 @@ def quiz_node(state: LearningState) -> dict:
                     "description": n.description if hasattr(n, "description") else n["description"]}
                    for n in nodes]
 
-        prompt = render_prompt("quiz_generate", knowledge_points=points, questions_per_point=QUESTIONS_PER_POINT)
+        skill_instructions = get_skill_section(state, "quiz")
+        prompt = render_prompt(
+            "quiz_generate",
+            knowledge_points=points,
+            questions_per_point=QUESTIONS_PER_POINT,
+            skill_instructions=skill_instructions,
+        )
         client = get_llm_client()
         generated = client.chat.completions.create(
             model=get_model_name(),

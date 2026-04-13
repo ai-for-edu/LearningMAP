@@ -5,6 +5,7 @@ from src.agent.state import LearningState
 from src.llm.client import get_llm_client, get_model_name
 from src.llm.schemas import KnowledgeGraph
 from src.prompts.loader import render_prompt
+from src.skills.loader import get_skill_section
 from langchain_core.messages import AIMessage
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,13 @@ MAX_NODES = 8
 def knowledge_graph_node(state: LearningState) -> dict:
     """Generate knowledge graph for the given topic."""
     topic = state.get("topic", "")
-    prompt = render_prompt("knowledge_graph", topic=topic, max_nodes=MAX_NODES)
+    skill_instructions = get_skill_section(state, "knowledge_graph")
+    prompt = render_prompt(
+        "knowledge_graph",
+        topic=topic,
+        max_nodes=MAX_NODES,
+        skill_instructions=skill_instructions,
+    )
 
     try:
         client = get_llm_client()

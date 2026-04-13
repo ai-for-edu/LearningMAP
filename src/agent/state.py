@@ -24,3 +24,7 @@ class LearningState(MessagesState):
     slide_outlines: list | None
     slide_contents: list | None
     lesson_format: str | None  # "markdown" | "slides"
+
+    # Skill
+    active_skill: str | None  # skill name, e.g. "feynman"
+    active_skill_content: dict | None  # {"chat": "...", "quiz": "...", ...}

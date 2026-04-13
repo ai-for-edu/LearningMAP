@@ -11,6 +11,7 @@ from langchain_core.messages import HumanMessage
 from src.agent.graph import build_graph
 from src.api.store import load_session, save_session
 from src.memory_client import ingest_session, DEFAULT_USER_ID
+from src.skills.loader import get_skill, list_skills
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -40,6 +41,8 @@ _DEFAULT_STATE = {
     "slide_outlines": None,
     "slide_contents": None,
     "lesson_format": None,
+    "active_skill": None,
+    "active_skill_content": None,
 }
 
 
@@ -65,11 +68,19 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=5000)
 
 
+class SkillInfo(BaseModel):
+    name: str
+    display_name: str
+    body: str
+    current_section: str | None = None
+
+
 class ChatResponse(BaseModel):
     session_id: str
     mode: str
     message: str
     data: dict | None = None
+    active_skill: SkillInfo | None = None
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -117,11 +128,27 @@ async def chat(req: ChatRequest) -> ChatResponse:
     elif mode == "lesson" and result.get("lesson_content"):
         data = {"lesson": result["lesson_content"]}
 
+    # Build skill metadata for frontend
+    skill_info = None
+    skill_name = result.get("active_skill")
+    if skill_name:
+        skill_meta = get_skill(skill_name)
+        if skill_meta:
+            # Map mode → section name for highlighting
+            mode_to_section = {"chat": "chat", "graph": "knowledge_graph", "quiz": "quiz", "lesson": "lesson"}
+            skill_info = SkillInfo(
+                name=skill_meta.name,
+                display_name=skill_meta.display_name,
+                body=skill_meta.raw_body,
+                current_section=mode_to_section.get(mode),
+            )
+
     return ChatResponse(
         session_id=session_id,
         mode=mode,
         message=last_ai_msg,
         data=data,
+        active_skill=skill_info,
     )
 
 
@@ -301,4 +328,50 @@ async def get_state(session_id: str) -> dict:
     if state.get("lesson_format"):
         result["lesson_format"] = state["lesson_format"]
 
+    # Skill data
+    if state.get("active_skill"):
+        result["active_skill"] = state["active_skill"]
+
     return result
+
+
+@router.get("/skills")
+async def get_available_skills() -> list[dict]:
+    """Return all available skills for frontend display."""
+    return list_skills()
+
+
+class SetSkillRequest(BaseModel):
+    skill: str | None = None  # skill name, or null to clear
+
+
+@router.post("/chat/{session_id}/set-skill")
+async def set_skill(session_id: str, req: SetSkillRequest) -> dict:
+    """Directly set or clear the active skill for a session."""
+    state = _get_session(session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if req.skill is None:
+        # Clear skill
+        state["active_skill"] = None
+        state["active_skill_content"] = None
+        _save(session_id, state)
+        return {"session_id": session_id, "active_skill": None}
+
+    skill_meta = get_skill(req.skill)
+    if not skill_meta:
+        raise HTTPException(status_code=404, detail=f"Skill '{req.skill}' not found")
+
+    state["active_skill"] = skill_meta.name
+    state["active_skill_content"] = skill_meta.sections
+    _save(session_id, state)
+
+    return {
+        "session_id": session_id,
+        "active_skill": {
+            "name": skill_meta.name,
+            "display_name": skill_meta.display_name,
+            "sections": skill_meta.affects,
+        },
+    }

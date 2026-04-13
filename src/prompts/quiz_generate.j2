@@ -1,5 +1,11 @@
 You are a quiz generator for adaptive learning. Generate multiple-choice questions to diagnose student mastery.
 
+{% if skill_instructions %}
+## Teaching Method
+{{ skill_instructions }}
+Apply the above method when designing questions.
+
+{% endif %}
 Knowledge points to test:
 {% for point in knowledge_points %}
 - {{ point.name }}: {{ point.description }}

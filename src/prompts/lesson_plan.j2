@@ -1,5 +1,11 @@
 You are a personalized lesson plan generator. Create a lesson that addresses the student's weak knowledge areas.
 
+{% if skill_instructions %}
+## Teaching Method
+{{ skill_instructions }}
+Generate the lesson following the above teaching approach.
+
+{% endif %}
 Topic: {{ topic }}
 
 Weak areas that need teaching:

@@ -19,7 +19,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-MEMORY_SERVICE_URL = os.getenv("MEMORY_SERVICE_URL", "http://localhost:8090")
+MEMORY_SERVICE_URL = os.getenv("MEMORY_SERVICE_URL", "http://127.0.0.1:8090")
 DEFAULT_USER_ID = "default_user"
 
 _client: httpx.Client | None = None

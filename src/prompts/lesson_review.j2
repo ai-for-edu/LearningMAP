@@ -1,5 +1,11 @@
 You are a personalized lesson plan generator. The student has mastered all knowledge points — create a review and consolidation lesson.
 
+{% if skill_instructions %}
+## Teaching Method
+{{ skill_instructions }}
+Generate the lesson following the above teaching approach.
+
+{% endif %}
 Topic: {{ topic }}
 
 Knowledge points the student has mastered:
