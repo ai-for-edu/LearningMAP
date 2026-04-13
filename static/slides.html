@@ -188,7 +188,7 @@ function updateLoadingProgress(current, total) {
     var bar = document.createElement('div');
     bar.id = 'slideProgress';
     bar.style.cssText = 'position:fixed;top:53px;left:0;right:0;z-index:100;padding:4px 24px;background:white;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;font-size:12px;color:#64748b;';
-    bar.innerHTML = '<span>生成中...</span><div style="flex:1;height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden"><div id="slideProgressBar" style="height:100%;background:#005da7;border-radius:4px;transition:width 0.3s"></div></div><span id="slideProgressText"></span>';
+    bar.innerHTML = '<span>Generating...</span><div style="flex:1;height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden"><div id="slideProgressBar" style="height:100%;background:#005da7;border-radius:4px;transition:width 0.3s"></div></div><span id="slideProgressText"></span>';
     document.body.appendChild(bar);
   }
   var pct = total > 0 ? Math.round((current / total) * 100) : 0;
@@ -246,7 +246,7 @@ function showSlide(index) {
     canvas.style.background = '#f8fafc';
     canvas.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">' +
       '<svg class="animate-spin" style="width:40px;height:40px;color:#005da7;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>' +
-      '<span style="font-size:14px;color:#64748b;">第 ' + (index + 1) + ' 页生成中...</span></div>';
+      '<span style="font-size:14px;color:#64748b;">Slide ' + (index + 1) + ' generating...</span></div>';
   } else {
     renderSlide(canvas, slide);
   }

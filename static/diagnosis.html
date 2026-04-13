@@ -212,8 +212,8 @@ async function initDiagnosis() {
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
       </svg>
-      <p class="font-headline font-bold text-lg text-on-surface">正在生成诊断题目</p>
-      <p class="font-body text-sm text-on-surface-variant mt-2" id="genProgress">AI 正在根据知识图谱出题...</p>
+      <p class="font-headline font-bold text-lg text-on-surface">Generating Questions</p>
+      <p class="font-body text-sm text-on-surface-variant mt-2" id="genProgress">AI is generating questions from the knowledge graph...</p>
     </div>`;
   document.getElementById('progressText').textContent = 'Generating...';
   document.getElementById('progressBar').style.width = '0%';
@@ -242,7 +242,7 @@ async function initDiagnosis() {
         // Show loading hint if still generating
         const hint = document.getElementById('loadingHint');
         if (hint && d.point_index < d.total_points) {
-          hint.innerHTML = `<span class="animate-pulse">出题中 ${d.point_index}/${d.total_points}...</span>`;
+          hint.innerHTML = `<span class="animate-pulse">Generating ${d.point_index}/${d.total_points}...</span>`;
         } else if (hint) {
           hint.textContent = '';
         }
@@ -270,7 +270,7 @@ async function initDiagnosis() {
       document.querySelector('main').innerHTML = `
         <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
           <span class="material-symbols-outlined text-4xl text-error mb-4">error</span>
-          <p class="font-headline font-bold text-on-surface mb-2">加载失败</p>
+          <p class="font-headline font-bold text-on-surface mb-2">Failed to load</p>
           <p class="font-body text-sm text-on-surface-variant mb-6">${escapeHtml(err.message)}</p>
           <a href="/" class="text-primary font-headline font-bold text-sm hover:underline">返回主页</a>
         </div>`;
@@ -281,7 +281,7 @@ async function initDiagnosis() {
 function showQuestion() {
   // If student is ahead of loaded questions, show waiting state
   if (currentIndex >= allQuestions.length) {
-    document.getElementById('questionText').textContent = '正在生成下一道题...';
+    document.getElementById('questionText').textContent = 'Generating next question...';
     document.getElementById('knowledgeTagText').textContent = '';
     document.querySelectorAll('.option-btn').forEach(b => { b.style.display = 'none'; });
     document.getElementById('nextBtn').disabled = true;
@@ -358,7 +358,7 @@ async function nextQuestion() {
 
   // All done — submit answers to backend
   document.getElementById('nextBtn').disabled = true;
-  document.getElementById('nextBtnText').textContent = '提交中...';
+  document.getElementById('nextBtnText').textContent = 'Submitting...';
   try {
     const resp = await fetch(`/api/chat/${sessionId}/submit-quiz`, {
       method: 'POST',
@@ -379,7 +379,7 @@ async function nextQuestion() {
   } catch (err) {
     document.getElementById('nextBtnText').textContent = 'Finish';
     document.getElementById('nextBtn').disabled = false;
-    alert('提交失败: ' + err.message);
+    alert('Submit failed: ' + err.message);
   }
 }
 
