@@ -154,7 +154,9 @@ async function init() {
   var state = await getSessionState(sessionId);
 
   // Check if slides already fully generated (skip if forcing regen)
-  if (!forceRegen && state.slide_contents && state.slide_contents.length > 0 && state.slides_task_status !== 'running') {
+  // Content-first: if all slides have data, they're done regardless of task status
+  var allSlidesReady = state.slide_contents && state.slide_contents.length > 0 && state.slide_contents.every(function(s) { return s !== null; });
+  if (!forceRegen && allSlidesReady) {
     allSlides = state.slide_contents;
     totalSlides = allSlides.length;
     slidesFullyLoaded = true;

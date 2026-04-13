@@ -722,9 +722,10 @@ async function showLessonFormatChoice(sid) {
     const state = await getSessionState(sid);
     lessonStatus = state.lesson_task_status;
     slidesStatus = state.slides_task_status;
-    // Also check if content exists
-    if (state.lesson_content && !lessonStatus) lessonStatus = 'done';
-    if (state.slide_contents && state.slide_contents.length > 0 && !slidesStatus) slidesStatus = 'done';
+    // Content exists = done, regardless of task status
+    if (state.lesson_content) lessonStatus = 'done';
+    if (state.slide_contents && state.slide_contents.length > 0 &&
+        state.slide_contents.every(s => s !== null)) slidesStatus = 'done';
   } catch(e) {}
 
   function statusBadge(s) {
