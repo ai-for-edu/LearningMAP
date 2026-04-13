@@ -350,7 +350,8 @@ async def set_skill(session_id: str, req: SetSkillRequest) -> dict:
     """Directly set or clear the active skill for a session."""
     state = _get_session(session_id)
     if not state:
-        raise HTTPException(status_code=404, detail="Session not found")
+        # Auto-create session (user may select skill before first message)
+        state = dict(_DEFAULT_STATE)
 
     if req.skill is None:
         # Clear skill

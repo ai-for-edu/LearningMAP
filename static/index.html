@@ -103,9 +103,8 @@
         .skill-item { padding: 12px 16px; cursor: pointer; transition: background 0.15s; position: relative; }
         .skill-item:hover { background: #f1f5f9; }
         .skill-item:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
-        .skill-preview { display: none; position: absolute; left: 100%; top: 0; width: 380px; max-height: 400px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 16px; margin-left: 8px; z-index: 210; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+        .skill-preview { display: none; margin-top: 8px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; line-height: 1.7; white-space: pre-wrap; color: #475569; max-height: 260px; overflow-y: auto; }
         .skill-item:hover .skill-preview { display: block; }
-        .skill-preview .section-active { background: #dbeafe; border-radius: 4px; padding: 2px 4px; font-weight: 600; }
         /* Skill badge on AI messages */
         .skill-badge { display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; cursor: pointer; position: relative; transition: background 0.15s; }
         .skill-badge:hover { background: #dbeafe; }
@@ -134,7 +133,7 @@
 </button>
 </aside>
 <script src="sidebar.js?v=2"></script>
-<script src="api.js?v=3"></script>
+<script src="api.js?v=4"></script>
 <!-- Main Content -->
 <main id="mainContent" class="ml-64 pt-24 pb-32 px-6 min-h-screen flex flex-col transition-all duration-300">
 <div class="max-w-4xl mx-auto w-full">
@@ -173,7 +172,7 @@ async function handleInputChange(e) {
   const val = e.target.value;
   const popup = document.getElementById('skillPopup');
 
-  if (val.trim() === '/skill') {
+  if (val.trim() === '/skill' || val.trim() === '/skill ') {
     if (!_cachedSkills) _cachedSkills = await fetchSkills();
     if (_cachedSkills.length === 0) {
       popup.innerHTML = '<div class="p-4 text-sm text-slate-400">暂无可用的教学方法</div>';
@@ -218,31 +217,16 @@ async function selectSkill(name) {
   const popup = document.getElementById('skillPopup');
   const input = document.getElementById('chatInput');
   popup.style.display = 'none';
-  input.value = '';
 
-  // Ensure session exists
-  if (!currentSessionId) {
-    currentSessionId = crypto.randomUUID();
-    setSessionId(currentSessionId);
-  }
-
-  try {
-    const result = await setSkill(currentSessionId, name);
-    _activeSkillInfo = _cachedSkills.find(s => s.name === name) || null;
-
-    const chatHistory = document.getElementById('chatHistory');
-    const displayName = _activeSkillInfo ? _activeSkillInfo.display_name : name;
-    chatHistory.innerHTML += `
-      <div class="flex justify-center">
-        <div class="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2">
-          <span class="material-symbols-outlined text-base">psychology</span>
-          已切换教学方法：<strong>${escapeHtml(displayName)}</strong>
-        </div>
-      </div>`;
-  } catch (err) {
-    alert('设置教学方法失败: ' + err.message);
-  }
+  // Fill input with /skill <name> prefix, user continues typing
+  _pendingSkill = name;
+  _activeSkillInfo = (_cachedSkills || []).find(s => s.name === name) || null;
+  input.value = `/skill ${name} `;
+  input.focus();
 }
+
+// Track pending skill to apply when message is sent
+let _pendingSkill = null;
 
 async function clearSkill() {
   const popup = document.getElementById('skillPopup');
@@ -250,49 +234,71 @@ async function clearSkill() {
   popup.style.display = 'none';
   input.value = '';
 
-  if (!currentSessionId) return;
-
-  try {
-    await setSkill(currentSessionId, null);
-    _activeSkillInfo = null;
-
-    const chatHistory = document.getElementById('chatHistory');
-    chatHistory.innerHTML += `
-      <div class="flex justify-center">
-        <div class="bg-slate-100 text-slate-600 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2">
-          <span class="material-symbols-outlined text-base">close</span>
-          已清除教学方法，恢复默认模式
-        </div>
-      </div>`;
-  } catch (err) {
-    alert('清除失败: ' + err.message);
+  if (currentSessionId) {
+    try {
+      await setSkill(currentSessionId, null);
+    } catch (err) { /* ignore */ }
   }
+
+  _activeSkillInfo = null;
+  _pendingSkill = null;
+  input.focus();
 }
 
 function buildSkillBadge(skillInfo) {
   if (!skillInfo) return '';
-  const body = formatSkillBody(skillInfo.body || '', skillInfo.current_section);
+  const displayName = skillInfo.display_name || skillInfo.name || '';
+  const body = skillInfo.body || '';
+  if (!displayName) return '';
+  const rendered = body ? formatSkillBody(body, skillInfo.current_section) : escapeHtml(displayName);
   return `
     <div class="skill-badge" style="margin-bottom:8px;">
       <span class="material-symbols-outlined" style="font-size:14px;">psychology</span>
-      ${escapeHtml(skillInfo.display_name)}
-      <div class="skill-badge-tooltip">${body}</div>
+      ${escapeHtml(displayName)}
+      ${body ? `<div class="skill-badge-tooltip">${rendered}</div>` : ''}
     </div>`;
 }
 
 async function handleSend(text) {
   const input = document.getElementById('chatInput');
-  const message = text || input.value.trim();
-  if (!message) return;
+  const rawMessage = text || input.value.trim();
+  if (!rawMessage) return;
   input.value = '';
+
+  // Handle /skill <name> prefix: extract skill, set it, send the rest as message
+  let message = rawMessage;
+  const skillMatch = rawMessage.match(/^\/skill\s+(\S+)\s+([\s\S]+)$/);
+  if (skillMatch) {
+    const skillName = skillMatch[1];
+    message = skillMatch[2].trim();
+
+    // Ensure session exists for set-skill
+    if (!currentSessionId) {
+      currentSessionId = crypto.randomUUID();
+      setSessionId(currentSessionId);
+    }
+
+    try {
+      await setSkill(currentSessionId, skillName);
+      if (!_cachedSkills) _cachedSkills = await fetchSkills();
+      _activeSkillInfo = (_cachedSkills || []).find(s => s.name === skillName) || null;
+    } catch (err) {
+      // Skill set failed, continue without skill
+    }
+    _pendingSkill = null;
+  }
 
   const chatHistory = document.getElementById('chatHistory');
 
-  // Show user message
+  // Show user message (display full text including /skill prefix)
+  const userBubbleContent = rawMessage !== message
+    ? `<span class="skill-badge" style="margin-right:6px;font-size:11px;vertical-align:middle;"><span class="material-symbols-outlined" style="font-size:12px;">psychology</span>${escapeHtml(_activeSkillInfo?.display_name || skillMatch?.[1] || '')}</span>${escapeHtml(message)}`
+    : escapeHtml(rawMessage);
+
   chatHistory.innerHTML += `
     <div class="flex justify-end">
       <div class="bg-surface-container-low px-6 py-4 rounded-3xl rounded-tr-none max-w-[85%] text-on-surface shadow-sm">
-        <p class="font-body leading-relaxed">${escapeHtml(message)}</p>
+        <p class="font-body leading-relaxed">${userBubbleContent}</p>
       </div>
     </div>`;
 
@@ -382,6 +388,7 @@ function renderKnowledgeGraph(data) {
         <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
       </div>
       <div class="flex-grow space-y-6">
+        ${buildSkillBadge(data.active_skill || _activeSkillInfo)}
         <div class="prose prose-slate max-w-none">
           <p class="font-headline text-2xl font-bold tracking-tight text-primary">${escapeHtml(graph.topic)} 知识图谱</p>
           <p class="font-body text-on-surface-variant leading-relaxed">${escapeHtml(data.message)}</p>
