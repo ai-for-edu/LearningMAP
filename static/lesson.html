@@ -250,7 +250,7 @@
 
 </main>
 
-<script src="api.js?v=3"></script>
+<script src="api.js?v=7"></script>
 <script>
 (async function() {
   const sessionId = getSessionId();
@@ -260,27 +260,68 @@
   document.getElementById('backLink').href = '/?session_id=' + sessionId + '&show=results';
   document.getElementById('finishBtn').href = '/?session_id=' + sessionId + '&show=lesson';
 
-  const state = await getSessionState(sessionId);
+  let state = await getSessionState(sessionId);
   const topic = state.topic || '';
   let lessonContent = state.lesson_content;
 
-  // If no lesson yet, show spinner and generate
+  // If no lesson yet, trigger background generation + poll
   if (!lessonContent) {
+    const isRunning = state.lesson_task_status === 'running';
+
     document.getElementById('lessonHeader').innerHTML = `
-      <div class="flex flex-col items-center justify-center py-20">
+      <div class="flex flex-col items-center justify-center py-20" id="lessonLoading">
         <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
         </svg>
-        <p class="font-headline font-bold text-lg text-on-surface">正在生成个性化教案</p>
-        <p class="font-body text-sm text-on-surface-variant mt-2">AI 正在根据诊断结果编写教案，请稍候...</p>
+        <p class="font-headline font-bold text-lg text-on-surface">Generating Lesson</p>
+        <p class="font-body text-sm text-on-surface-variant mt-2">AI is creating a personalized lesson based on your diagnosis...</p>
+        <div class="flex gap-3 mt-6">
+          <button onclick="cancelAndReturn()" class="text-sm text-slate-500 hover:text-error transition-colors flex items-center gap-1">
+            <span class="material-symbols-outlined" style="font-size:16px;">stop_circle</span> Stop
+          </button>
+          <a href="/?session_id=${sessionId}" class="text-sm text-slate-500 hover:text-primary transition-colors flex items-center gap-1">
+            <span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span> Back to Chat
+          </a>
+        </div>
       </div>`;
     document.getElementById('lessonSections').innerHTML = '';
 
-    const resp = await fetch('/api/chat/' + sessionId + '/generate-lesson', { method: 'POST' });
-    const data = await resp.json();
-    lessonContent = data.lesson_content || '';
+    // Trigger generation if not already running
+    if (!isRunning) {
+      try { await startGeneration(sessionId, 'lesson'); } catch(e) {}
+    }
+
+    // Poll until done
+    await new Promise((resolve) => {
+      pollStatus(sessionId, 'lesson',
+        function onUpdate() { /* still running, wait */ },
+        async function onDone(s) {
+          if (s.status === 'done') {
+            state = await getSessionState(sessionId);
+            lessonContent = state.lesson_content || '';
+          } else if (s.status === 'error') {
+            document.getElementById('lessonHeader').innerHTML = `
+              <div class="flex flex-col items-center justify-center py-20">
+                <span class="material-symbols-outlined text-4xl text-error mb-4">error</span>
+                <p class="font-headline font-bold text-on-surface mb-2">Generation Failed</p>
+                <button onclick="window.location.reload()" class="text-primary font-headline font-bold text-sm hover:underline">Retry</button>
+              </div>`;
+          }
+          resolve();
+        },
+        2000
+      );
+    });
+
+    if (!lessonContent) return;
   }
+
+  window._cancelLesson = async function() {
+    try { await cancelGeneration(sessionId, 'lesson'); } catch(e) {}
+    window.location.href = '/?session_id=' + sessionId;
+  };
+  window.cancelAndReturn = window._cancelLesson;
 
   // Render lesson as plain text (LLM returns markdown-like text)
   const weakPoints = state.diagnosis_result?.breakdown?.filter(b => b.status === 'weak').map(b => b.name) || [];

@@ -76,6 +76,57 @@ async function streamSSE(url, body, handlers) {
   }
 }
 
+// Background generation API
+async function startGeneration(sessionId, taskType) {
+  const resp = await fetch(`${API_BASE}/chat/${sessionId}/generate/${taskType}`, { method: 'POST' });
+  if (!resp.ok) throw new Error(`Start generation failed: ${resp.status}`);
+  return resp.json();
+}
+
+async function cancelGeneration(sessionId, taskType) {
+  const resp = await fetch(`${API_BASE}/chat/${sessionId}/generate/${taskType}/cancel`, { method: 'POST' });
+  if (!resp.ok) throw new Error(`Cancel failed: ${resp.status}`);
+  return resp.json();
+}
+
+async function getGenerationStatus(sessionId, taskType) {
+  const resp = await fetch(`${API_BASE}/chat/${sessionId}/generate/${taskType}/status`);
+  if (!resp.ok) throw new Error(`Status check failed: ${resp.status}`);
+  return resp.json();
+}
+
+function pollStatus(sessionId, taskType, onUpdate, onDone, interval = 2000) {
+  let stopped = false;
+  const poll = async () => {
+    if (stopped) return;
+    try {
+      const status = await getGenerationStatus(sessionId, taskType);
+      if (stopped) return;
+      if (status.status === 'done') {
+        onDone(status);
+        return;
+      }
+      if (status.status === 'error') {
+        onDone(status);
+        return;
+      }
+      if (status.status === 'running') {
+        onUpdate(status);
+      }
+      if (status.status === null) {
+        // Task not running (cancelled or never started)
+        onDone({ status: null });
+        return;
+      }
+      setTimeout(poll, interval);
+    } catch (err) {
+      if (!stopped) setTimeout(poll, interval * 2);
+    }
+  };
+  poll();
+  return { stop: () => { stopped = true; } };
+}
+
 // 获取会话状态
 async function getSessionState(sessionId) {
   const resp = await fetch(`${API_BASE}/chat/${sessionId}/state`);

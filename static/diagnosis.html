@@ -139,7 +139,7 @@
   </div>
 </main>
 
-<script src="api.js?v=6"></script>
+<script src="api.js?v=7"></script>
 <script>
 let sessionId = getSessionId();
 let allQuestions = [];
@@ -158,6 +158,9 @@ function buildQuizUI() {
               <span id="knowledgeTagText"></span>
             </span>
             <span class="text-xs text-slate-400" id="loadingHint"></span>
+            <button onclick="stopQuiz()" class="text-xs text-slate-400 hover:text-error transition-colors ml-2" id="stopBtn" style="display:none;">
+              <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">stop_circle</span> Stop
+            </button>
           </div>
           <p class="font-headline text-xl font-bold text-on-surface leading-relaxed mb-2" id="questionText"></p>
           <p class="font-body text-sm text-on-surface-variant">Select one answer</p>
@@ -197,6 +200,7 @@ function buildQuizUI() {
 }
 
 let quizFullyLoaded = false;
+let _poller = null;
 
 async function initDiagnosis() {
   if (!sessionId) {
@@ -205,7 +209,23 @@ async function initDiagnosis() {
     return;
   }
 
-  // Show loading while first questions generate
+  // Check if questions already exist (returning to page)
+  try {
+    const state = await getSessionState(sessionId);
+    if (state.questions && state.questions.length > 0) {
+      allQuestions = state.questions;
+      quizFullyLoaded = state.quiz_task_status !== 'running';
+      buildQuizUI();
+      showQuestion();
+      // If still generating, poll for more
+      if (!quizFullyLoaded) {
+        startPolling();
+      }
+      return;
+    }
+  } catch (e) { /* continue to generate */ }
+
+  // Show loading
   document.querySelector('main').innerHTML = `
     <div class="max-w-6xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh]">
       <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -213,69 +233,89 @@ async function initDiagnosis() {
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
       </svg>
       <p class="font-headline font-bold text-lg text-on-surface">Generating Questions</p>
-      <p class="font-body text-sm text-on-surface-variant mt-2" id="genProgress">AI is generating questions from the knowledge graph...</p>
+      <p class="font-body text-sm text-on-surface-variant mt-2">AI is generating questions from the knowledge graph...</p>
+      <button onclick="window.location.href='/?session_id=${sessionId}'" class="mt-6 text-sm text-slate-500 hover:text-primary transition-colors">← Back to Chat (generation continues in background)</button>
     </div>`;
   document.getElementById('progressText').textContent = 'Generating...';
   document.getElementById('progressBar').style.width = '0%';
 
-  let uiBuilt = false;
-
+  // Trigger background generation
   try {
-    await streamSSE(`/api/chat/${sessionId}/generate-quiz/stream`, null, {
-      start(d) {
-        // total_points available
-      },
-      questions(d) {
-        // Append new questions
-        allQuestions.push(...d.batch);
+    await startGeneration(sessionId, 'quiz');
+  } catch (err) {
+    // May already be running — that's fine
+  }
 
-        // Build quiz UI on first batch
-        if (!uiBuilt) {
-          uiBuilt = true;
-          buildQuizUI();
+  // Poll for results
+  startPolling();
+}
+
+function startPolling() {
+  _poller = pollStatus(sessionId, 'quiz',
+    async function onUpdate(status) {
+      // Check for new questions
+      try {
+        const state = await getSessionState(sessionId);
+        if (state.questions && state.questions.length > allQuestions.length) {
+          allQuestions = state.questions;
+          if (!document.getElementById('optionsContainer')) {
+            buildQuizUI();
+          }
+          showQuestion();
+          // Update loading hint
+          const hint = document.getElementById('loadingHint');
+          if (hint && status.progress) {
+            hint.innerHTML = `<span class="animate-pulse">Generating ${status.progress}...</span>`;
+          }
+        }
+      } catch (e) { /* ignore */ }
+    },
+    async function onDone(status) {
+      quizFullyLoaded = true;
+      // Final fetch
+      try {
+        const state = await getSessionState(sessionId);
+        if (state.questions && state.questions.length > 0) {
+          allQuestions = state.questions;
+          if (!document.getElementById('optionsContainer')) {
+            buildQuizUI();
+          }
           showQuestion();
         }
-
-        // Update answer progress (not loading progress)
-        if (uiBuilt) showQuestion();
-
-        // Show loading hint if still generating
-        const hint = document.getElementById('loadingHint');
-        if (hint && d.point_index < d.total_points) {
-          hint.innerHTML = `<span class="animate-pulse">Generating ${d.point_index}/${d.total_points}...</span>`;
-        } else if (hint) {
-          hint.textContent = '';
-        }
-      },
-      done(d) {
-        quizFullyLoaded = true;
-        const hint = document.getElementById('loadingHint');
-        if (hint) hint.textContent = '';
-        if (uiBuilt) {
-          document.getElementById('progressText').textContent =
-            `Question ${currentIndex + 1} / ${allQuestions.length}`;
-        }
-      },
-      error(d) {
+      } catch (e) { /* ignore */ }
+      const hint = document.getElementById('loadingHint');
+      if (hint) hint.textContent = '';
+      if (status.status === 'error') {
         document.querySelector('main').innerHTML = `
           <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
             <span class="material-symbols-outlined text-4xl text-error mb-4">error</span>
-            <p class="font-headline font-bold text-on-surface mb-2">出题失败</p>
-            <a href="/" class="text-primary font-headline font-bold text-sm hover:underline">返回主页</a>
+            <p class="font-headline font-bold text-on-surface mb-2">Generation Failed</p>
+            <button onclick="retryQuiz()" class="text-primary font-headline font-bold text-sm hover:underline">Retry</button>
           </div>`;
-      },
-    });
-  } catch (err) {
-    if (!uiBuilt) {
-      document.querySelector('main').innerHTML = `
-        <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
-          <span class="material-symbols-outlined text-4xl text-error mb-4">error</span>
-          <p class="font-headline font-bold text-on-surface mb-2">Failed to load</p>
-          <p class="font-body text-sm text-on-surface-variant mb-6">${escapeHtml(err.message)}</p>
-          <a href="/" class="text-primary font-headline font-bold text-sm hover:underline">返回主页</a>
-        </div>`;
-    }
-  }
+      }
+    },
+    1500
+  );
+}
+
+async function retryQuiz() {
+  allQuestions = [];
+  currentIndex = 0;
+  answers = [];
+  quizFullyLoaded = false;
+  if (_poller) _poller.stop();
+  // Reset status
+  try { await cancelGeneration(sessionId, 'quiz'); } catch(e) {}
+  initDiagnosis();
+}
+
+async function stopQuiz() {
+  try { await cancelGeneration(sessionId, 'quiz'); } catch(e) {}
+  if (_poller) _poller.stop();
+  quizFullyLoaded = true;
+  const hint = document.getElementById('loadingHint');
+  if (hint) hint.textContent = 'Stopped';
+  showQuestion();
 }
 
 function showQuestion() {
@@ -294,6 +334,10 @@ function showQuestion() {
   }
 
   document.querySelectorAll('.option-btn').forEach(b => { b.style.display = ''; });
+
+  // Show/hide stop button
+  const stopBtn = document.getElementById('stopBtn');
+  if (stopBtn) stopBtn.style.display = quizFullyLoaded ? 'none' : '';
 
   const q = allQuestions[currentIndex];
   const totalLabel = quizFullyLoaded ? allQuestions.length : allQuestions.length + '+';

@@ -46,6 +46,11 @@ _DEFAULT_STATE = {
     "lesson_format": None,
     "active_skill": None,
     "active_skill_content": None,
+    "quiz_task_status": None,
+    "quiz_task_progress": None,
+    "lesson_task_status": None,
+    "slides_task_status": None,
+    "slides_task_progress": None,
 }
 
 
@@ -554,6 +559,20 @@ async def get_state(session_id: str) -> dict:
     if state.get("active_skill"):
         result["active_skill"] = state["active_skill"]
 
+    # Task status
+    for t in ("quiz", "lesson", "slides"):
+        s = state.get(f"{t}_task_status")
+        if s:
+            # Recovery: if state says running but no live task, reset
+            if s == "running" and not task_manager.is_running(session_id, t):
+                s = None
+                state[f"{t}_task_status"] = None
+                _save(session_id, state)
+            result[f"{t}_task_status"] = s
+        p = state.get(f"{t}_task_progress")
+        if p:
+            result[f"{t}_task_progress"] = p
+
     return result
 
 
@@ -598,3 +617,100 @@ async def set_skill(session_id: str, req: SetSkillRequest) -> dict:
             "sections": skill_meta.affects,
         },
     }
+
+
+# ------------------------------------------------------------------
+# Background generation endpoints
+# ------------------------------------------------------------------
+
+from src.api.tasks import (
+    task_manager,
+    run_quiz_generation,
+    run_lesson_generation,
+    run_slides_generation,
+)
+
+
+@router.post("/chat/{session_id}/generate/{task_type}")
+async def start_generation(session_id: str, task_type: str) -> dict:
+    """Start background generation. Returns immediately.
+
+    task_type: "quiz" | "lesson" | "slides"
+    """
+    if task_type not in ("quiz", "lesson", "slides"):
+        raise HTTPException(status_code=400, detail=f"Invalid task type: {task_type}")
+
+    state = _get_session(session_id)
+    if not state:
+        state = dict(_DEFAULT_STATE)
+        _save(session_id, state)
+
+    # Snapshot state for the background task
+    snapshot = dict(state)
+
+    if task_type == "quiz":
+        if not state.get("knowledge_graph"):
+            raise HTTPException(status_code=400, detail="No knowledge graph — learn a topic first")
+        task_id = task_manager.start(session_id, task_type, lambda: run_quiz_generation(
+            session_id, snapshot, _get_session, _save,
+        ))
+    elif task_type == "lesson":
+        if not state.get("diagnosis_result"):
+            raise HTTPException(status_code=400, detail="No diagnosis — complete quiz first")
+        task_id = task_manager.start(session_id, task_type, lambda: run_lesson_generation(
+            session_id, snapshot, _get_session, _save,
+        ))
+    elif task_type == "slides":
+        if not state.get("diagnosis_result"):
+            raise HTTPException(status_code=400, detail="No diagnosis — complete quiz first")
+        task_id = task_manager.start(session_id, task_type, lambda: run_slides_generation(
+            session_id, snapshot, _get_session, _save,
+        ))
+
+    return {"session_id": session_id, "task_type": task_type, "status": "running"}
+
+
+@router.get("/chat/{session_id}/generate/{task_type}/status")
+async def generation_status(session_id: str, task_type: str) -> dict:
+    """Poll generation status."""
+    if task_type not in ("quiz", "lesson", "slides"):
+        raise HTTPException(status_code=400, detail=f"Invalid task type: {task_type}")
+
+    state = _get_session(session_id)
+    if not state:
+        return {"status": None, "progress": None, "error": None}
+
+    status_key = f"{task_type}_task_status"
+    progress_key = f"{task_type}_task_progress"
+
+    status = state.get(status_key)
+
+    # Recovery: if state says "running" but no live task exists, reset
+    if status == "running" and not task_manager.is_running(session_id, task_type):
+        status = None
+        state[status_key] = None
+        _save(session_id, state)
+
+    return {
+        "status": status,
+        "progress": state.get(progress_key),
+        "error": state.get(f"{task_type}_task_error"),
+    }
+
+
+@router.post("/chat/{session_id}/generate/{task_type}/cancel")
+async def cancel_generation(session_id: str, task_type: str) -> dict:
+    """Cancel a running generation task."""
+    if task_type not in ("quiz", "lesson", "slides"):
+        raise HTTPException(status_code=400, detail=f"Invalid task type: {task_type}")
+
+    cancelled = task_manager.cancel(session_id, task_type)
+
+    # Reset status in state
+    state = _get_session(session_id)
+    if state:
+        state[f"{task_type}_task_status"] = None
+        state[f"{task_type}_task_progress"] = None
+        _save(session_id, state)
+
+    return {"cancelled": cancelled}

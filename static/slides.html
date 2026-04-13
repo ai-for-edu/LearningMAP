@@ -112,7 +112,7 @@ tailwind.config = {
   </div>
 </main>
 
-<script src="api.js?v=6"></script>
+<script src="api.js?v=7"></script>
 <script>
 var sessionId = getSessionId();
 var allSlides = [];
@@ -126,60 +126,107 @@ if (sessionId) {
 
 var totalSlides = 0;
 var slidesFullyLoaded = false;
+var _slidePoller = null;
 
 async function init() {
   if (!sessionId) { window.location.href = '/'; return; }
 
-  // Check if slides already generated
   var state = await getSessionState(sessionId);
-  if (state.slide_contents && state.slide_contents.length > 0) {
+
+  // Check if slides already fully generated
+  if (state.slide_contents && state.slide_contents.length > 0 && state.slides_task_status !== 'running') {
     allSlides = state.slide_contents;
+    totalSlides = allSlides.length;
     slidesFullyLoaded = true;
     showSlideViewer();
     return;
   }
 
-  // Generate slides progressively via SSE
-  var viewerShown = false;
-  try {
-    await streamSSE('/api/chat/' + sessionId + '/generate-slides/stream', null, {
-      outlines: function(d) {
-        totalSlides = d.total;
-        // Pre-fill allSlides with nulls (placeholders)
-        allSlides = new Array(totalSlides).fill(null);
-        // Show viewer immediately with placeholder slides
-        viewerShown = true;
-        showSlideViewer();
-        updateLoadingProgress(0, totalSlides);
-      },
-      slide: function(d) {
-        allSlides[d.index] = d.slide;
-        // Update the thumbnail
-        updateThumbnail(d.index);
-        // If user is viewing this slide, re-render it
-        if (currentSlideIndex === d.index) {
-          showSlide(d.index);
-        }
-        updateLoadingProgress(d.index + 1, d.total);
-      },
-      done: function(d) {
-        slidesFullyLoaded = true;
-        var prog = document.getElementById('slideProgress');
-        if (prog) prog.remove();
-      },
-      error: function(d) {
-        if (!viewerShown) {
-          document.getElementById('loadingView').innerHTML =
-            '<p class="text-error font-headline font-bold">生成失败: ' + escapeHtml(d.message || '未知错误') + '</p>';
-        }
-      }
-    });
-  } catch (err) {
-    if (!viewerShown) {
-      document.getElementById('loadingView').innerHTML =
-        '<p class="text-error font-headline font-bold">生成失败: ' + escapeHtml(err.message) + '</p>';
-    }
+  // Partially generated (came back mid-generation)
+  if (state.slide_contents && state.slide_contents.length > 0) {
+    allSlides = state.slide_contents;
+    totalSlides = allSlides.length;
+    showSlideViewer();
+    updateLoadingProgress(allSlides.filter(Boolean).length, totalSlides);
+    startSlidePolling();
+    return;
   }
+
+  // Nothing yet — trigger background generation
+  document.getElementById('loadingView').innerHTML = `
+    <div class="flex flex-col items-center justify-center">
+      <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      <p class="font-headline font-bold text-lg text-on-surface">Generating Slides</p>
+      <p class="font-body text-sm text-on-surface-variant mt-2">Creating outlines and slides...</p>
+      <div class="flex gap-3 mt-6">
+        <button onclick="cancelSlides()" class="text-sm text-slate-500 hover:text-error transition-colors flex items-center gap-1">
+          <span class="material-symbols-outlined" style="font-size:16px;">stop_circle</span> Stop
+        </button>
+        <a href="/?session_id=${sessionId}" class="text-sm text-slate-500 hover:text-primary transition-colors flex items-center gap-1">
+          <span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span> Back to Chat
+        </a>
+      </div>
+    </div>`;
+
+  try { await startGeneration(sessionId, 'slides'); } catch(e) {}
+  startSlidePolling();
+}
+
+function startSlidePolling() {
+  _slidePoller = pollStatus(sessionId, 'slides',
+    async function onUpdate(status) {
+      try {
+        var state = await getSessionState(sessionId);
+        if (state.slide_contents && state.slide_contents.length > 0) {
+          var oldLen = allSlides.filter(Boolean).length;
+          allSlides = state.slide_contents;
+          totalSlides = allSlides.length;
+
+          if (!document.getElementById('slideCanvas')) {
+            // First slides arrived — show viewer
+            showSlideViewer();
+          }
+
+          var newLen = allSlides.filter(Boolean).length;
+          if (newLen > oldLen) {
+            buildThumbnails();
+            if (allSlides[currentSlideIndex]) showSlide(currentSlideIndex);
+            // Re-highlight
+            document.querySelectorAll('.thumb').forEach(function(t, i) {
+              t.style.borderColor = i === currentSlideIndex ? '#005da7' : '#e6e8ea';
+              t.style.opacity = i === currentSlideIndex ? '1' : '0.6';
+            });
+          }
+          updateLoadingProgress(newLen, totalSlides);
+        }
+      } catch(e) {}
+    },
+    async function onDone(status) {
+      slidesFullyLoaded = true;
+      var prog = document.getElementById('slideProgress');
+      if (prog) prog.remove();
+      // Final fetch
+      try {
+        var state = await getSessionState(sessionId);
+        if (state.slide_contents) {
+          allSlides = state.slide_contents;
+          totalSlides = allSlides.length;
+          if (!document.getElementById('slideCanvas')) showSlideViewer();
+          else { buildThumbnails(); showSlide(currentSlideIndex); }
+        }
+      } catch(e) {}
+    },
+    2000
+  );
+}
+
+async function cancelSlides() {
+  try { await cancelGeneration(sessionId, 'slides'); } catch(e) {}
+  if (_slidePoller) _slidePoller.stop();
+  window.location.href = '/?session_id=' + sessionId;
 }
 
 function updateLoadingProgress(current, total) {

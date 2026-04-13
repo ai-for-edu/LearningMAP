@@ -711,41 +711,45 @@ function renderDiagnosisResults(r, sessionId) {
     </div>`;
 }
 
-function renderLessonButton(sessionId) {
-  const chatHistory = document.getElementById('chatHistory');
-  chatHistory.innerHTML += `
-    <div class="flex gap-4">
-      <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
-        <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
-      </div>
-      <div class="flex-grow">
-        ${buildSkillBadge(_activeSkillInfo ? {..._activeSkillInfo, current_section: 'lesson'} : null)}
-        <p class="font-body text-on-surface-variant mb-4">教案学习完成！你可以随时回顾。</p>
-        <a href="lesson.html?session_id=${sessionId}" class="inline-flex items-center gap-2 bg-primary/10 text-primary py-3 px-6 rounded-2xl font-headline font-bold text-sm hover:bg-primary/20 transition-all">
-          <span class="material-symbols-outlined text-lg">school</span>Review Lesson
-        </a>
-      </div>
-    </div>`;
-}
+// renderLessonButton removed — Start Learning button on diagnosis card is the single entry point
 
-function showLessonFormatChoice(sid) {
+async function showLessonFormatChoice(sid) {
   document.querySelector('.lesson-format-overlay')?.remove();
+
+  // Fetch current status
+  let lessonStatus = null, slidesStatus = null;
+  try {
+    const state = await getSessionState(sid);
+    lessonStatus = state.lesson_task_status;
+    slidesStatus = state.slides_task_status;
+    // Also check if content exists
+    if (state.lesson_content && !lessonStatus) lessonStatus = 'done';
+    if (state.slide_contents && state.slide_contents.length > 0 && !slidesStatus) slidesStatus = 'done';
+  } catch(e) {}
+
+  function statusBadge(s) {
+    if (s === 'done') return '<span class="text-xs text-green-600 font-medium flex items-center gap-1"><span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:\'FILL\' 1;">check_circle</span>Ready</span>';
+    if (s === 'running') return '<span class="text-xs text-blue-600 font-medium flex items-center gap-1 animate-pulse"><span class="material-symbols-outlined" style="font-size:14px;">sync</span>Generating...</span>';
+    if (s === 'error') return '<span class="text-xs text-red-600 font-medium flex items-center gap-1"><span class="material-symbols-outlined" style="font-size:14px;">error</span>Failed — click to retry</span>';
+    return '<span class="text-xs text-slate-400">Click to generate</span>';
+  }
+
   const overlay = document.createElement('div');
   overlay.className = 'lesson-format-overlay fixed inset-0 bg-black/30 flex items-center justify-center z-[100]';
   overlay.innerHTML = `
     <div class="bg-white rounded-3xl p-8 max-w-md mx-4 shadow-xl">
-      <h3 class="font-headline font-bold text-lg text-on-surface mb-2">选择学习方式</h3>
-      <p class="font-body text-sm text-on-surface-variant mb-6">选择教案格式：</p>
+      <h3 class="font-headline font-bold text-lg text-on-surface mb-2">Choose Format</h3>
+      <p class="font-body text-sm text-on-surface-variant mb-6">Select a lesson format. You can generate both!</p>
       <div class="flex gap-4">
-        <button id="chooseMarkdown" class="flex-1 flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-slate-200 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">
+        <button id="chooseMarkdown" class="flex-1 flex flex-col items-center gap-3 p-6 rounded-2xl border-2 ${lessonStatus === 'done' ? 'border-green-300 bg-green-50' : 'border-slate-200 hover:border-primary hover:bg-primary/5'} transition-all cursor-pointer">
           <span class="material-symbols-outlined text-3xl text-primary">article</span>
           <span class="font-headline font-bold text-sm">Markdown</span>
-          <span class="text-xs text-on-surface-variant">文字教案，支持笔记</span>
+          ${statusBadge(lessonStatus)}
         </button>
-        <button id="chooseSlides" class="flex-1 flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-slate-200 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">
+        <button id="chooseSlides" class="flex-1 flex flex-col items-center gap-3 p-6 rounded-2xl border-2 ${slidesStatus === 'done' ? 'border-green-300 bg-green-50' : 'border-slate-200 hover:border-primary hover:bg-primary/5'} transition-all cursor-pointer">
           <span class="material-symbols-outlined text-3xl text-primary">slideshow</span>
-          <span class="font-headline font-bold text-sm">PPT 幻灯片</span>
-          <span class="text-xs text-on-surface-variant">演示文稿式教案</span>
+          <span class="font-headline font-bold text-sm">PPT Slides</span>
+          ${statusBadge(slidesStatus)}
         </button>
       </div>
       <button id="cancelFormatChoice" class="w-full mt-4 text-sm text-on-surface-variant hover:bg-slate-100 py-2.5 rounded-xl transition-colors">Cancel</button>
@@ -804,9 +808,7 @@ function showLessonFormatChoice(sid) {
     renderDiagnosisResults(state.diagnosis_result, sid);
   }
 
-  if (state.has_lesson) {
-    renderLessonButton(sid);
-  }
+  // No lesson card — Start Learning button on diagnosis card handles both formats
 
   // Render remaining chat messages
   if (state.messages && state.messages.length > 0) {
@@ -882,8 +884,43 @@ document.addEventListener('click', function(e) {
   }
   const regenBtn = e.target.closest('[data-regen-idx]');
   if (regenBtn) {
-    const msg = _msgStore[+regenBtn.dataset.regenIdx];
-    if (msg && msg.raw) handleSend(msg.raw);
+    const idx = +regenBtn.dataset.regenIdx;
+    const msg = _msgStore[idx];
+    if (!msg || !msg.raw) return;
+
+    // Find the content element in the same message wrapper
+    const wrapper = regenBtn.closest('.msg-wrapper');
+    const contentEl = wrapper.querySelector('.prose');
+    if (!contentEl) return;
+
+    // Clear and re-stream in place
+    contentEl.innerHTML = '<span class="stream-cursor"></span>';
+    let newText = '';
+
+    const body = { message: msg.raw };
+    if (currentSessionId) body.session_id = currentSessionId;
+
+    streamSSE(`${API_BASE}/chat/stream`, body, {
+      token(d) {
+        newText += d.content;
+        contentEl.innerHTML = safeMarkdown(newText) + '<span class="stream-cursor"></span>';
+      },
+      done(d) {
+        contentEl.innerHTML = safeMarkdown(newText);
+        _msgStore[idx].text = newText;
+      },
+      complete(d) {
+        if (d.message) {
+          contentEl.innerHTML = safeMarkdown(d.message);
+          _msgStore[idx].text = d.message;
+        }
+      },
+      error(d) {
+        contentEl.innerHTML = `<span class="text-error">${escapeHtml(d.message || 'Regeneration failed')}</span>`;
+      },
+      skill() {},
+      start() {},
+    });
     return;
   }
 });
