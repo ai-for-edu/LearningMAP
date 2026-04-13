@@ -489,6 +489,10 @@ async function handleSend(text) {
           setSessionId(currentSessionId);
           renderKnowledgeGraph({ data: d.data, message: d.message, session_id: d.session_id, active_skill: _activeSkillInfo });
           setTimeout(initAllGraphs, 100);
+          // Auto-rename session with topic
+          if (d.data.graph.topic && typeof renameCurrentSession === 'function') {
+            renameCurrentSession(d.data.graph.topic);
+          }
         } else {
           chatHistory.innerHTML += `
             <div class="flex gap-4">

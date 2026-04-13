@@ -194,6 +194,20 @@ async def chat_stream(req: ChatRequest):
                 break
 
         async def non_stream_sse():
+            # Send skill event if active (so frontend shows badge)
+            active_skill_name = result.get("active_skill") or state.get("active_skill")
+            if active_skill_name:
+                skill_meta = get_skill(active_skill_name)
+                if skill_meta:
+                    mode_to_section = {"chat": "chat", "graph": "knowledge_graph", "quiz": "quiz", "lesson": "lesson"}
+                    yield _sse_event({
+                        "type": "skill",
+                        "name": skill_meta.name,
+                        "display_name": skill_meta.display_name,
+                        "body": skill_meta.raw_body,
+                        "current_section": mode_to_section.get(result.get("mode", mode)),
+                    })
+
             m = result.get("mode", mode)
             data: dict | None = None
             if m == "graph" and result.get("knowledge_graph"):
