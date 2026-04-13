@@ -221,11 +221,12 @@ async function initDiagnosis() {
   // Check if questions already exist (returning to page)
   try {
     const state = await getSessionState(sessionId);
-    if (state.questions && state.questions.length > 0) {
+    if (!_forceRegen && state.questions && state.questions.length > 0) {
       allQuestions = state.questions;
       quizFullyLoaded = state.quiz_task_status !== 'running';
       buildQuizUI();
       showQuestion();
+      updateNavButtons();
       // If still generating, poll for more
       if (!quizFullyLoaded) {
         startPolling();
@@ -246,6 +247,9 @@ async function initDiagnosis() {
     </div>`;
   document.getElementById('progressText').textContent = 'Generating...';
   document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('navStopBtn').style.display = '';
+
+  _forceRegen = false;
 
   // Trigger background generation
   try {
@@ -326,10 +330,12 @@ async function retryQuiz() {
   answers = [];
   quizFullyLoaded = false;
   if (_poller) _poller.stop();
-  // Reset status
   try { await cancelGeneration(sessionId, 'quiz'); } catch(e) {}
+  _forceRegen = true;
   initDiagnosis();
 }
+
+let _forceRegen = false;
 
 async function stopQuiz() {
   try { await cancelGeneration(sessionId, 'quiz'); } catch(e) {}

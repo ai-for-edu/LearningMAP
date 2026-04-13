@@ -60,7 +60,7 @@ tailwind.config = {
     <button id="navStopBtn" onclick="cancelSlides()" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors" title="Stop generating" style="display:none;">
       <span class="material-symbols-outlined text-lg">stop_circle</span>
     </button>
-    <button id="navRegenBtn" onclick="window.location.reload()" class="flex items-center text-sm text-slate-500 hover:text-primary transition-colors" title="Regenerate" style="display:none;">
+    <button id="navRegenBtn" onclick="regenSlides()" class="flex items-center text-sm text-slate-500 hover:text-primary transition-colors" title="Regenerate" style="display:none;">
       <span class="material-symbols-outlined text-lg">refresh</span>
     </button>
     <a id="backLink" href="/" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors p-1 rounded-lg hover:bg-slate-100" title="Close">
@@ -150,10 +150,11 @@ function updateSlideNavButtons() {
 async function init() {
   if (!sessionId) { window.location.href = '/'; return; }
 
+  var forceRegen = new URLSearchParams(window.location.search).has('regen');
   var state = await getSessionState(sessionId);
 
-  // Check if slides already fully generated
-  if (state.slide_contents && state.slide_contents.length > 0 && state.slides_task_status !== 'running') {
+  // Check if slides already fully generated (skip if forcing regen)
+  if (!forceRegen && state.slide_contents && state.slide_contents.length > 0 && state.slides_task_status !== 'running') {
     allSlides = state.slide_contents;
     totalSlides = allSlides.length;
     slidesFullyLoaded = true;
@@ -163,7 +164,7 @@ async function init() {
   }
 
   // Partially generated (came back mid-generation)
-  if (state.slide_contents && state.slide_contents.length > 0) {
+  if (!forceRegen && state.slide_contents && state.slide_contents.length > 0) {
     allSlides = state.slide_contents;
     totalSlides = allSlides.length;
     showSlideViewer();
@@ -241,6 +242,12 @@ async function cancelSlides() {
   try { await cancelGeneration(sessionId, 'slides'); } catch(e) {}
   if (_slidePoller) _slidePoller.stop();
   window.location.href = '/?session_id=' + sessionId;
+}
+
+async function regenSlides() {
+  try { await cancelGeneration(sessionId, 'slides'); } catch(e) {}
+  if (_slidePoller) _slidePoller.stop();
+  window.location.href = 'slides.html?session_id=' + sessionId + '&regen=1';
 }
 
 function updateLoadingProgress(current, total) {

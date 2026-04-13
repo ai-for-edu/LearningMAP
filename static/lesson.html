@@ -270,9 +270,10 @@
   document.getElementById('backLink').href = '/?session_id=' + sessionId + '&show=results';
   document.getElementById('finishBtn').href = '/?session_id=' + sessionId + '&show=lesson';
 
+  const forceRegen = new URLSearchParams(window.location.search).has('regen');
   let state = await getSessionState(sessionId);
   const topic = state.topic || '';
-  let lessonContent = state.lesson_content;
+  let lessonContent = forceRegen ? null : state.lesson_content;
 
   // If no lesson yet, trigger background generation + poll
   if (!lessonContent) {
@@ -322,7 +323,18 @@
   // Wire up nav buttons
   document.getElementById('navStopBtn').style.display = 'none';
   document.getElementById('navRegenBtn').style.display = '';
-  document.getElementById('navRegenBtn').onclick = function() { window.location.reload(); };
+  document.getElementById('navRegenBtn').onclick = async function() {
+    // Cancel existing, clear content, re-trigger
+    try { await cancelGeneration(sessionId, 'lesson'); } catch(e) {}
+    // Clear lesson_content from state so page re-generates
+    try {
+      const s = await getSessionState(sessionId);
+      // We can't directly clear state — just cancel and set status to null
+      // The page reload will see no content and trigger generation
+    } catch(e) {}
+    // Force regeneration by adding ?regen param
+    window.location.href = 'lesson.html?session_id=' + sessionId + '&regen=1';
+  };
 
   // Show stop during generation
   if (!lessonContent) {
