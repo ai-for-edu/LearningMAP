@@ -112,7 +112,7 @@ tailwind.config = {
   </div>
 </main>
 
-<script src="api.js?v=3"></script>
+<script src="api.js?v=6"></script>
 <script>
 var sessionId = getSessionId();
 var allSlides = [];
@@ -124,6 +124,9 @@ if (sessionId) {
   document.getElementById('finishBtn').href = '/?session_id=' + sessionId + '&show=lesson';
 }
 
+var totalSlides = 0;
+var slidesFullyLoaded = false;
+
 async function init() {
   if (!sessionId) { window.location.href = '/'; return; }
 
@@ -131,25 +134,98 @@ async function init() {
   var state = await getSessionState(sessionId);
   if (state.slide_contents && state.slide_contents.length > 0) {
     allSlides = state.slide_contents;
+    slidesFullyLoaded = true;
     showSlideViewer();
     return;
   }
 
-  // Generate slides
+  // Generate slides progressively via SSE
+  var viewerShown = false;
   try {
-    var resp = await fetch('/api/chat/' + sessionId + '/generate-slides', { method: 'POST' });
-    if (!resp.ok) throw new Error('API error: ' + resp.status);
-    var data = await resp.json();
-    if (data.slides && data.slides.length > 0) {
-      allSlides = data.slides;
-      showSlideViewer();
-    } else {
-      document.getElementById('loadingView').innerHTML =
-        '<p class="text-error font-headline font-bold">幻灯片生成失败，请返回重试。</p>';
-    }
+    await streamSSE('/api/chat/' + sessionId + '/generate-slides/stream', null, {
+      outlines: function(d) {
+        totalSlides = d.total;
+        // Pre-fill allSlides with nulls (placeholders)
+        allSlides = new Array(totalSlides).fill(null);
+        // Show viewer immediately with placeholder slides
+        viewerShown = true;
+        showSlideViewer();
+        updateLoadingProgress(0, totalSlides);
+      },
+      slide: function(d) {
+        allSlides[d.index] = d.slide;
+        // Update the thumbnail
+        updateThumbnail(d.index);
+        // If user is viewing this slide, re-render it
+        if (currentSlide === d.index) {
+          showSlide(d.index);
+        }
+        updateLoadingProgress(d.index + 1, d.total);
+      },
+      done: function(d) {
+        slidesFullyLoaded = true;
+        var prog = document.getElementById('slideProgress');
+        if (prog) prog.remove();
+      },
+      error: function(d) {
+        if (!viewerShown) {
+          document.getElementById('loadingView').innerHTML =
+            '<p class="text-error font-headline font-bold">生成失败: ' + escapeHtml(d.message || '未知错误') + '</p>';
+        }
+      }
+    });
   } catch (err) {
-    document.getElementById('loadingView').innerHTML =
-      '<p class="text-error font-headline font-bold">生成失败: ' + escapeHtml(err.message) + '</p>';
+    if (!viewerShown) {
+      document.getElementById('loadingView').innerHTML =
+        '<p class="text-error font-headline font-bold">生成失败: ' + escapeHtml(err.message) + '</p>';
+    }
+  }
+}
+
+function updateLoadingProgress(current, total) {
+  var existing = document.getElementById('slideProgress');
+  if (!existing) {
+    var bar = document.createElement('div');
+    bar.id = 'slideProgress';
+    bar.style.cssText = 'position:fixed;top:53px;left:0;right:0;z-index:100;padding:4px 24px;background:white;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;font-size:12px;color:#64748b;';
+    bar.innerHTML = '<span>生成中...</span><div style="flex:1;height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden"><div id="slideProgressBar" style="height:100%;background:#005da7;border-radius:4px;transition:width 0.3s"></div></div><span id="slideProgressText"></span>';
+    document.body.appendChild(bar);
+  }
+  var pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  var pbar = document.getElementById('slideProgressBar');
+  if (pbar) pbar.style.width = pct + '%';
+  var ptxt = document.getElementById('slideProgressText');
+  if (ptxt) ptxt.textContent = current + '/' + total;
+}
+
+function updateThumbnail(index) {
+  var strip = document.getElementById('thumbnailStrip');
+  if (!strip) return;
+  var thumbs = strip.querySelectorAll('.thumb');
+  if (index < thumbs.length) {
+    // Re-build this specific thumbnail
+    var slide = allSlides[index];
+    var thumb = thumbs[index];
+    // Clear spinner
+    var spinner = thumb.querySelector('.thumb-spinner');
+    if (spinner) spinner.remove();
+    // Re-render mini content
+    if (slide && slide.elements) {
+      var mini = thumb.querySelector('div');
+      if (mini) {
+        mini.innerHTML = '';
+        if (slide.background && slide.background.color) mini.style.background = slide.background.color;
+        for (var j = 0; j < Math.min(slide.elements.length, 5); j++) {
+          var el = slide.elements[j];
+          if (el.type === 'text') {
+            var d = document.createElement('div');
+            d.style.cssText = 'position:absolute;left:' + el.left + 'px;top:' + el.top + 'px;width:' + el.width + 'px;font-size:10px;color:#333;overflow:hidden;';
+            d.textContent = (el.content || '').replace(/<[^>]+>/g, '').substring(0, 50);
+            mini.appendChild(d);
+          }
+        }
+      }
+    }
   }
 }
 
@@ -183,10 +259,21 @@ function showSlide(index) {
   currentSlideIndex = index;
   var slide = allSlides[index];
   var canvas = document.getElementById('slideCanvas');
-  renderSlide(canvas, slide);
+
+  if (!slide) {
+    // Slide not generated yet — show spinner
+    canvas.innerHTML = '';
+    canvas.style.background = '#f8fafc';
+    canvas.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">' +
+      '<svg class="animate-spin" style="width:40px;height:40px;color:#005da7;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>' +
+      '<span style="font-size:14px;color:#64748b;">第 ' + (index + 1) + ' 页生成中...</span></div>';
+  } else {
+    renderSlide(canvas, slide);
+  }
 
   // Update controls
-  document.getElementById('pageIndicator').textContent = (index + 1) + ' / ' + allSlides.length;
+  var totalLabel = slidesFullyLoaded ? allSlides.length : allSlides.length + '';
+  document.getElementById('pageIndicator').textContent = (index + 1) + ' / ' + totalLabel;
   document.getElementById('prevBtn').disabled = index === 0;
   document.getElementById('nextBtn').disabled = index === allSlides.length - 1;
 
@@ -214,6 +301,13 @@ function buildThumbnails() {
     thumb.style.opacity = '0.6';
     thumb.style.position = 'relative';
     thumb.onclick = function() { showSlide(i); };
+
+    // Spinner for unloaded slides
+    if (!slide) {
+      thumb.innerHTML = '<div class="thumb-spinner" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f8fafc;"><svg class="animate-spin" style="width:16px;height:16px;color:#94a3b8;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></div>';
+      strip.appendChild(thumb);
+      return;
+    }
 
     // Mini render
     var mini = document.createElement('div');

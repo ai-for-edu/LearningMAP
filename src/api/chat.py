@@ -411,6 +411,49 @@ async def generate_slides(session_id: str) -> dict:
     }
 
 
+@router.post("/chat/{session_id}/generate-slides/stream")
+async def generate_slides_stream(session_id: str):
+    """SSE endpoint — generates slides progressively (outlines then per-slide)."""
+    from src.agent.nodes.slides import generate_slide_content, generate_slide_outlines
+
+    state = _get_session(session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    async def stream_sse():
+        # Stage 1: Generate outlines
+        outlines = await asyncio.to_thread(generate_slide_outlines, state)
+        if not outlines:
+            yield _sse_event({"type": "error", "message": "大纲生成失败"})
+            return
+
+        outlines_data = [o.model_dump() for o in outlines]
+        yield _sse_event({"type": "outlines", "outlines": outlines_data, "total": len(outlines)})
+
+        # Stage 2: Generate each slide
+        slides: list[dict | None] = []
+        for i, outline in enumerate(outlines):
+            slide = await asyncio.to_thread(generate_slide_content, outline)
+            slide_data = slide.model_dump() if slide else None
+            slides.append(slide_data)
+            yield _sse_event({
+                "type": "slide",
+                "index": i,
+                "total": len(outlines),
+                "slide": slide_data,
+            })
+
+        # Save to state
+        state["slide_outlines"] = outlines_data
+        state["slide_contents"] = slides
+        state["lesson_format"] = "slides"
+        _save(session_id, state)
+
+        yield _sse_event({"type": "done", "session_id": session_id})
+
+    return StreamingResponse(stream_sse(), media_type="text/event-stream")
+
+
 @router.get("/chat/{session_id}/export-pptx")
 async def export_pptx(session_id: str):
     """Export slides as downloadable PPTX file."""
