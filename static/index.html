@@ -183,9 +183,9 @@ async function handleInputChange(e) {
     if (_cachedSkills.length === 0) {
       popup.innerHTML = '<div class="p-4 text-sm text-slate-400">暂无可用的教学方法</div>';
     } else {
-      popup.innerHTML = _cachedSkills.map(s => `
+      popup.innerHTML = _cachedSkills.map((s, i) => `
         <div class="skill-item">
-          <div class="skill-item-main" onclick="selectSkill('${escapeHtml(s.name)}')">
+          <div class="skill-item-main" data-skill-idx="${i}">
             <div class="flex items-center gap-2">
               <span class="material-symbols-outlined text-primary text-base">psychology</span>
               <span class="font-headline font-bold text-sm text-on-surface">${escapeHtml(s.display_name)}</span>
@@ -193,17 +193,17 @@ async function handleInputChange(e) {
             <p class="text-xs text-on-surface-variant mt-1 line-clamp-2">${escapeHtml(s.description)}</p>
           </div>
           <div class="skill-item-actions">
-            <button class="skill-action-btn" onclick="event.stopPropagation();showSkillModal('${escapeHtml(s.name)}')" title="查看详情">
+            <button class="skill-action-btn" data-info-idx="${i}" title="查看详情">
               <span class="material-symbols-outlined" style="font-size:16px;">info</span>
             </button>
-            <button class="skill-action-btn" onclick="event.stopPropagation();deleteSkillFile('${escapeHtml(s.name)}')" title="删除">
+            <button class="skill-action-btn" data-delete-idx="${i}" title="删除">
               <span class="material-symbols-outlined" style="font-size:16px;">delete</span>
             </button>
           </div>
         </div>
       `).join('') + `
         <div class="skill-item" style="border-top:1px solid #e2e8f0;">
-          <div class="skill-item-main" onclick="clearSkill()">
+          <div class="skill-item-main" data-clear-skill="1">
             <div class="flex items-center gap-2">
               <span class="material-symbols-outlined text-slate-400 text-base">close</span>
               <span class="font-body text-sm text-slate-500">清除教学方法（恢复默认）</span>
@@ -211,6 +211,17 @@ async function handleInputChange(e) {
           </div>
         </div>`;
     }
+    // Bind events via delegation (no inline onclick — avoids XSS)
+    popup.onclick = function(e) {
+      const main = e.target.closest('[data-skill-idx]');
+      const info = e.target.closest('[data-info-idx]');
+      const del = e.target.closest('[data-delete-idx]');
+      const clr = e.target.closest('[data-clear-skill]');
+      if (info) { e.stopPropagation(); showSkillModal(_cachedSkills[+info.dataset.infoIdx]); return; }
+      if (del) { e.stopPropagation(); deleteSkillFile(_cachedSkills[+del.dataset.deleteIdx].name); return; }
+      if (clr) { clearSkill(); return; }
+      if (main) { selectSkill(_cachedSkills[+main.dataset.skillIdx].name); return; }
+    };
     popup.style.display = 'block';
   } else {
     popup.style.display = 'none';
@@ -244,9 +255,14 @@ function showSkillModal(nameOrInfo, highlightSection) {
   }
   if (!skill) return;
 
+  // Remove any existing modal (prevent stacking)
+  document.querySelector('.skill-modal-overlay')?.remove();
+
   const body = formatSkillBody(skill.body || '', highlightSection || null);
   const overlay = document.createElement('div');
   overlay.className = 'skill-modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
   overlay.innerHTML = `
     <div class="skill-modal">
       <div class="skill-modal-header">
@@ -257,13 +273,19 @@ function showSkillModal(nameOrInfo, highlightSection) {
           </div>
           <p class="text-xs text-on-surface-variant mt-1">${escapeHtml(skill.description || '')}</p>
         </div>
-        <button onclick="this.closest('.skill-modal-overlay').remove()" class="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+        <button class="skill-modal-close p-1 rounded-lg hover:bg-slate-100 transition-colors">
           <span class="material-symbols-outlined text-slate-400">close</span>
         </button>
       </div>
       <div class="skill-modal-body">${body}</div>
     </div>`;
-  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+  // Close handlers
+  const closeModal = () => { overlay.remove(); document.removeEventListener('keydown', escHandler); };
+  const escHandler = (e) => { if (e.key === 'Escape') closeModal(); };
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  overlay.querySelector('.skill-modal-close').addEventListener('click', closeModal);
+  document.addEventListener('keydown', escHandler);
   document.body.appendChild(overlay);
 }
 
@@ -277,13 +299,10 @@ async function selectSkill(name) {
   const input = document.getElementById('chatInput');
   popup.style.display = 'none';
 
-  _pendingSkill = name;
   _activeSkillInfo = (_cachedSkills || []).find(s => s.name === name) || null;
   input.value = `/skill ${name} `;
   input.focus();
 }
-
-let _pendingSkill = null;
 
 async function clearSkill() {
   const popup = document.getElementById('skillPopup');
@@ -295,7 +314,6 @@ async function clearSkill() {
     try { await setSkill(currentSessionId, null); } catch (err) { /* ignore */ }
   }
   _activeSkillInfo = null;
-  _pendingSkill = null;
   input.focus();
 }
 
@@ -303,20 +321,26 @@ function buildSkillBadge(skillInfo) {
   if (!skillInfo) return '';
   const displayName = skillInfo.display_name || skillInfo.name || '';
   if (!displayName) return '';
-  const section = skillInfo.current_section || null;
-  const sName = escapeHtml(skillInfo.name || '');
-  const sSection = section ? escapeHtml(section) : '';
+  // Store skill info in a global registry keyed by index to avoid inline JS
+  const idx = _badgeSkillStore.length;
+  _badgeSkillStore.push({...skillInfo});
   return `
-    <div class="skill-badge" onclick="openSkillDetail('${sName}', '${sSection}')" style="margin-bottom:8px;">
+    <div class="skill-badge" data-badge-idx="${idx}" style="margin-bottom:8px;">
       <span class="material-symbols-outlined" style="font-size:14px;">psychology</span>
       ${escapeHtml(displayName)}
     </div>`;
 }
 
-function openSkillDetail(name, section) {
-  const skill = (_cachedSkills || []).find(s => s.name === name) || _activeSkillInfo || {name, display_name: name, body: '', description: ''};
-  showSkillModal(skill, section || null);
-}
+const _badgeSkillStore = [];
+
+// Delegate all badge clicks at document level
+document.addEventListener('click', function(e) {
+  const badge = e.target.closest('[data-badge-idx]');
+  if (badge) {
+    const info = _badgeSkillStore[+badge.dataset.badgeIdx];
+    if (info) showSkillModal(info, info.current_section || null);
+  }
+});
 
 async function handleSend(text) {
   const input = document.getElementById('chatInput');
@@ -344,8 +368,7 @@ async function handleSend(text) {
     } catch (err) {
       // Skill set failed, continue without skill
     }
-    _pendingSkill = null;
-  }
+    }
 
   const chatHistory = document.getElementById('chatHistory');
 
@@ -609,8 +632,9 @@ function renderLessonButton(sessionId) {
 }
 
 function showLessonFormatChoice(sid) {
+  document.querySelector('.lesson-format-overlay')?.remove();
   const overlay = document.createElement('div');
-  overlay.className = 'fixed inset-0 bg-black/30 flex items-center justify-center z-[100]';
+  overlay.className = 'lesson-format-overlay fixed inset-0 bg-black/30 flex items-center justify-center z-[100]';
   overlay.innerHTML = `
     <div class="bg-white rounded-3xl p-8 max-w-md mx-4 shadow-xl">
       <h3 class="font-headline font-bold text-lg text-on-surface mb-2">选择学习方式</h3>
