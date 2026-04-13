@@ -115,12 +115,11 @@
         .skill-modal { background: white; border-radius: 20px; padding: 0; max-width: 560px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
         .skill-modal-header { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
         .skill-modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; color: #334155; }
-        /* Message action buttons */
-        .msg-wrapper { position: relative; }
-        .msg-actions { display: none; position: absolute; bottom: -4px; right: 0; transform: translateY(100%); background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 2px; gap: 2px; z-index: 10; }
-        .msg-wrapper:hover .msg-actions { display: flex; }
-        .msg-action { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; border-radius: 6px; color: #94a3b8; transition: all 0.15s; }
-        .msg-action:hover { background: #f1f5f9; color: #475569; }
+        /* Message action buttons — ChatGPT style */
+        .msg-actions { display: flex; gap: 4px; margin-top: 6px; opacity: 0; transition: opacity 0.15s; }
+        .msg-wrapper:hover .msg-actions { opacity: 1; }
+        .msg-action { border: none; background: transparent; cursor: pointer; padding: 4px; color: #b0b8c4; transition: color 0.15s; }
+        .msg-action:hover { color: #475569; }
         /* Streaming cursor */
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
         .stream-cursor { display: inline-block; width: 2px; height: 1em; background: #005da7; margin-left: 2px; vertical-align: text-bottom; animation: blink 0.8s step-end infinite; }
@@ -468,16 +467,16 @@ async function handleSend(text) {
         }
         // Final render (remove cursor)
         contentEl.innerHTML = safeMarkdown(streamText);
-        // Add message actions
+        // Add message actions below text, inside the flex-grow container
         const msgIdx = _msgStore.length;
         _msgStore.push({ text: streamText, raw: message });
-        respEl.insertAdjacentHTML('beforeend', `
+        contentEl.insertAdjacentHTML('afterend', `
           <div class="msg-actions">
-            <button class="msg-action" data-copy-idx="${msgIdx}" title="复制">
-              <span class="material-symbols-outlined" style="font-size:16px;">content_copy</span>
+            <button class="msg-action" data-copy-idx="${msgIdx}" title="Copy">
+              <span class="material-symbols-outlined" style="font-size:18px;">content_copy</span>
             </button>
-            <button class="msg-action" data-regen-idx="${msgIdx}" title="重新生成">
-              <span class="material-symbols-outlined" style="font-size:16px;">refresh</span>
+            <button class="msg-action" data-regen-idx="${msgIdx}" title="Regenerate">
+              <span class="material-symbols-outlined" style="font-size:18px;">refresh</span>
             </button>
           </div>`);
       },
@@ -842,11 +841,11 @@ function showLessonFormatChoice(sid) {
             <div class="flex-grow">
               ${badge}
               <div class="prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${safeMarkdown(msg.content)}</div>
-            </div>
-            <div class="msg-actions">
-              <button class="msg-action" data-copy-idx="${msgIdx}" title="复制">
-                <span class="material-symbols-outlined" style="font-size:16px;">content_copy</span>
-              </button>
+              <div class="msg-actions">
+                <button class="msg-action" data-copy-idx="${msgIdx}" title="Copy">
+                  <span class="material-symbols-outlined" style="font-size:18px;">content_copy</span>
+                </button>
+              </div>
             </div>
           </div>`;
       }
