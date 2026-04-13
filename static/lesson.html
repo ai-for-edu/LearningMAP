@@ -198,10 +198,17 @@
     <span class="text-slate-300">|</span>
     <span class="font-headline font-bold text-sm text-on-surface-variant">Lesson Mode</span>
   </div>
-  <a id="backLink" href="results.html" class="flex items-center gap-1 text-sm text-slate-500 hover:text-primary transition-colors">
-    <span class="material-symbols-outlined text-lg">arrow_back</span>
-    <span class="font-label font-medium">Back to Chat</span>
-  </a>
+  <div class="flex items-center gap-2">
+    <button id="navStopBtn" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors" title="Stop generating" style="display:none;">
+      <span class="material-symbols-outlined text-lg">stop_circle</span>
+    </button>
+    <button id="navRegenBtn" class="flex items-center text-sm text-slate-500 hover:text-primary transition-colors" title="Regenerate" style="display:none;">
+      <span class="material-symbols-outlined text-lg">refresh</span>
+    </button>
+    <a id="backLink" href="/" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors p-1 rounded-lg hover:bg-slate-100" title="Close">
+      <span class="material-symbols-outlined text-lg">close</span>
+    </a>
+  </div>
 </nav>
 
 <!-- Main Split Layout -->
@@ -276,14 +283,6 @@
         </svg>
         <p class="font-headline font-bold text-lg text-on-surface">Generating Lesson</p>
         <p class="font-body text-sm text-on-surface-variant mt-2">AI is creating a personalized lesson based on your diagnosis...</p>
-        <div class="flex gap-3 mt-6">
-          <button onclick="cancelAndReturn()" class="text-sm text-slate-500 hover:text-error transition-colors flex items-center gap-1">
-            <span class="material-symbols-outlined" style="font-size:16px;">stop_circle</span> Stop
-          </button>
-          <a href="/?session_id=${sessionId}" class="text-sm text-slate-500 hover:text-primary transition-colors flex items-center gap-1">
-            <span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span> Back to Chat
-          </a>
-        </div>
       </div>`;
     document.getElementById('lessonSections').innerHTML = '';
 
@@ -317,11 +316,20 @@
     if (!lessonContent) return;
   }
 
-  window._cancelLesson = async function() {
-    try { await cancelGeneration(sessionId, 'lesson'); } catch(e) {}
-    window.location.href = '/?session_id=' + sessionId;
-  };
-  window.cancelAndReturn = window._cancelLesson;
+  // Wire up nav buttons
+  document.getElementById('navStopBtn').style.display = 'none';
+  document.getElementById('navRegenBtn').style.display = '';
+  document.getElementById('navRegenBtn').onclick = function() { window.location.reload(); };
+
+  // Show stop during generation
+  if (!lessonContent) {
+    document.getElementById('navStopBtn').style.display = '';
+    document.getElementById('navRegenBtn').style.display = 'none';
+    document.getElementById('navStopBtn').onclick = async function() {
+      try { await cancelGeneration(sessionId, 'lesson'); } catch(e) {}
+      window.location.href = '/?session_id=' + sessionId;
+    };
+  }
 
   // Render lesson as plain text (LLM returns markdown-like text)
   const weakPoints = state.diagnosis_result?.breakdown?.filter(b => b.status === 'weak').map(b => b.name) || [];

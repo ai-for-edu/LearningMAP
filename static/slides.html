@@ -56,10 +56,17 @@ tailwind.config = {
     <span class="text-slate-300">|</span>
     <span class="font-headline font-bold text-sm text-on-surface-variant">Slide Mode</span>
   </div>
-  <a id="backLink" href="/" class="flex items-center gap-1 text-sm text-slate-500 hover:text-primary transition-colors">
-    <span class="material-symbols-outlined text-lg">arrow_back</span>
-    <span class="font-medium">Back to Chat</span>
-  </a>
+  <div class="flex items-center gap-2">
+    <button id="navStopBtn" onclick="cancelSlides()" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors" title="Stop generating" style="display:none;">
+      <span class="material-symbols-outlined text-lg">stop_circle</span>
+    </button>
+    <button id="navRegenBtn" onclick="window.location.reload()" class="flex items-center text-sm text-slate-500 hover:text-primary transition-colors" title="Regenerate" style="display:none;">
+      <span class="material-symbols-outlined text-lg">refresh</span>
+    </button>
+    <a id="backLink" href="/" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors p-1 rounded-lg hover:bg-slate-100" title="Close">
+      <span class="material-symbols-outlined text-lg">close</span>
+    </a>
+  </div>
 </nav>
 
 <!-- Main Content -->
@@ -128,6 +135,18 @@ var totalSlides = 0;
 var slidesFullyLoaded = false;
 var _slidePoller = null;
 
+function updateSlideNavButtons() {
+  var stop = document.getElementById('navStopBtn');
+  var regen = document.getElementById('navRegenBtn');
+  if (slidesFullyLoaded) {
+    if (stop) stop.style.display = 'none';
+    if (regen) regen.style.display = '';
+  } else {
+    if (stop) stop.style.display = '';
+    if (regen) regen.style.display = 'none';
+  }
+}
+
 async function init() {
   if (!sessionId) { window.location.href = '/'; return; }
 
@@ -139,6 +158,7 @@ async function init() {
     totalSlides = allSlides.length;
     slidesFullyLoaded = true;
     showSlideViewer();
+    updateSlideNavButtons();
     return;
   }
 
@@ -161,14 +181,6 @@ async function init() {
       </svg>
       <p class="font-headline font-bold text-lg text-on-surface">Generating Slides</p>
       <p class="font-body text-sm text-on-surface-variant mt-2">Creating outlines and slides...</p>
-      <div class="flex gap-3 mt-6">
-        <button onclick="cancelSlides()" class="text-sm text-slate-500 hover:text-error transition-colors flex items-center gap-1">
-          <span class="material-symbols-outlined" style="font-size:16px;">stop_circle</span> Stop
-        </button>
-        <a href="/?session_id=${sessionId}" class="text-sm text-slate-500 hover:text-primary transition-colors flex items-center gap-1">
-          <span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span> Back to Chat
-        </a>
-      </div>
     </div>`;
 
   try { await startGeneration(sessionId, 'slides'); } catch(e) {}
@@ -176,6 +188,7 @@ async function init() {
 }
 
 function startSlidePolling() {
+  updateSlideNavButtons();
   _slidePoller = pollStatus(sessionId, 'slides',
     async function onUpdate(status) {
       try {
@@ -206,6 +219,7 @@ function startSlidePolling() {
     },
     async function onDone(status) {
       slidesFullyLoaded = true;
+      updateSlideNavButtons();
       var prog = document.getElementById('slideProgress');
       if (prog) prog.remove();
       // Final fetch

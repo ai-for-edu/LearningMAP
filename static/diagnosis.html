@@ -69,10 +69,17 @@
     <span class="text-slate-300">|</span>
     <span class="font-headline font-bold text-sm text-on-surface-variant">Diagnosis Mode</span>
   </div>
-  <a href="index.html" class="flex items-center gap-1 text-sm text-slate-500 hover:text-error transition-colors">
-    <span class="material-symbols-outlined text-lg">close</span>
-    <span class="font-label font-medium">Exit</span>
-  </a>
+  <div class="flex items-center gap-2">
+    <button id="navStopBtn" onclick="stopQuiz()" class="flex items-center gap-1 text-sm text-slate-500 hover:text-error transition-colors" title="Stop generating" style="display:none;">
+      <span class="material-symbols-outlined text-lg">stop_circle</span>
+    </button>
+    <button id="navRegenBtn" onclick="retryQuiz()" class="flex items-center gap-1 text-sm text-slate-500 hover:text-primary transition-colors" title="Regenerate" style="display:none;">
+      <span class="material-symbols-outlined text-lg">refresh</span>
+    </button>
+    <a id="navExitBtn" href="index.html" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors p-1 rounded-lg hover:bg-slate-100" title="Close">
+      <span class="material-symbols-outlined text-lg">close</span>
+    </a>
+  </div>
 </nav>
 
 <!-- Progress Bar -->
@@ -158,9 +165,6 @@ function buildQuizUI() {
               <span id="knowledgeTagText"></span>
             </span>
             <span class="text-xs text-slate-400" id="loadingHint"></span>
-            <button onclick="stopQuiz()" class="text-xs text-slate-400 hover:text-error transition-colors ml-2" id="stopBtn" style="display:none;">
-              <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">stop_circle</span> Stop
-            </button>
           </div>
           <p class="font-headline text-xl font-bold text-on-surface leading-relaxed mb-2" id="questionText"></p>
           <p class="font-body text-sm text-on-surface-variant">Select one answer</p>
@@ -234,7 +238,6 @@ async function initDiagnosis() {
       </svg>
       <p class="font-headline font-bold text-lg text-on-surface">Generating Questions</p>
       <p class="font-body text-sm text-on-surface-variant mt-2">AI is generating questions from the knowledge graph...</p>
-      <button onclick="window.location.href='/?session_id=${sessionId}'" class="mt-6 text-sm text-slate-500 hover:text-primary transition-colors">← Back to Chat (generation continues in background)</button>
     </div>`;
   document.getElementById('progressText').textContent = 'Generating...';
   document.getElementById('progressBar').style.width = '0%';
@@ -250,7 +253,22 @@ async function initDiagnosis() {
   startPolling();
 }
 
+function updateNavButtons() {
+  const stop = document.getElementById('navStopBtn');
+  const regen = document.getElementById('navRegenBtn');
+  const exit = document.getElementById('navExitBtn');
+  if (exit) exit.href = sessionId ? '/?session_id=' + sessionId : '/';
+  if (quizFullyLoaded) {
+    if (stop) stop.style.display = 'none';
+    if (regen) regen.style.display = '';
+  } else {
+    if (stop) stop.style.display = '';
+    if (regen) regen.style.display = 'none';
+  }
+}
+
 function startPolling() {
+  updateNavButtons();
   _poller = pollStatus(sessionId, 'quiz',
     async function onUpdate(status) {
       // Check for new questions
@@ -272,6 +290,7 @@ function startPolling() {
     },
     async function onDone(status) {
       quizFullyLoaded = true;
+      updateNavButtons();
       // Final fetch
       try {
         const state = await getSessionState(sessionId);
@@ -313,6 +332,7 @@ async function stopQuiz() {
   try { await cancelGeneration(sessionId, 'quiz'); } catch(e) {}
   if (_poller) _poller.stop();
   quizFullyLoaded = true;
+  updateNavButtons();
   const hint = document.getElementById('loadingHint');
   if (hint) hint.textContent = 'Stopped';
   showQuestion();
