@@ -42,7 +42,6 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
   margin-bottom: 12px; width: 100%;
 }
 .new-session-btn:hover { background: white; }
-.sidebar-section-label { font-size: 10px; font-weight: 600; color: var(--text-4); letter-spacing: .06em; text-transform: uppercase; padding: 0 8px; margin: 8px 0 4px; }
 .session-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 7px; font-size: 13px; color: var(--text-3); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-item:hover { background: #E8E4DE; }
 .session-item.active { background: white; color: var(--text); font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
@@ -92,21 +91,6 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 #mainContent { margin-left: 210px; padding-top: 94px; min-height: 100vh; padding-bottom: 40px; }
 .content-area { max-width: 860px; margin: 0 auto; padding: 24px; }
 
-/* ── Graph canvas card ── */
-.graph-card { background: white; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-.graph-card-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-.graph-card-title { font-size: 14px; font-weight: 600; color: var(--text); }
-#graphContainer { min-height: 340px; background: #FAFAF9; }
-.graph-card-footer { padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); }
-.graph-legend { display: flex; gap: 14px; }
-.graph-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); }
-.graph-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
-.start-diag-btn {
-  background: var(--accent); color: white; font-size: 13px; font-weight: 600;
-  padding: 8px 20px; border-radius: 99px; border: none; cursor: pointer; transition: background .15s;
-}
-.start-diag-btn:hover { background: var(--accent-dark); }
-
 /* ── Quiz progress bar ── */
 .quiz-progress-wrap { margin-bottom: 16px; }
 .quiz-progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 4px; }
@@ -153,12 +137,6 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 .status-card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 40px 24px; text-align: center; }
 .status-text { font-size: 14px; color: var(--text-3); }
 
-/* ── No-scrollbar ── */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-/* ── Legacy progress bar (hidden, kept for JS compat) ── */
-#_legacyProgress { display: none; }
 </style>
 </head>
 <body>
@@ -179,7 +157,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 <!-- Top Nav -->
 <nav id="topNav">
   <div class="topnav-left">
-    <span class="topnav-title" id="topNavTitle">知识图谱 · 诊断</span>
+    <span class="topnav-title" id="topNavTitle">诊断</span>
   </div>
   <div class="topnav-actions">
     <button id="navStopBtn" onclick="stopQuiz()" class="topnav-ghost-btn" style="display:none;">
@@ -200,23 +178,17 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
     <span class="step-num">✓</span>话题
   </div>
   <span class="step-sep">›</span>
-  <div class="step-item active" id="step2">
-    <span class="step-num">2</span>知识图谱
+  <div class="step-item done" id="step2">
+    <span class="step-num">✓</span>知识图谱
   </div>
   <span class="step-sep">›</span>
-  <div class="step-item" id="step3">
+  <div class="step-item active" id="step3">
     <span class="step-num">3</span>诊断
   </div>
   <span class="step-sep">›</span>
   <div class="step-item" id="step4">
     <span class="step-num">4</span>课程
   </div>
-</div>
-
-<!-- Hidden legacy progress elements for JS compatibility -->
-<div id="_legacyProgress">
-  <span id="progressText"></span>
-  <div><div id="progressBar" style="width:0%"></div></div>
 </div>
 
 <!-- Main content -->
@@ -259,7 +231,6 @@ function updateStepNav(activeStep) {
 }
 
 function buildQuizUI() {
-  updateStepNav(3);
   document.querySelector('main').innerHTML = `
     <div class="content-area">
       <div class="quiz-progress-wrap">
@@ -336,6 +307,7 @@ async function initDiagnosis() {
         </svg>
         <p style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">正在生成题目</p>
         <p class="status-text">AI 正在根据知识图谱生成诊断题目…</p>
+        <p class="status-text" id="loadingHint" style="margin-top:4px;font-size:11px;color:var(--text-4);"></p>
       </div>
     </div>`;
   document.getElementById('navStopBtn').style.display = '';
@@ -454,10 +426,6 @@ function showQuestion() {
 
   document.querySelectorAll('.option-btn').forEach(b => { b.style.display = ''; });
 
-  // Show/hide stop button
-  const stopBtn = document.getElementById('stopBtn');
-  if (stopBtn) stopBtn.style.display = quizFullyLoaded ? 'none' : '';
-
   const q = allQuestions[currentIndex];
   const totalLabel = quizFullyLoaded ? allQuestions.length : allQuestions.length + '+';
 
@@ -466,12 +434,6 @@ function showQuestion() {
   const label = document.getElementById('quizProgressLabel');
   if (fill) fill.style.width = `${((currentIndex + 1) / allQuestions.length) * 100}%`;
   if (label) label.textContent = `题目 ${currentIndex + 1} / ${totalLabel}`;
-
-  // Legacy compat (elements are hidden but JS still writes to them)
-  const pt = document.getElementById('progressText');
-  const pb = document.getElementById('progressBar');
-  if (pt) pt.textContent = `Question ${currentIndex + 1} / ${totalLabel}`;
-  if (pb) pb.style.width = `${((currentIndex + 1) / allQuestions.length) * 100}%`;
 
   document.getElementById('knowledgeTagText').textContent = q.knowledge_point;
   document.getElementById('questionText').textContent = q.question;
@@ -551,11 +513,6 @@ async function nextQuestion() {
           <a href="/?session_id=${sessionId}&show=results" style="display:inline-block;background:var(--accent);color:white;padding:10px 28px;border-radius:99px;font-size:13px;font-weight:600;text-decoration:none;">查看结果</a>
         </div>
       </div>`;
-    // Legacy compat
-    const pb = document.getElementById('progressBar');
-    const pt = document.getElementById('progressText');
-    if (pb) pb.style.width = '100%';
-    if (pt) pt.textContent = 'Completed';
   } catch (err) {
     document.getElementById('nextBtnText').textContent = '完成';
     document.getElementById('nextBtn').disabled = false;
@@ -563,7 +520,6 @@ async function nextQuestion() {
   }
 }
 
-updateStepNav(3);
 initDiagnosis();
 </script>
 
