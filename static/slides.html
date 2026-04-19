@@ -36,9 +36,9 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
   width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
   background: linear-gradient(135deg, var(--accent), var(--accent-dark));
   display: flex; align-items: center; justify-content: center;
-  color: white; font-size: 15px; font-weight: 800;
+  color: white;
 }
-.sidebar-logo-text { font-size: 14px; font-weight: 800; color: var(--text); letter-spacing: -.02em; }
+.sidebar-logo-text { font-size: 13px; font-weight: 800; color: var(--text); letter-spacing: -.02em; }
 .new-session-btn {
   display: flex; align-items: center; gap: 8px; padding: 8px 10px;
   border: 1.5px dashed #D4CFC8; border-radius: 8px; background: transparent;
@@ -127,8 +127,8 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 <!-- Sidebar -->
 <aside id="sidebar">
   <div class="sidebar-logo">
-    <div class="sidebar-logo-icon">E</div>
-    <span class="sidebar-logo-text">EduAI</span>
+    <div class="sidebar-logo-icon"><span class="material-symbols-outlined" style="font-size:18px;">school</span></div>
+    <span class="sidebar-logo-text">OpenAILearning</span>
   </div>
   <button class="new-session-btn" onclick="window.location.href='index.html'">
     <span class="material-symbols-outlined" style="font-size:16px;">add</span>
