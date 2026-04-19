@@ -8,290 +8,407 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
 <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script>
-  tailwind.config = {
-    darkMode: "class",
-    theme: {
-      extend: {
-        colors: {
-          "secondary": "#3c692b",
-          "error": "#ba1a1a",
-          "on-surface-variant": "#414751",
-          "surface-container-low": "#f2f4f6",
-          "surface-container": "#eceef0",
-          "primary": "#005da7",
-          "surface": "#f7f9fb",
-          "on-primary": "#ffffff",
-          "on-surface": "#191c1e",
-          "outline": "#717783",
-          "primary-fixed": "#d4e3ff",
-          "primary-container": "#2976c7",
-          "surface-container-lowest": "#ffffff",
-        },
-        fontFamily: {
-          "headline": ["Manrope"],
-          "body": ["Inter"],
-          "label": ["Inter"]
-        },
-      },
-    },
-  }
+tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'] } } } }
 </script>
 <style>
-  .material-symbols-outlined {
-    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-  }
-  .lesson-section { scroll-margin-top: 100px; }
-  /* Lesson markdown typography */
-  .lesson-section h2 { font-family: 'Manrope'; font-weight: 800; font-size: 1.35rem; color: #191c1e; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e6e8ea; }
-  .lesson-section h3 { font-family: 'Manrope'; font-weight: 700; font-size: 1.1rem; color: #005da7; margin: 2rem 0 0.75rem; }
-  .lesson-section h4 { font-family: 'Manrope'; font-weight: 700; font-size: 0.95rem; color: #414751; margin: 1.5rem 0 0.5rem; }
-  .lesson-section p { line-height: 1.8; margin: 0.75rem 0; color: #414751; }
-  .lesson-section ul, .lesson-section ol { margin: 0.75rem 0; padding-left: 1.5rem; color: #414751; }
-  .lesson-section li { margin: 0.4rem 0; line-height: 1.7; }
-  .lesson-section strong { color: #191c1e; font-weight: 600; }
-  .lesson-section blockquote { border-left: 4px solid #005da7; background: #f2f4f6; padding: 1rem 1.25rem; margin: 1rem 0; border-radius: 0 0.75rem 0.75rem 0; }
-  .lesson-section blockquote p { color: #414751; margin: 0; }
-  .lesson-section code { background: #eceef0; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.875rem; color: #005da7; }
-  .lesson-section pre { background: #1e293b; color: #e2e8f0; padding: 1.25rem; border-radius: 0.75rem; overflow-x: auto; margin: 1rem 0; }
-  .lesson-section pre code { background: none; color: inherit; padding: 0; }
-  .lesson-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
-  .lesson-section th { background: #f2f4f6; font-weight: 700; text-align: left; padding: 0.75rem; border-bottom: 2px solid #e6e8ea; font-size: 0.875rem; }
-  .lesson-section td { padding: 0.75rem; border-bottom: 1px solid #e6e8ea; font-size: 0.875rem; }
-  .lesson-section hr { border: none; border-top: 1px solid #e6e8ea; margin: 2rem 0; }
-  .nav-link { transition: all 0.15s ease-in-out; }
-  .nav-link:hover, .nav-link.active { color: #005da7; border-left-color: #005da7; }
+:root {
+  --bg: #FAF9F7; --bg-sidebar: #F0EDE8; --bg-doc: #FDFCFA;
+  --border: #EAE6E0; --border-input: #E0DDD8;
+  --accent: #CF6833; --accent-light: #FFF3EC; --accent-border: #F5D5BF; --accent-dark: #9E4A2A;
+  --text: #1a1a1a; --text-2: #4a4a4a; --text-3: #888; --text-4: #B0A898;
+  --error: #DC2626; --success: #059669;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--text); margin: 0; }
 
-  /* Selection toolbar */
-  #selectionToolbar {
-    display: none;
-    position: absolute;
-    z-index: 60;
-    animation: fadeIn 0.12s ease-out;
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+/* ── Sidebar ── */
+#sidebar {
+  width: 210px; height: 100vh; position: fixed; left: 0; top: 0;
+  background: var(--bg-sidebar); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; padding: 16px 12px; gap: 4px; z-index: 40;
+}
+.sidebar-logo { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 8px; }
+.sidebar-logo-icon {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 15px; font-weight: 800;
+}
+.sidebar-logo-text { font-size: 14px; font-weight: 800; color: var(--text); letter-spacing: -.02em; }
+.new-session-btn {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border: 1.5px dashed #D4CFC8; border-radius: 8px; background: transparent;
+  font-size: 13px; font-weight: 500; color: var(--text-3); cursor: pointer;
+  margin-bottom: 12px; width: 100%;
+}
+.new-session-btn:hover { background: white; }
+.session-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 7px; font-size: 13px; color: var(--text-3); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-item:hover { background: #E8E4DE; }
+.session-item.active { background: white; color: var(--text); font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
 
-  /* Highlighted text with note */
-  .noted-text {
-    background-color: #d4e3ff;
-    border-bottom: 2px solid #005da7;
-    cursor: pointer;
-    border-radius: 2px;
-    position: relative;
-  }
-  .noted-text:hover { background-color: #a4c9ff; }
+/* ── Top Nav ── */
+#topNav {
+  height: 50px; position: fixed; top: 0; left: 210px; right: 0; z-index: 30;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+}
+.topnav-left { display: flex; align-items: center; gap: 8px; }
+.topnav-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.topnav-skill-pill {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--accent-light); border: 1px solid var(--accent-border);
+  color: var(--accent-dark); font-size: 11px; font-weight: 600;
+  padding: 4px 10px; border-radius: 99px; cursor: pointer;
+}
+.topnav-actions { display: flex; align-items: center; gap: 8px; }
+.topnav-ghost-btn {
+  display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500;
+  color: var(--text-3); background: transparent; border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 99px; cursor: pointer; text-decoration: none;
+}
+.topnav-ghost-btn:hover { background: white; color: var(--text-2); }
+.topnav-ghost-btn .material-symbols-outlined { font-size: 15px; }
 
-  /* Note annotation card in margin */
-  .note-annotation {
-    position: absolute;
-    right: 0;
-    width: 200px;
-    background: #f0f6ff;
-    border: 1px solid #d4e3ff;
-    border-radius: 12px;
-    padding: 8px 10px;
-    font-size: 12px;
-    color: #005da7;
-    font-family: 'Inter', sans-serif;
-    cursor: default;
-    transition: all 0.15s;
-    z-index: 5;
-  }
-  .note-annotation:hover {
-    background: #d4e3ff;
-    border-color: #a4c9ff;
-  }
-  .note-annotation .note-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 4px;
-  }
-  .note-annotation .note-header span:first-child {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #717783;
-  }
-  .note-annotation .note-delete {
-    font-size: 14px;
-    color: #717783;
-    cursor: pointer;
-    border: none;
-    background: none;
-    padding: 0;
-    line-height: 1;
-  }
-  .note-annotation .note-delete:hover { color: #ba1a1a; }
-  .note-annotation .note-quoted {
-    font-size: 11px;
-    color: #414751;
-    font-style: italic;
-    margin-bottom: 4px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .note-annotation .note-body {
-    font-size: 12px;
-    color: #005da7;
-    line-height: 1.4;
-  }
-  /* Connector line from highlight to annotation */
-  .note-annotation::before {
-    content: '';
-    position: absolute;
-    left: -20px;
-    top: 14px;
-    width: 20px;
-    height: 1px;
-    background: #d4e3ff;
-  }
+/* ── Step Nav ── */
+#stepNav {
+  height: 44px; position: fixed; top: 50px; left: 210px; right: 0; z-index: 29;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 0;
+}
+.step-item {
+  display: flex; align-items: center; gap: 6px; padding: 0 8px; height: 44px;
+  font-size: 13px; font-weight: 500; color: var(--text-4); cursor: default;
+  border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.step-item.done { color: var(--accent); }
+.step-item.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.step-num {
+  width: 20px; height: 20px; border-radius: 50%; background: #E8E4DE; color: var(--text-4);
+  display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
+}
+.step-item.done .step-num { background: var(--accent); color: white; }
+.step-item.active .step-num { background: var(--accent); color: white; }
+.step-sep { color: #D4CFC8; font-size: 14px; padding: 0 4px; }
 
-  /* Note input box */
-  #noteInputBox {
-    display: none;
-    position: absolute;
-    z-index: 60;
-    animation: fadeIn 0.12s ease-out;
-  }
+/* ── Three-column layout ── */
+#mainContent {
+  margin-left: 210px; padding-top: 94px; height: calc(100vh - 94px);
+  display: flex; overflow: hidden;
+}
 
-  /* Outline sidebar */
-  #outlineSidebar {
-    transition: all 0.3s ease;
-  }
-  #outlineSidebar.collapsed {
-    margin-left: -240px;
-  }
-  .outline-item {
-    transition: all 0.15s;
-    border-left: 2px solid transparent;
-  }
-  .outline-item:hover {
-    color: #005da7;
-    border-left-color: #005da7;
-    background-color: #f2f4f6;
-  }
-  .outline-item.active {
-    color: #005da7;
-    border-left-color: #005da7;
-    font-weight: 600;
-  }
-  .outline-item.sub {
-    padding-left: 28px;
-    font-size: 12px;
-  }
+/* TOC column */
+#tocPanel {
+  width: 190px; flex-shrink: 0; background: var(--bg-doc);
+  border-right: 1px solid var(--border); overflow-y: auto;
+  padding: 16px 0 80px;
+}
+.toc-header { font-size: 10px; font-weight: 600; color: var(--text-4); text-transform: uppercase; letter-spacing: .06em; padding: 0 16px; margin-bottom: 8px; }
+.toc-item {
+  padding: 7px 16px; font-size: 13px; color: var(--text-3); cursor: pointer;
+  transition: all .1s; border-left: 3px solid transparent;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.toc-item:hover { color: var(--text-2); background: #F0EDE8; }
+.toc-item.active { color: var(--accent); background: var(--accent-light); border-left-color: var(--accent); font-weight: 500; }
+.nav-link { transition: all .15s; }
+.nav-link:hover, .nav-link.active { color: var(--accent); border-left-color: var(--accent); }
+.toc-weak-box { margin: 12px 10px 0; background: var(--accent-light); border: 1px solid var(--accent-border); border-radius: 8px; padding: 10px 12px; }
+.toc-weak-label { font-size: 10px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.toc-weak-item { font-size: 11px; color: var(--accent-dark); line-height: 1.5; }
+
+/* Main document column */
+#docPanel { flex: 1; overflow-y: auto; padding: 24px 32px 120px; }
+
+/* Right panel */
+#rightPanel {
+  width: 200px; flex-shrink: 0; background: var(--bg-doc);
+  border-left: 1px solid var(--border); overflow-y: auto;
+  padding: 16px 0 80px;
+}
+.right-panel-section { padding: 0 12px; margin-bottom: 20px; }
+.right-panel-title { font-size: 10px; font-weight: 600; color: var(--text-4); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; display: block; }
+.ks-toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ks-toggle { width: 32px; height: 18px; border-radius: 9px; background: #D4CFC8; position: relative; cursor: pointer; transition: background .2s; border: none; flex-shrink: 0; }
+.ks-toggle.on { background: var(--accent); }
+.ks-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: left .2s; }
+.ks-toggle.on::after { left: 16px; }
+.ks-card { background: white; border-radius: 8px; margin-bottom: 6px; border: 1px solid var(--border); }
+.ks-card summary { padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--text-2); cursor: pointer; display: flex; align-items: center; gap: 6px; list-style: none; }
+.ks-card summary::marker, .ks-card summary::-webkit-details-marker { display: none; }
+.ks-card-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
+.ks-card-body { padding: 0 10px 10px; font-size: 11px; color: var(--text-3); line-height: 1.5; }
+#lessonGraph { min-height: 140px; background: #FAFAF9; border-radius: 8px; border: 1px solid var(--border); }
+.graph-legend-row { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+.graph-legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-4); }
+.graph-legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+/* ── Lesson document typography ── */
+.lesson-title { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+.lesson-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-4); margin-bottom: 20px; flex-wrap: wrap; }
+.lesson-skill-tag { background: var(--accent-light); border: 1px solid var(--accent-border); color: var(--accent-dark); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
+.lesson-section { scroll-margin-top: 110px; }
+.lesson-section h2 { font-weight: 700; font-size: 14px; color: var(--text); margin: 20px 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.lesson-section h3 { font-weight: 700; font-size: 13px; color: var(--accent-dark); margin: 16px 0 8px; }
+.lesson-section h4 { font-weight: 600; font-size: 13px; color: var(--text-2); margin: 12px 0 6px; }
+.lesson-section p { line-height: 1.75; margin: 8px 0; color: var(--text-2); font-size: 13px; }
+.lesson-section ul, .lesson-section ol { margin: 8px 0; padding-left: 1.5rem; color: var(--text-2); font-size: 13px; }
+.lesson-section li { margin: 4px 0; line-height: 1.7; }
+.lesson-section strong { color: var(--text); font-weight: 600; }
+.lesson-section blockquote { border-left: 3px solid var(--accent); background: var(--accent-light); padding: 10px 14px; margin: 12px 0; border-radius: 0 8px 8px 0; }
+.lesson-section blockquote p { color: var(--text-2); margin: 0; }
+.lesson-section code { background: var(--bg-sidebar); padding: .1rem .35rem; border-radius: .25rem; font-size: .85em; color: var(--accent-dark); }
+.lesson-section pre { background: #1e293b; color: #e2e8f0; padding: 1.25rem; border-radius: 8px; overflow-x: auto; margin: 12px 0; }
+.lesson-section pre code { background: none; color: inherit; padding: 0; }
+.lesson-section table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+.lesson-section th { background: var(--bg-sidebar); font-weight: 700; text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border); font-size: 12px; }
+.lesson-section td { padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.lesson-section hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* Inline knowledge skill cards (inserted before each h2 by JS) */
+.inline-ks-card { background: #F0FDF4; border: 1.5px dashed #86EFAC; border-radius: 8px; margin-bottom: 10px; }
+.inline-ks-card summary { padding: 10px 14px; font-size: 12px; font-weight: 600; color: #15803D; cursor: pointer; display: flex; align-items: center; gap: 6px; list-style: none; }
+.inline-ks-card summary::marker, .inline-ks-card summary::-webkit-details-marker { display: none; }
+.inline-ks-card-body { padding: 0 14px 12px; font-size: 11px; color: #166534; line-height: 1.55; }
+
+/* Pedagogy skill card */
+.pedagogy-skill-card { background: var(--accent-light); border: 1.5px solid var(--accent-border); border-radius: 10px; margin-bottom: 16px; }
+.pedagogy-skill-card summary { padding: 12px 16px; font-size: 13px; font-weight: 600; color: var(--accent-dark); cursor: pointer; display: flex; align-items: center; gap: 8px; list-style: none; }
+.pedagogy-skill-card summary::marker, .pedagogy-skill-card summary::-webkit-details-marker { display: none; }
+.pedagogy-skill-card-body { padding: 0 16px 14px; font-size: 12px; color: var(--accent-dark); line-height: 1.55; }
+
+/* Selection toolbar */
+#selectionToolbar { display: none; position: absolute; z-index: 60; animation: fadeIn .12s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.noted-text { background: #FFF9C4; border-bottom: 2px solid #F59E0B; cursor: pointer; }
+.noted-text.selected-note { background: #FDE68A; }
+
+/* Finish / slides nav buttons */
+.lesson-finish-btn {
+  background: var(--accent); color: white; font-size: 13px; font-weight: 600;
+  padding: 10px 24px; border-radius: 99px; border: none; cursor: pointer; transition: background .15s;
+}
+.lesson-finish-btn:hover { background: var(--accent-dark); }
+.lesson-slides-btn {
+  background: transparent; color: var(--text-3); font-size: 13px; font-weight: 500;
+  padding: 10px 20px; border-radius: 99px; border: 1px solid var(--border); cursor: pointer; transition: all .15s;
+}
+.lesson-slides-btn:hover { background: white; color: var(--text-2); }
+
+/* Bottom chat input */
+#lessonBottomBar {
+  position: fixed; bottom: 0; left: 210px; right: 0; z-index: 28;
+  padding: 10px 14px; background: var(--bg); border-top: 1px solid var(--border);
+  display: none; align-items: center; gap: 8px;
+}
+#lessonChatInput {
+  flex: 1; font-size: 13px; font-family: 'Inter', sans-serif; color: var(--text);
+  border: 1.5px solid var(--border-input); border-radius: 10px; outline: none;
+  padding: 8px 12px; background: white;
+}
+#lessonChatInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(207,104,51,.1); }
+.lesson-send-btn { width: 34px; height: 34px; background: var(--accent); border-radius: 8px; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; }
+.lesson-send-btn:hover { background: var(--accent-dark); }
+
+/* No-scrollbar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Note annotation card in margin */
+.note-annotation {
+  position: absolute;
+  right: 0;
+  width: 200px;
+  background: var(--accent-light);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--accent-dark);
+  font-family: 'Inter', sans-serif;
+  cursor: default;
+  transition: all 0.15s;
+  z-index: 5;
+}
+.note-annotation:hover {
+  background: var(--accent-border);
+}
+.note-annotation .note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.note-annotation .note-header span:first-child {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+}
+.note-annotation .note-delete {
+  font-size: 14px;
+  color: var(--text-3);
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  line-height: 1;
+}
+.note-annotation .note-delete:hover { color: var(--error); }
+.note-annotation .note-quoted {
+  font-size: 11px;
+  color: var(--text-2);
+  font-style: italic;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note-annotation .note-body {
+  font-size: 12px;
+  color: var(--accent-dark);
+  line-height: 1.4;
+}
+.note-annotation::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 14px;
+  width: 20px;
+  height: 1px;
+  background: var(--accent-border);
+}
+
+/* Note input box */
+#noteInputBox {
+  display: none;
+  position: absolute;
+  z-index: 60;
+  animation: fadeIn 0.12s ease-out;
+}
 </style>
 </head>
-<body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
+<body>
 
-<!-- Top Navigation Bar -->
-<nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 flex justify-between items-center px-6 py-3">
-  <div class="flex items-center gap-4">
-    <span class="text-xl font-extrabold tracking-tighter text-blue-800">OpenAILearning</span>
-    <span class="text-slate-300">|</span>
-    <span class="font-headline font-bold text-sm text-on-surface-variant">Lesson Mode</span>
+<!-- Left sidebar (session list) -->
+<aside id="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-icon">E</div>
+    <span class="sidebar-logo-text">EduAI</span>
   </div>
-  <div class="flex items-center gap-2">
-    <button id="navStopBtn" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors" title="Stop generating" style="display:none;">
-      <span class="material-symbols-outlined text-lg">stop_circle</span>
+  <button class="new-session-btn" onclick="window.location.href='index.html'">
+    <span class="material-symbols-outlined" style="font-size:16px;">add</span>
+    新对话
+  </button>
+  <div style="flex:1;overflow-y:auto;" id="session-list"></div>
+</aside>
+
+<!-- Top Nav -->
+<nav id="topNav">
+  <div class="topnav-left">
+    <span class="topnav-title" id="lessonTitle">课程</span>
+    <span id="topNavSkillPill" class="topnav-skill-pill" style="display:none;">
+      <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;"></span>
+      <span id="topNavSkillName"></span>
+    </span>
+  </div>
+  <div class="topnav-actions">
+    <button id="navStopBtn" onclick="stopLesson()" class="topnav-ghost-btn" style="display:none;">
+      <span class="material-symbols-outlined" style="font-size:15px;">stop_circle</span>停止
     </button>
-    <button id="navRegenBtn" class="flex items-center text-sm text-slate-500 hover:text-primary transition-colors" title="Regenerate" style="display:none;">
-      <span class="material-symbols-outlined text-lg">refresh</span>
+    <button id="navRegenBtn" onclick="retryLesson()" class="topnav-ghost-btn" style="display:none;">
+      <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>重试
     </button>
-    <a id="backLink" href="/" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors p-1 rounded-lg hover:bg-slate-100" title="Close">
-      <span class="material-symbols-outlined text-lg">close</span>
+    <button id="navSlidesBtn" onclick="goToSlides()" class="topnav-ghost-btn" style="display:none;">
+      <span class="material-symbols-outlined" style="font-size:15px;">slideshow</span>转为 PPT
+    </button>
+    <a id="backLink" href="index.html" class="topnav-ghost-btn">
+      <span class="material-symbols-outlined" style="font-size:15px;">close</span>
     </a>
   </div>
 </nav>
 
-<!-- Main Split Layout -->
-<main class="pt-[70px] min-h-screen flex">
+<!-- Step Nav -->
+<div id="stepNav">
+  <div class="step-item done"><span class="step-num">✓</span>话题</div>
+  <span class="step-sep">›</span>
+  <div class="step-item done"><span class="step-num">✓</span>知识图谱</div>
+  <span class="step-sep">›</span>
+  <div class="step-item done"><span class="step-num">✓</span>诊断</div>
+  <span class="step-sep">›</span>
+  <div class="step-item active"><span class="step-num">4</span>课程</div>
+</div>
 
-  <!-- Left: Outline Sidebar -->
-  <div id="outlineSidebar" class="w-[240px] border-r border-slate-100 bg-white flex flex-col relative" style="height: calc(100vh - 70px); position: sticky; top: 70px; flex-shrink: 0;">
-    <div class="p-5 border-b border-slate-100">
-      <p class="font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest">Outline</p>
+<!-- Three-column main content -->
+<div id="mainContent">
+
+  <!-- TOC Column -->
+  <div id="tocPanel">
+    <div class="toc-header">目录</div>
+    <nav id="tocList"></nav>
+    <div id="weakPointBox" class="toc-weak-box" style="display:none;">
+      <div class="toc-weak-label">📌 薄弱点</div>
+      <div id="weakPointList" class="toc-weak-item"></div>
     </div>
-    <div class="flex-grow overflow-y-auto py-3" id="outlineList"></div>
-    <!-- Collapse handle -->
-    <button onclick="toggleOutline()" class="absolute top-1/2 -translate-y-1/2 -right-4 w-8 h-16 bg-white border border-slate-200 rounded-r-lg flex items-center justify-center shadow-sm hover:bg-slate-50 transition-colors z-50">
-      <span class="material-symbols-outlined text-sm text-slate-400" id="outlineCollapseIcon">chevron_left</span>
-    </button>
   </div>
 
-  <!-- Center: Lesson Content -->
-  <div class="flex-1 overflow-y-auto px-10 py-10" style="max-height: calc(100vh - 70px);" id="lessonScroll">
-    <div class="relative mx-auto" style="max-width: 680px; margin-right: 240px; margin-left: auto;">
-      <!-- Annotation margin zone (right side) -->
+  <!-- Main Document Column -->
+  <div id="docPanel">
+    <div id="lessonContent">
+      <!-- Annotation margin zone (right side, for note-annotation cards) -->
       <div id="annotationMargin" style="position: absolute; top: 0; right: -230px; width: 210px; pointer-events: auto;"></div>
-
-      <div id="lessonHeader"></div>
-      <div id="lessonSections"></div>
-
-      <!-- Finish Button -->
-      <div class="text-center py-10">
-        <a id="finishBtn" href="/" class="inline-flex items-center gap-2 bg-secondary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all" style="display:none;">
-          <span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-          Finish Learning
-        </a>
-      </div>
-
+    </div>
+    <div id="lessonNav" style="display:none;padding-top:16px;border-top:1px solid var(--border);margin-top:32px;display:flex;align-items:center;justify-content:flex-end;gap:12px;">
+      <button class="lesson-slides-btn" id="slidesBtn" onclick="goToSlides()" style="display:none;">转为 PPT</button>
+      <button class="lesson-finish-btn" id="finishLearningBtn" onclick="finishLearning()" style="display:none;">完成学习 →</button>
     </div>
   </div>
 
-  <!-- Right: Knowledge Graph + Knowledge Skills Sidebar -->
-  <div class="w-[340px] border-l border-slate-100 bg-white flex flex-col overflow-y-auto" style="height: calc(100vh - 70px); position: sticky; top: 70px;">
-    <!-- Knowledge Point Skills panel -->
-    <div id="knowledgeSkillsPanel" class="hidden">
-      <div class="p-6 pb-3 border-b border-slate-100">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest flex items-center gap-1">
-              <span class="material-symbols-outlined" style="font-size:14px;">lightbulb</span>
-              Knowledge Skills
-            </p>
-            <p class="font-body text-xs text-on-surface-variant mt-1">知识点教学技能</p>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="useKnowledgeSkills" class="sr-only peer" checked>
-            <div class="w-9 h-5 bg-outline/30 rounded-full peer peer-checked:bg-primary transition-colors
-                        after:content-[''] after:absolute after:top-0.5 after:left-[2px]
-                        after:bg-white after:rounded-full after:h-4 after:w-4
-                        after:transition-all peer-checked:after:translate-x-full"></div>
-          </label>
-        </div>
+  <!-- Right Panel -->
+  <div id="rightPanel">
+    <div class="right-panel-section" id="knowledgeSkillsSection">
+      <div class="ks-toggle-row">
+        <span class="right-panel-title">💡 知识点技能</span>
+        <button class="ks-toggle" id="ksToggleBtn" onclick="toggleKnowledgeSkills()"></button>
       </div>
-      <div id="knowledgeSkillsList" class="p-4 space-y-2"></div>
+      <div id="knowledgeSkillsPanel"></div>
     </div>
-    <!-- Knowledge Map -->
-    <div class="p-6 border-b border-slate-100">
-      <p class="font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest">Knowledge Map</p>
-      <p class="font-body text-xs text-on-surface-variant mt-1">薄弱知识点高亮</p>
+    <div class="right-panel-section">
+      <span class="right-panel-title">📊 薄弱点图谱</span>
+      <div id="lessonGraph"></div>
+      <div class="graph-legend-row">
+        <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#FECACA;border:1px solid #DC2626;"></div>薄弱</div>
+        <div class="graph-legend-item"><div class="graph-legend-dot" style="background:var(--accent);"></div>核心</div>
+      </div>
     </div>
-    <div class="flex-grow flex items-center justify-center p-6 relative" id="lessonGraph"></div>
   </div>
 
-</main>
+</div><!-- /mainContent -->
+
+<!-- Sticky bottom chat -->
+<div id="lessonBottomBar">
+  <input type="text" id="lessonChatInput" placeholder="有问题？输入提问…"
+    onkeydown="if(event.key==='Enter') sendLessonChat()"/>
+  <button class="lesson-send-btn" onclick="sendLessonChat()">
+    <span class="material-symbols-outlined" style="font-size:18px;">arrow_upward</span>
+  </button>
+</div>
 
 <script src="api.js?v=7"></script>
+<script src="sidebar.js?v=2"></script>
 <script>
 (async function() {
   const sessionId = getSessionId();
   if (!sessionId) { window.location.href = '/'; return; }
 
   // Set exit link immediately
-  document.getElementById('backLink').href = '/?session_id=' + sessionId;
+  document.getElementById('backLink').href = 'index.html?session_id=' + sessionId;
 
   // Update back link
-  document.getElementById('backLink').href = '/?session_id=' + sessionId + '&show=results';
-  document.getElementById('finishBtn').href = '/?session_id=' + sessionId + '&show=lesson';
+  document.getElementById('backLink').href = 'index.html?session_id=' + sessionId + '&show=results';
 
   const forceRegen = new URLSearchParams(window.location.search).has('regen');
   let state = await getSessionState(sessionId);
@@ -302,16 +419,16 @@
   if (!lessonContent) {
     const isRunning = state.lesson_task_status === 'running';
 
-    document.getElementById('lessonHeader').innerHTML = `
-      <div class="flex flex-col items-center justify-center py-20" id="lessonLoading">
-        <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+    document.getElementById('lessonContent').innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 0;" id="lessonLoading">
+        <svg style="animation:spin 1s linear infinite;width:40px;height:40px;color:var(--accent);margin-bottom:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+          <circle style="opacity:.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path style="opacity:.75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
         </svg>
-        <p class="font-headline font-bold text-lg text-on-surface">Generating Lesson</p>
-        <p class="font-body text-sm text-on-surface-variant mt-2" id="generationProgress">AI is creating a personalized lesson based on your diagnosis...</p>
+        <p style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">正在生成课程</p>
+        <p style="font-size:13px;color:var(--text-3);" id="generationProgress">AI 正在根据诊断结果生成个性化教案…</p>
       </div>`;
-    document.getElementById('lessonSections').innerHTML = '';
 
     // Show stop button in nav during generation
     document.getElementById('navStopBtn').style.display = '';
@@ -345,11 +462,11 @@
             state = await getSessionState(sessionId);
             lessonContent = state.lesson_content || '';
           } else if (s.status === 'error') {
-            document.getElementById('lessonHeader').innerHTML = `
-              <div class="flex flex-col items-center justify-center py-20">
-                <span class="material-symbols-outlined text-4xl text-error mb-4">error</span>
-                <p class="font-headline font-bold text-on-surface mb-2">Generation Failed</p>
-                <button onclick="window.location.reload()" class="text-primary font-headline font-bold text-sm hover:underline">Retry</button>
+            document.getElementById('lessonContent').innerHTML = `
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 0;">
+                <span class="material-symbols-outlined" style="font-size:40px;color:var(--error);margin-bottom:16px;">error</span>
+                <p style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px;">生成失败</p>
+                <button onclick="window.location.reload()" style="font-size:13px;color:var(--accent);font-weight:600;background:none;border:none;cursor:pointer;">重试</button>
               </div>`;
           }
           resolve();
@@ -362,10 +479,12 @@
   }
 
   // Show Finish Learning button + regenerate
-  document.getElementById('finishBtn').style.display = '';
-  document.getElementById('finishBtn').href = '/?session_id=' + sessionId;
+  document.getElementById('finishLearningBtn').style.display = '';
+  document.getElementById('slidesBtn').style.display = '';
+  document.getElementById('lessonNav').style.display = 'flex';
   document.getElementById('navStopBtn').style.display = 'none';
   document.getElementById('navRegenBtn').style.display = '';
+  document.getElementById('navSlidesBtn').style.display = '';
   document.getElementById('navRegenBtn').onclick = async function() {
     try { await cancelGeneration(sessionId, 'lesson'); } catch(e) {}
     window.location.href = 'lesson.html?session_id=' + sessionId + '&regen=1';
@@ -373,36 +492,59 @@
 
   // Render lesson as plain text (LLM returns markdown-like text)
   const weakPoints = state.diagnosis_result?.breakdown?.filter(b => b.status === 'weak').map(b => b.name) || [];
-  const weakDesc = weakPoints.map(n => '<strong class="text-error">' + n + '</strong>').join(' 和 ');
+  const weakDesc = weakPoints.map(n => '<strong style="color:var(--error);">' + n + '</strong>').join(' 和 ');
+
+  // Show weak points in TOC panel
+  if (weakPoints.length > 0) {
+    document.getElementById('weakPointBox').style.display = '';
+    document.getElementById('weakPointList').innerHTML = weakPoints.map(n => escapeHtml(n)).join('<br>');
+  }
+
+  // Update lesson title in top nav
+  if (topic) {
+    document.getElementById('lessonTitle').textContent = topic + ' · 课程';
+  }
 
   // Build pedagogy skill card for header (collapsible)
   const skillName = state.active_skill_display_name || '';
   const skillLessonSection = state.active_skill_lesson_section || '';
   let pedagogyCardHtml = '';
   if (skillName) {
-    pedagogyCardHtml = `
-      <details class="mb-6 rounded-2xl border border-primary/15 bg-primary/[0.03] group">
-        <summary class="flex items-center gap-2 p-5 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
-          <span class="material-symbols-outlined text-primary" style="font-size:18px;">psychology</span>
-          <span class="font-headline font-bold text-sm text-primary flex-grow">教学法：${escapeHtml(skillName)}</span>
-          <span class="material-symbols-outlined text-primary/50 text-lg transition-transform group-open:rotate-180">expand_more</span>
-        </summary>
-        ${skillLessonSection ? '<div class="px-5 pb-5 font-body text-xs text-on-surface-variant leading-relaxed whitespace-pre-wrap border-t border-primary/10 pt-3 mx-5">' + escapeHtml(skillLessonSection) + '</div>' : ''}
-      </details>`;
+    pedagogyCardHtml = `<details class="pedagogy-skill-card">
+      <summary>
+        <span class="material-symbols-outlined" style="font-size:16px;color:var(--accent);">psychology</span>
+        教学法：${escapeHtml(skillName)}
+      </summary>
+      <div class="pedagogy-skill-card-body">${skillLessonSection ? safeMarkdown(skillLessonSection) : ''}</div>
+    </details>`;
+    // Show skill pill in top nav
+    const pill = document.getElementById('topNavSkillPill');
+    if (pill) {
+      pill.style.display = '';
+      document.getElementById('topNavSkillName').textContent = skillName;
+    }
   }
 
-  document.getElementById('lessonHeader').innerHTML =
-    '<div class="mb-10"><p class="font-headline text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2">个性化教案</p>' +
-    '<h1 class="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-3">' + topic + '：薄弱知识点</h1>' +
-    '<p class="font-body text-on-surface-variant leading-relaxed mb-6">本教案根据诊断结果生成，重点讲解 ' + (weakDesc || '相关知识点') + '。</p>' +
+  const lessonContentEl = document.getElementById('lessonContent');
+  lessonContentEl.innerHTML =
+    '<div id="annotationMargin" style="position:absolute;top:0;right:-230px;width:210px;pointer-events:auto;"></div>' +
+    '<div id="lessonHeader">' +
+    '<div class="lesson-title">' + escapeHtml(topic) + '：薄弱知识点</div>' +
+    '<div class="lesson-meta">' +
+    '<span>个性化教案</span>' +
+    (skillName ? '<span class="lesson-skill-tag">' + escapeHtml(skillName) + '</span>' : '') +
+    '</div>' +
+    '<p style="font-size:13px;color:var(--text-3);margin-bottom:16px;">本教案根据诊断结果生成，重点讲解 ' + (weakDesc || '相关知识点') + '。</p>' +
     pedagogyCardHtml +
-    '</div><hr class="border-slate-100 mb-10"/>';
+    '</div>' +
+    '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0 20px;">' +
+    '<div id="lessonSections"></div>';
 
   // Parse markdown to HTML
   const parsedHtml = DOMPurify.sanitize(marked.parse(lessonContent));
 
   document.getElementById('lessonSections').innerHTML =
-    '<section class="lesson-section mb-12 prose prose-slate max-w-none" id="section-1">' + parsedHtml + '</section>';
+    '<section class="lesson-section" id="section-1">' + parsedHtml + '</section>';
 
   // Inject knowledge point skill cards before each h2 heading
   const ks = state.knowledge_skills || {};
@@ -416,77 +558,90 @@
         return headingText.indexOf(k) !== -1 || k.indexOf(headingText) !== -1;
       });
       if (matchedKey) {
+        const ksName = matchedKey;
+        const ksContent = ks[matchedKey];
         const card = document.createElement('div');
-        card.className = 'not-prose';
         card.innerHTML =
-          '<details class="my-4 rounded-xl border border-dashed border-green-300 bg-green-50/50 group">' +
-            '<summary class="flex items-center gap-1.5 px-4 py-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">' +
-              '<span class="material-symbols-outlined text-green-700" style="font-size:15px;">lightbulb</span>' +
-              '<span class="font-headline font-bold text-xs text-green-800 flex-grow">知识点技能：' + escapeHtml(matchedKey) + '</span>' +
-              '<span class="material-symbols-outlined text-green-600/50 text-lg transition-transform group-open:rotate-180">expand_more</span>' +
-            '</summary>' +
-            '<div class="px-4 pb-3 font-body text-xs text-green-900/70 leading-relaxed whitespace-pre-wrap border-t border-green-200 pt-2 mx-4">' + escapeHtml(ks[matchedKey]) + '</div>' +
+          '<details class="inline-ks-card">' +
+            '<summary>💡 知识点技能：' + escapeHtml(ksName) + '</summary>' +
+            '<div class="inline-ks-card-body">' + safeMarkdown(ksContent) + '</div>' +
           '</details>';
         h2.parentNode.insertBefore(card, h2.nextSibling);
       }
     });
   }
 
-  // Build outline from rendered headings
+  // Build TOC from rendered headings
   const sectionEl = document.getElementById('section-1');
   const headings = sectionEl.querySelectorAll('h2, h3');
-  let outlineHtml = '';
+  let tocHtml = '';
   headings.forEach((h, i) => {
     const id = 'heading-' + i;
     h.id = id;
     const isH3 = h.tagName === 'H3';
-    outlineHtml += `<a href="#${id}" class="outline-item ${isH3 ? 'sub' : ''} block px-5 py-${isH3 ? '1.5' : '2'} text-sm text-on-surface-variant font-${isH3 ? 'body' : 'headline font-semibold'} rounded-r-lg">` +
-      (isH3 ? h.textContent : `<span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-error flex-shrink-0"></span>${h.textContent}</span>`) + '</a>';
+    tocHtml += '<div class="toc-item' + (isH3 ? ' sub' : '') + '" data-section="' + id + '" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' +
+      escapeHtml(h.textContent) + '</div>';
   });
-  if (!outlineHtml) {
-    outlineHtml = '<a href="#section-1" class="outline-item block px-5 py-2 text-sm text-on-surface-variant font-headline font-semibold rounded-r-lg active"><span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-error flex-shrink-0"></span>教案内容</span></a>';
+  if (!tocHtml) {
+    tocHtml = '<div class="toc-item active" data-section="section-1" onclick="document.getElementById(\'section-1\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">教案内容</div>';
   }
-  document.getElementById('outlineList').innerHTML = outlineHtml;
+  document.getElementById('tocList').innerHTML = tocHtml;
 
-  // Smooth scroll for outline links
-  document.querySelectorAll('#outlineList a').forEach(link => {
-    link.addEventListener('click', e => {
-      e.preventDefault();
-      const target = document.querySelector(link.getAttribute('href'));
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  });
-
-  // Knowledge Skills sidebar
-  const ksPanel = document.getElementById('knowledgeSkillsPanel');
-  const ksList = document.getElementById('knowledgeSkillsList');
-  const ksToggle = document.getElementById('useKnowledgeSkills');
+  // Knowledge Skills sidebar (right panel)
+  const ksToggleBtn = document.getElementById('ksToggleBtn');
   const knowledgeSkills = state.knowledge_skills;
+  let ksEnabled = state.use_knowledge_skills !== false;
 
   if (knowledgeSkills && Object.keys(knowledgeSkills).length > 0) {
-    ksPanel.classList.remove('hidden');
-    ksList.innerHTML = Object.entries(knowledgeSkills).map(function(entry) {
-      const name = entry[0], skill = entry[1];
-      return '<details class="bg-surface-container-low rounded-xl">' +
-        '<summary class="p-3 cursor-pointer font-headline text-xs font-semibold text-on-surface hover:bg-surface-container rounded-xl">' + escapeHtml(name) + '</summary>' +
-        '<div class="px-3 pb-3 font-body text-xs text-on-surface-variant whitespace-pre-wrap leading-relaxed">' + escapeHtml(skill) + '</div>' +
+    document.getElementById('knowledgeSkillsPanel').innerHTML = Object.entries(knowledgeSkills).map(function(entry) {
+      const name = entry[0], content = entry[1];
+      return '<details class="ks-card">' +
+        '<summary><span class="ks-card-dot"></span>' + escapeHtml(name) + '</summary>' +
+        '<div class="ks-card-body">' + safeMarkdown(content) + '</div>' +
         '</details>';
     }).join('');
   }
 
-  // Toggle handler
-  if (ksToggle) {
-    ksToggle.checked = state.use_knowledge_skills !== false;
-    ksToggle.addEventListener('change', async function(e) {
-      try {
-        await fetch('/api/chat/' + sessionId + '/toggle-knowledge-skills', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({enabled: e.target.checked}),
-        });
-      } catch(err) { /* ignore */ }
-    });
+  // Set initial toggle state
+  if (ksToggleBtn) {
+    ksToggleBtn.classList.toggle('on', ksEnabled);
   }
+
+  // Toggle knowledge skills function (called by onclick on ksToggleBtn)
+  window.toggleKnowledgeSkills = async function() {
+    ksEnabled = !ksEnabled;
+    const btn = document.getElementById('ksToggleBtn');
+    if (btn) btn.classList.toggle('on', ksEnabled);
+    try {
+      await fetch('/api/chat/' + sessionId + '/toggle-knowledge-skills', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({enabled: ksEnabled}),
+      });
+    } catch(err) { /* ignore */ }
+  };
+
+  // Top-level nav action stubs
+  window.stopLesson = function() {
+    cancelGeneration(sessionId, 'lesson').catch(function(){});
+    window.location.href = 'index.html?session_id=' + sessionId;
+  };
+  window.retryLesson = async function() {
+    try { await cancelGeneration(sessionId, 'lesson'); } catch(e) {}
+    window.location.href = 'lesson.html?session_id=' + sessionId + '&regen=1';
+  };
+  window.goToSlides = function() {
+    window.location.href = 'slides.html?session_id=' + sessionId;
+  };
+  window.finishLearning = function() {
+    window.location.href = 'index.html?session_id=' + sessionId + '&show=lesson';
+  };
+  window.sendLessonChat = function() {
+    const input = document.getElementById('lessonChatInput');
+    if (!input || !input.value.trim()) return;
+    // Chat with lesson context — placeholder for future implementation
+    input.value = '';
+  };
 
   // Graph sidebar — vis.js interactive graph
   const graphContainer = document.getElementById('lessonGraph');
@@ -505,10 +660,10 @@
         size: isCore ? 22 : 16,
         shape: 'dot',
         color: {
-          background: isWeak ? '#fca5a5' : (isCore ? '#005da7' : '#a4c9ff'),
-          border: isWeak ? '#ef4444' : (isCore ? '#004883' : '#6ba3e8'),
+          background: isWeak ? '#FECACA' : (isCore ? '#CF6833' : '#F5D5BF'),
+          border: isWeak ? '#DC2626' : (isCore ? '#9E4A2A' : '#CF6833'),
         },
-        font: { color: '#191c1e', size: 11, face: 'Manrope, sans-serif' },
+        font: { color: '#1a1a1a', size: 11, face: 'Inter, sans-serif' },
         borderWidth: isWeak ? 3 : 2,
       };
     }));
@@ -528,32 +683,16 @@
   }
 })();
 
-// Outline toggle
-let outlineOpen = true;
-function toggleOutline() {
-  outlineOpen = !outlineOpen;
-  const sidebar = document.getElementById('outlineSidebar');
-  const icon = document.getElementById('outlineCollapseIcon');
-  if (outlineOpen) {
-    sidebar.classList.remove('collapsed');
-    icon.textContent = 'chevron_left';
-  } else {
-    sidebar.classList.add('collapsed');
-    icon.textContent = 'chevron_right';
-  }
-}
-
-// Highlight active outline item on scroll
+// Highlight active TOC item on scroll
 (function() {
-  const scrollEl = document.getElementById('lessonScroll');
-  const outlineLinks = document.querySelectorAll('#outlineList a');
+  const scrollEl = document.getElementById('docPanel');
+  if (!scrollEl) return;
 
   scrollEl.addEventListener('scroll', function() {
-    var scrollTop = scrollEl.scrollTop;
     var active = null;
 
     // Check all headings with IDs
-    var allHeadings = scrollEl.querySelectorAll('h2[id], h3[id], section[id]');
+    var allHeadings = document.querySelectorAll('h2[id], h3[id], section[id]');
     allHeadings.forEach(function(h) {
       var rect = h.getBoundingClientRect();
       var containerRect = scrollEl.getBoundingClientRect();
@@ -562,12 +701,12 @@ function toggleOutline() {
       }
     });
 
-    outlineLinks.forEach(function(link) {
-      var href = link.getAttribute('href');
-      if (href === '#' + active) {
-        link.classList.add('active');
+    document.querySelectorAll('#tocList .toc-item').forEach(function(item) {
+      var section = item.getAttribute('data-section');
+      if (section === active) {
+        item.classList.add('active');
       } else {
-        link.classList.remove('active');
+        item.classList.remove('active');
       }
     });
   });
@@ -577,17 +716,17 @@ function toggleOutline() {
 
 <!-- Selection Toolbar -->
 <div id="selectionToolbar">
-  <button id="noteBtn" class="flex items-center gap-1.5 bg-white border border-slate-200 shadow-lg rounded-xl px-3 py-2 text-xs font-headline font-bold text-primary hover:bg-primary-fixed transition-colors">
-    <span class="material-symbols-outlined text-sm">edit_note</span>
+  <button id="noteBtn" style="display:flex;align-items:center;gap:6px;background:white;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,.12);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--accent-dark);cursor:pointer;">
+    <span class="material-symbols-outlined" style="font-size:14px;">edit_note</span>
     Note
   </button>
 </div>
 
 <!-- Note Input Box -->
 <div id="noteInputBox">
-  <div class="bg-white border border-slate-200 shadow-xl rounded-2xl p-3 w-64">
-    <p class="font-headline font-bold text-xs text-on-surface-variant mb-2 uppercase tracking-widest">Add Note</p>
-    <input type="text" id="noteInput" class="w-full bg-surface-container-low border border-slate-200 rounded-lg px-3 py-2 text-sm font-body text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" placeholder="Type your note, press Enter..."/>
+  <div style="background:white;border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,.12);border-radius:10px;padding:12px;width:240px;">
+    <p style="font-size:10px;font-weight:700;color:var(--text-4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">添加笔记</p>
+    <input type="text" id="noteInput" style="width:100%;background:var(--bg);border:1.5px solid var(--border-input);border-radius:6px;padding:6px 10px;font-size:13px;color:var(--text);font-family:'Inter',sans-serif;outline:none;" placeholder="输入笔记，按 Enter 保存…"/>
   </div>
 </div>
 
@@ -597,7 +736,7 @@ function toggleOutline() {
   const noteBtn = document.getElementById('noteBtn');
   const noteInputBox = document.getElementById('noteInputBox');
   const noteInput = document.getElementById('noteInput');
-  const lessonArea = document.getElementById('lessonSections');
+  const lessonArea = document.getElementById('lessonContent');
   let savedRange = null;
   let savedText = '';
 
@@ -612,7 +751,7 @@ function toggleOutline() {
         savedText = text;
 
         const rect = savedRange.getBoundingClientRect();
-        const scrollEl = lessonArea.closest('.overflow-y-auto');
+        const scrollEl = document.getElementById('docPanel');
         const scrollRect = scrollEl.getBoundingClientRect();
 
         toolbar.style.display = 'block';
@@ -646,7 +785,7 @@ function toggleOutline() {
     if (!savedRange) return;
 
     const rect = savedRange.getBoundingClientRect();
-    const scrollEl = lessonArea.closest('.overflow-y-auto');
+    const scrollEl = document.getElementById('docPanel');
     const scrollRect = scrollEl.getBoundingClientRect();
 
     noteInputBox.style.display = 'block';
@@ -701,7 +840,7 @@ function toggleOutline() {
       // Calculate position relative to content wrapper
       const highlightRect = highlight.getBoundingClientRect();
       const wrapperRect = contentWrapper.getBoundingClientRect();
-      const scrollEl = document.getElementById('lessonScroll');
+      const scrollEl = document.getElementById('docPanel');
       const topPos = highlightRect.top - wrapperRect.top + scrollEl.scrollTop;
 
       // Create annotation card in margin
@@ -733,8 +872,8 @@ function toggleOutline() {
 
       // Click highlight to scroll annotation into view
       highlight.addEventListener('click', function() {
-        annotation.style.background = '#d4e3ff';
-        setTimeout(function() { annotation.style.background = '#f0f6ff'; }, 800);
+        annotation.style.background = 'var(--accent-border)';
+        setTimeout(function() { annotation.style.background = 'var(--accent-light)'; }, 800);
       });
 
       marginContainer.appendChild(annotation);
