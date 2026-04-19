@@ -66,6 +66,17 @@ def intent_node(state: LearningState) -> dict:
 
         # Handle intent routing
         if result.intent == "learn_topic" and result.topic:
+            # GATE: Pedagogy skill is mandatory for learning flow
+            if not state.get("active_skill") and not matched_skill_name:
+                updates["mode"] = "chat"
+                updates["pending_topic"] = result.topic
+                from langchain_core.messages import AIMessage
+                updates["messages"] = [AIMessage(
+                    content=f"开始学习「{result.topic}」之前，请先选择一种教学法 🎓\n\n"
+                            "请使用 `/skill` 选择教学法（费曼学习法、苏格拉底提问法、脚手架教学法），"
+                            "选择后我会自动开始生成知识图谱。"
+                )]
+                return updates
             updates["mode"] = "graph"
             updates["topic"] = result.topic
         elif result.intent == "start_diagnosis":

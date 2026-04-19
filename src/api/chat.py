@@ -46,6 +46,9 @@ _DEFAULT_STATE = {
     "lesson_format": None,
     "active_skill": None,
     "active_skill_content": None,
+    "knowledge_skills": None,
+    "use_knowledge_skills": True,
+    "pending_topic": None,
     "quiz_task_status": None,
     "quiz_task_progress": None,
     "lesson_task_status": None,
@@ -128,7 +131,9 @@ async def chat(req: ChatRequest) -> ChatResponse:
     elif mode == "quiz" and result.get("questions"):
         questions = result["questions"]
         data = {
-            "questions": [q.model_dump() if hasattr(q, "model_dump") else q for q in questions],
+            "questions": [
+                q.model_dump() if hasattr(q, "model_dump") else q for q in questions
+            ],
         }
     elif mode == "result" and result.get("diagnosis_result"):
         dr = result["diagnosis_result"]
@@ -143,7 +148,12 @@ async def chat(req: ChatRequest) -> ChatResponse:
         skill_meta = get_skill(skill_name)
         if skill_meta:
             # Map mode → section name for highlighting
-            mode_to_section = {"chat": "chat", "graph": "knowledge_graph", "quiz": "quiz", "lesson": "lesson"}
+            mode_to_section = {
+                "chat": "chat",
+                "graph": "knowledge_graph",
+                "quiz": "quiz",
+                "lesson": "lesson",
+            }
             skill_info = SkillInfo(
                 name=skill_meta.name,
                 display_name=skill_meta.display_name,
@@ -204,21 +214,38 @@ async def chat_stream(req: ChatRequest):
             if active_skill_name:
                 skill_meta = get_skill(active_skill_name)
                 if skill_meta:
-                    mode_to_section = {"chat": "chat", "graph": "knowledge_graph", "quiz": "quiz", "lesson": "lesson"}
-                    yield _sse_event({
-                        "type": "skill",
-                        "name": skill_meta.name,
-                        "display_name": skill_meta.display_name,
-                        "body": skill_meta.raw_body,
-                        "current_section": mode_to_section.get(result.get("mode", mode)),
-                    })
+                    mode_to_section = {
+                        "chat": "chat",
+                        "graph": "knowledge_graph",
+                        "quiz": "quiz",
+                        "lesson": "lesson",
+                    }
+                    yield _sse_event(
+                        {
+                            "type": "skill",
+                            "name": skill_meta.name,
+                            "display_name": skill_meta.display_name,
+                            "body": skill_meta.raw_body,
+                            "current_section": mode_to_section.get(
+                                result.get("mode", mode)
+                            ),
+                        }
+                    )
 
             m = result.get("mode", mode)
             data: dict | None = None
             if m == "graph" and result.get("knowledge_graph"):
                 kg = result["knowledge_graph"]
                 data = {"graph": kg.model_dump() if hasattr(kg, "model_dump") else kg}
-            yield _sse_event({"type": "complete", "mode": m, "message": last_msg, "data": data, "session_id": session_id})
+            yield _sse_event(
+                {
+                    "type": "complete",
+                    "mode": m,
+                    "message": last_msg,
+                    "data": data,
+                    "session_id": session_id,
+                }
+            )
 
         return StreamingResponse(non_stream_sse(), media_type="text/event-stream")
 
@@ -229,7 +256,15 @@ async def chat_stream(req: ChatRequest):
         if skill_name:
             skill_meta = get_skill(skill_name)
             if skill_meta:
-                yield _sse_event({"type": "skill", "name": skill_meta.name, "display_name": skill_meta.display_name, "body": skill_meta.raw_body, "current_section": "chat"})
+                yield _sse_event(
+                    {
+                        "type": "skill",
+                        "name": skill_meta.name,
+                        "display_name": skill_meta.display_name,
+                        "body": skill_meta.raw_body,
+                        "current_section": "chat",
+                    }
+                )
 
         yield _sse_event({"type": "start", "session_id": session_id})
 
@@ -267,7 +302,15 @@ async def generate_lesson_stream(session_id: str):
         if skill_name:
             skill_meta = get_skill(skill_name)
             if skill_meta:
-                yield _sse_event({"type": "skill", "name": skill_meta.name, "display_name": skill_meta.display_name, "body": skill_meta.raw_body, "current_section": "lesson"})
+                yield _sse_event(
+                    {
+                        "type": "skill",
+                        "name": skill_meta.name,
+                        "display_name": skill_meta.display_name,
+                        "body": skill_meta.raw_body,
+                        "current_section": "lesson",
+                    }
+                )
 
         yield _sse_event({"type": "start"})
 
@@ -302,7 +345,9 @@ async def generate_quiz_stream(session_id: str):
 
     graph = state.get("knowledge_graph")
     if not graph:
-        raise HTTPException(status_code=400, detail="No knowledge graph — learn a topic first")
+        raise HTTPException(
+            status_code=400, detail="No knowledge graph — learn a topic first"
+        )
 
     nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
     total_points = len(nodes)
@@ -317,12 +362,14 @@ async def generate_quiz_stream(session_id: str):
             questions_data = [q.model_dump() for q in batch]
             all_questions.extend(batch)
             point_idx += 1
-            yield _sse_event({
-                "type": "questions",
-                "batch": questions_data,
-                "point_index": point_idx,
-                "total_points": total_points,
-            })
+            yield _sse_event(
+                {
+                    "type": "questions",
+                    "batch": questions_data,
+                    "point_index": point_idx,
+                    "total_points": total_points,
+                }
+            )
 
         # Save all questions to state
         state["questions"] = all_questions
@@ -447,7 +494,9 @@ async def generate_slides_stream(session_id: str):
             return
 
         outlines_data = [o.model_dump() for o in outlines]
-        yield _sse_event({"type": "outlines", "outlines": outlines_data, "total": len(outlines)})
+        yield _sse_event(
+            {"type": "outlines", "outlines": outlines_data, "total": len(outlines)}
+        )
 
         # Stage 2: Generate each slide
         slides: list[dict | None] = []
@@ -455,12 +504,14 @@ async def generate_slides_stream(session_id: str):
             slide = await asyncio.to_thread(generate_slide_content, outline)
             slide_data = slide.model_dump() if slide else None
             slides.append(slide_data)
-            yield _sse_event({
-                "type": "slide",
-                "index": i,
-                "total": len(outlines),
-                "slide": slide_data,
-            })
+            yield _sse_event(
+                {
+                    "type": "slide",
+                    "index": i,
+                    "total": len(outlines),
+                    "slide": slide_data,
+                }
+            )
 
         # Save to state
         state["slide_outlines"] = outlines_data
@@ -491,6 +542,7 @@ async def export_pptx(session_id: str):
     topic = state.get("topic", "lesson")
     # URL-encode filename for non-ASCII characters (RFC 5987)
     from urllib.parse import quote
+
     filename = f"{topic}.pptx"
     encoded = quote(filename)
 
@@ -525,7 +577,9 @@ async def get_state(session_id: str) -> dict:
 
     dr = state.get("diagnosis_result")
     if dr:
-        result["diagnosis_result"] = dr.model_dump() if hasattr(dr, "model_dump") else dr
+        result["diagnosis_result"] = (
+            dr.model_dump() if hasattr(dr, "model_dump") else dr
+        )
 
     lc = state.get("lesson_content")
     if lc:
@@ -534,14 +588,19 @@ async def get_state(session_id: str) -> dict:
     # Questions and answers for export
     questions = state.get("questions", [])
     if questions:
-        result["questions"] = [q.model_dump() if hasattr(q, "model_dump") else q for q in questions]
+        result["questions"] = [
+            q.model_dump() if hasattr(q, "model_dump") else q for q in questions
+        ]
         result["answers"] = state.get("answers", [])
 
     # Messages for export
     messages = state.get("messages", [])
     if messages:
         result["messages"] = [
-            {"role": "ai" if getattr(m, "type", "human") == "ai" else "user", "content": m.content}
+            {
+                "role": "ai" if getattr(m, "type", "human") == "ai" else "user",
+                "content": m.content,
+            }
             if hasattr(m, "content")
             else {"role": "user", "content": str(m)}
             for m in messages
@@ -558,6 +617,15 @@ async def get_state(session_id: str) -> dict:
     # Skill data
     if state.get("active_skill"):
         result["active_skill"] = state["active_skill"]
+        skill_meta = get_skill(state["active_skill"])
+        if skill_meta:
+            result["active_skill_display_name"] = skill_meta.display_name
+            result["active_skill_lesson_section"] = dict(skill_meta.sections).get("lesson", "")
+    if state.get("knowledge_skills"):
+        result["knowledge_skills"] = state["knowledge_skills"]
+    result["use_knowledge_skills"] = state.get("use_knowledge_skills", True)
+    if state.get("pending_topic"):
+        result["pending_topic"] = state["pending_topic"]
 
     # Task status
     for t in ("quiz", "lesson", "slides"):
@@ -607,6 +675,25 @@ async def set_skill(session_id: str, req: SetSkillRequest) -> dict:
 
     state["active_skill"] = skill_meta.name
     state["active_skill_content"] = dict(skill_meta.sections)
+
+    # Auto-resume: if a topic was waiting for skill selection, start learning
+    pending = state.get("pending_topic")
+    if pending:
+        state["pending_topic"] = None
+        state["topic"] = pending
+        state["mode"] = "graph"
+        _save(session_id, state)
+        return {
+            "session_id": session_id,
+            "active_skill": {
+                "name": skill_meta.name,
+                "display_name": skill_meta.display_name,
+                "sections": skill_meta.affects,
+            },
+            "auto_resume": True,
+            "topic": pending,
+        }
+
     _save(session_id, state)
 
     return {
@@ -617,6 +704,23 @@ async def set_skill(session_id: str, req: SetSkillRequest) -> dict:
             "sections": skill_meta.affects,
         },
     }
+
+
+class ToggleKnowledgeSkillsRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/chat/{session_id}/toggle-knowledge-skills")
+async def toggle_knowledge_skills(
+    session_id: str, req: ToggleKnowledgeSkillsRequest
+) -> dict:
+    """Toggle knowledge point skill generation on/off for a session."""
+    state = _get_session(session_id)
+    if not state:
+        state = dict(_DEFAULT_STATE)
+    state["use_knowledge_skills"] = req.enabled
+    _save(session_id, state)
+    return {"session_id": session_id, "use_knowledge_skills": req.enabled}
 
 
 # ------------------------------------------------------------------
@@ -650,22 +754,49 @@ async def start_generation(session_id: str, task_type: str) -> dict:
 
     if task_type == "quiz":
         if not state.get("knowledge_graph"):
-            raise HTTPException(status_code=400, detail="No knowledge graph — learn a topic first")
-        task_id = task_manager.start(session_id, task_type, lambda: run_quiz_generation(
-            session_id, snapshot, _get_session, _save,
-        ))
+            raise HTTPException(
+                status_code=400, detail="No knowledge graph — learn a topic first"
+            )
+        task_id = task_manager.start(
+            session_id,
+            task_type,
+            lambda: run_quiz_generation(
+                session_id,
+                snapshot,
+                _get_session,
+                _save,
+            ),
+        )
     elif task_type == "lesson":
         if not state.get("diagnosis_result"):
-            raise HTTPException(status_code=400, detail="No diagnosis — complete quiz first")
-        task_id = task_manager.start(session_id, task_type, lambda: run_lesson_generation(
-            session_id, snapshot, _get_session, _save,
-        ))
+            raise HTTPException(
+                status_code=400, detail="No diagnosis — complete quiz first"
+            )
+        task_id = task_manager.start(
+            session_id,
+            task_type,
+            lambda: run_lesson_generation(
+                session_id,
+                snapshot,
+                _get_session,
+                _save,
+            ),
+        )
     elif task_type == "slides":
         if not state.get("diagnosis_result"):
-            raise HTTPException(status_code=400, detail="No diagnosis — complete quiz first")
-        task_id = task_manager.start(session_id, task_type, lambda: run_slides_generation(
-            session_id, snapshot, _get_session, _save,
-        ))
+            raise HTTPException(
+                status_code=400, detail="No diagnosis — complete quiz first"
+            )
+        task_id = task_manager.start(
+            session_id,
+            task_type,
+            lambda: run_slides_generation(
+                session_id,
+                snapshot,
+                _get_session,
+                _save,
+            ),
+        )
 
     return {"session_id": session_id, "task_type": task_type, "status": "running"}
 

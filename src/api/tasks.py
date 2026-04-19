@@ -120,6 +120,7 @@ task_manager = TaskManager()
 # Background generation coroutines
 # ------------------------------------------------------------------
 
+
 async def run_quiz_generation(
     session_id: str,
     state_snapshot: dict[str, Any],
@@ -181,48 +182,102 @@ async def run_lesson_generation(
     get_session,
     save_session,
 ) -> None:
-    """Generate lesson content in background."""
-    from src.agent.nodes.lesson import _build_lesson_prompt
+    """Generate lesson content in background using two-step pipeline."""
+    from src.agent.nodes.lesson import retrieve_skills, _generate_review_lesson
+    from src.prompts.loader import render_prompt
     from src.llm.client import get_raw_client, get_model_name
     from src.memory_client import ingest_session, DEFAULT_USER_ID
 
     try:
         state = get_session(session_id) or {}
         state["lesson_task_status"] = "running"
+        state["lesson_task_progress"] = "retrieving skills"
         save_session(session_id, state)
-
-        prompt = _build_lesson_prompt(state_snapshot)
-        if not prompt:
-            state = get_session(session_id) or {}
-            state["lesson_task_status"] = "error"
-            save_session(session_id, state)
-            return
 
         task = task_manager.get_task(session_id, "lesson")
 
-        client = get_raw_client()
-        response = await asyncio.to_thread(
-            lambda: client.chat.completions.create(
-                model=get_model_name(),
-                max_tokens=8192,
-                messages=[{"role": "user", "content": prompt}],
-            )
+        # Step 1: Retrieve skills
+        pedagogy_instructions, knowledge_skills, weak_points = await asyncio.to_thread(
+            retrieve_skills, state_snapshot
         )
 
         if task and task.cancelled:
             return
 
-        lesson_text = response.choices[0].message.content
+        # Save knowledge skills to state
+        state = get_session(session_id) or {}
+        state["knowledge_skills"] = knowledge_skills if knowledge_skills else None
+        state["lesson_task_progress"] = (
+            f"0/{len(weak_points)}" if weak_points else "generating"
+        )
+        save_session(session_id, state)
+
+        if not weak_points:
+            # All mastered — review lesson
+            graph = state_snapshot.get("knowledge_graph")
+            nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
+            lesson_text = await asyncio.to_thread(
+                _generate_review_lesson,
+                state_snapshot.get("topic", ""),
+                nodes,
+                pedagogy_instructions,
+            )
+        else:
+            # Step 2: Generate per-point content (with progress updates)
+            client = get_raw_client()
+            sections = []
+            total = len(weak_points)
+
+            for i, wp in enumerate(weak_points):
+                if task and task.cancelled:
+                    logger.info("Lesson generation cancelled for %s", session_id)
+                    return
+
+                prompt = render_prompt(
+                    "lesson_point",
+                    topic=state_snapshot.get("topic", ""),
+                    knowledge_point_name=wp["name"],
+                    knowledge_point_description=wp["description"],
+                    pedagogy_instructions=pedagogy_instructions or "无特定教学法要求",
+                    knowledge_skill=knowledge_skills.get(wp["name"], "无额外教学技能"),
+                    point_index=i + 1,
+                    total_points=total,
+                )
+                response = await asyncio.to_thread(
+                    lambda p=prompt: client.chat.completions.create(
+                        model=get_model_name(),
+                        max_tokens=4096,
+                        messages=[{"role": "user", "content": p}],
+                    )
+                )
+                sections.append(response.choices[0].message.content.strip())
+
+                # Update progress
+                state = get_session(session_id) or {}
+                state["lesson_task_progress"] = f"{i + 1}/{total}"
+                save_session(session_id, state)
+
+            lesson_text = "\n\n---\n\n".join(sections)
+
+        if task and task.cancelled:
+            return
 
         state = get_session(session_id) or {}
         state["lesson_content"] = lesson_text
         state["lesson_task_status"] = "done"
+        state["lesson_task_progress"] = None
         state["lesson_format"] = "markdown"
+        if knowledge_skills:
+            state["knowledge_skills"] = knowledge_skills
         save_session(session_id, state)
 
         # Memory ingest
         asyncio.get_event_loop().run_in_executor(
-            None, ingest_session, DEFAULT_USER_ID, f"{session_id}_lesson", state_snapshot
+            None,
+            ingest_session,
+            DEFAULT_USER_ID,
+            f"{session_id}_lesson",
+            state_snapshot,
         )
 
     except Exception:
@@ -293,7 +348,11 @@ async def run_slides_generation(
         # Memory ingest
         if not (task and task.cancelled):
             asyncio.get_event_loop().run_in_executor(
-                None, ingest_session, DEFAULT_USER_ID, f"{session_id}_slides", state_snapshot
+                None,
+                ingest_session,
+                DEFAULT_USER_ID,
+                f"{session_id}_slides",
+                state_snapshot,
             )
 
     except Exception:

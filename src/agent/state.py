@@ -28,3 +28,12 @@ class LearningState(MessagesState):
     # Skill
     active_skill: str | None  # skill name, e.g. "feynman"
     active_skill_content: dict | None  # {"chat": "...", "quiz": "...", ...}
+
+    # Knowledge point skills (generated per knowledge point, derived from pedagogy skill)
+    knowledge_skills: dict | None  # {knowledge_point_name: skill_text}
+    use_knowledge_skills: (
+        bool  # whether to generate knowledge point skills (user toggle)
+    )
+
+    # Pending topic waiting for skill selection
+    pending_topic: str | None

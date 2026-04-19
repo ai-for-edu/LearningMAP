@@ -246,8 +246,31 @@
     </div>
   </div>
 
-  <!-- Right: Knowledge Graph Sidebar -->
-  <div class="w-[340px] border-l border-slate-100 bg-white flex flex-col" style="height: calc(100vh - 70px); position: sticky; top: 70px;">
+  <!-- Right: Knowledge Graph + Knowledge Skills Sidebar -->
+  <div class="w-[340px] border-l border-slate-100 bg-white flex flex-col overflow-y-auto" style="height: calc(100vh - 70px); position: sticky; top: 70px;">
+    <!-- Knowledge Point Skills panel -->
+    <div id="knowledgeSkillsPanel" class="hidden">
+      <div class="p-6 pb-3 border-b border-slate-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest flex items-center gap-1">
+              <span class="material-symbols-outlined" style="font-size:14px;">lightbulb</span>
+              Knowledge Skills
+            </p>
+            <p class="font-body text-xs text-on-surface-variant mt-1">知识点教学技能</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="useKnowledgeSkills" class="sr-only peer" checked>
+            <div class="w-9 h-5 bg-outline/30 rounded-full peer peer-checked:bg-primary transition-colors
+                        after:content-[''] after:absolute after:top-0.5 after:left-[2px]
+                        after:bg-white after:rounded-full after:h-4 after:w-4
+                        after:transition-all peer-checked:after:translate-x-full"></div>
+          </label>
+        </div>
+      </div>
+      <div id="knowledgeSkillsList" class="p-4 space-y-2"></div>
+    </div>
+    <!-- Knowledge Map -->
     <div class="p-6 border-b border-slate-100">
       <p class="font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest">Knowledge Map</p>
       <p class="font-body text-xs text-on-surface-variant mt-1">薄弱知识点高亮</p>
@@ -286,7 +309,7 @@
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
         </svg>
         <p class="font-headline font-bold text-lg text-on-surface">Generating Lesson</p>
-        <p class="font-body text-sm text-on-surface-variant mt-2">AI is creating a personalized lesson based on your diagnosis...</p>
+        <p class="font-body text-sm text-on-surface-variant mt-2" id="generationProgress">AI is creating a personalized lesson based on your diagnosis...</p>
       </div>`;
     document.getElementById('lessonSections').innerHTML = '';
 
@@ -305,7 +328,18 @@
     // Poll until done
     await new Promise((resolve) => {
       pollStatus(sessionId, 'lesson',
-        function onUpdate() { /* still running, wait */ },
+        function onUpdate(s) {
+          var el = document.getElementById('generationProgress');
+          if (!el || !s.progress) return;
+          if (s.progress === 'retrieving skills') {
+            el.textContent = '正在检索教学技能...';
+          } else if (s.progress && s.progress.indexOf('/') !== -1) {
+            var parts = s.progress.split('/');
+            el.textContent = '正在生成内容（' + parts[0] + '/' + parts[1] + ' 个知识点）...';
+          } else {
+            el.textContent = '正在生成教案...';
+          }
+        },
         async function onDone(s) {
           if (s.status === 'done') {
             state = await getSessionState(sessionId);
@@ -341,16 +375,62 @@
   const weakPoints = state.diagnosis_result?.breakdown?.filter(b => b.status === 'weak').map(b => b.name) || [];
   const weakDesc = weakPoints.map(n => '<strong class="text-error">' + n + '</strong>').join(' 和 ');
 
+  // Build pedagogy skill card for header (collapsible)
+  const skillName = state.active_skill_display_name || '';
+  const skillLessonSection = state.active_skill_lesson_section || '';
+  let pedagogyCardHtml = '';
+  if (skillName) {
+    pedagogyCardHtml = `
+      <details class="mb-6 rounded-2xl border border-primary/15 bg-primary/[0.03] group">
+        <summary class="flex items-center gap-2 p-5 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+          <span class="material-symbols-outlined text-primary" style="font-size:18px;">psychology</span>
+          <span class="font-headline font-bold text-sm text-primary flex-grow">教学法：${escapeHtml(skillName)}</span>
+          <span class="material-symbols-outlined text-primary/50 text-lg transition-transform group-open:rotate-180">expand_more</span>
+        </summary>
+        ${skillLessonSection ? '<div class="px-5 pb-5 font-body text-xs text-on-surface-variant leading-relaxed whitespace-pre-wrap border-t border-primary/10 pt-3 mx-5">' + escapeHtml(skillLessonSection) + '</div>' : ''}
+      </details>`;
+  }
+
   document.getElementById('lessonHeader').innerHTML =
     '<div class="mb-10"><p class="font-headline text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2">个性化教案</p>' +
     '<h1 class="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-3">' + topic + '：薄弱知识点</h1>' +
-    '<p class="font-body text-on-surface-variant leading-relaxed">本教案根据诊断结果生成，重点讲解 ' + (weakDesc || '相关知识点') + '。</p></div><hr class="border-slate-100 mb-10"/>';
+    '<p class="font-body text-on-surface-variant leading-relaxed mb-6">本教案根据诊断结果生成，重点讲解 ' + (weakDesc || '相关知识点') + '。</p>' +
+    pedagogyCardHtml +
+    '</div><hr class="border-slate-100 mb-10"/>';
 
   // Parse markdown to HTML
   const parsedHtml = DOMPurify.sanitize(marked.parse(lessonContent));
 
   document.getElementById('lessonSections').innerHTML =
     '<section class="lesson-section mb-12 prose prose-slate max-w-none" id="section-1">' + parsedHtml + '</section>';
+
+  // Inject knowledge point skill cards before each h2 heading
+  const ks = state.knowledge_skills || {};
+  if (Object.keys(ks).length > 0) {
+    const sectionEl2 = document.getElementById('section-1');
+    const h2s = sectionEl2.querySelectorAll('h2');
+    h2s.forEach(function(h2) {
+      const headingText = h2.textContent.trim();
+      // Match heading to knowledge point name
+      const matchedKey = Object.keys(ks).find(function(k) {
+        return headingText.indexOf(k) !== -1 || k.indexOf(headingText) !== -1;
+      });
+      if (matchedKey) {
+        const card = document.createElement('div');
+        card.className = 'not-prose';
+        card.innerHTML =
+          '<details class="my-4 rounded-xl border border-dashed border-green-300 bg-green-50/50 group">' +
+            '<summary class="flex items-center gap-1.5 px-4 py-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">' +
+              '<span class="material-symbols-outlined text-green-700" style="font-size:15px;">lightbulb</span>' +
+              '<span class="font-headline font-bold text-xs text-green-800 flex-grow">知识点技能：' + escapeHtml(matchedKey) + '</span>' +
+              '<span class="material-symbols-outlined text-green-600/50 text-lg transition-transform group-open:rotate-180">expand_more</span>' +
+            '</summary>' +
+            '<div class="px-4 pb-3 font-body text-xs text-green-900/70 leading-relaxed whitespace-pre-wrap border-t border-green-200 pt-2 mx-4">' + escapeHtml(ks[matchedKey]) + '</div>' +
+          '</details>';
+        h2.parentNode.insertBefore(card, h2.nextSibling);
+      }
+    });
+  }
 
   // Build outline from rendered headings
   const sectionEl = document.getElementById('section-1');
@@ -376,6 +456,37 @@
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
+
+  // Knowledge Skills sidebar
+  const ksPanel = document.getElementById('knowledgeSkillsPanel');
+  const ksList = document.getElementById('knowledgeSkillsList');
+  const ksToggle = document.getElementById('useKnowledgeSkills');
+  const knowledgeSkills = state.knowledge_skills;
+
+  if (knowledgeSkills && Object.keys(knowledgeSkills).length > 0) {
+    ksPanel.classList.remove('hidden');
+    ksList.innerHTML = Object.entries(knowledgeSkills).map(function(entry) {
+      const name = entry[0], skill = entry[1];
+      return '<details class="bg-surface-container-low rounded-xl">' +
+        '<summary class="p-3 cursor-pointer font-headline text-xs font-semibold text-on-surface hover:bg-surface-container rounded-xl">' + escapeHtml(name) + '</summary>' +
+        '<div class="px-3 pb-3 font-body text-xs text-on-surface-variant whitespace-pre-wrap leading-relaxed">' + escapeHtml(skill) + '</div>' +
+        '</details>';
+    }).join('');
+  }
+
+  // Toggle handler
+  if (ksToggle) {
+    ksToggle.checked = state.use_knowledge_skills !== false;
+    ksToggle.addEventListener('change', async function(e) {
+      try {
+        await fetch('/api/chat/' + sessionId + '/toggle-knowledge-skills', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({enabled: e.target.checked}),
+        });
+      } catch(err) { /* ignore */ }
+    });
+  }
 
   // Graph sidebar — vis.js interactive graph
   const graphContainer = document.getElementById('lessonGraph');

@@ -169,6 +169,7 @@ let currentSessionId = getSessionId();
 let messageCount = 0;
 let _cachedSkills = null;
 let _activeSkillInfo = null; // {name, display_name, body, current_section}
+let _knowledgeSkills = null; // {knowledge_point_name: skill_text}
 
 // Input handler: detect /skill and show popup
 function handleInputKeydown(e) {
@@ -302,6 +303,33 @@ function showSkillModal(nameOrInfo, highlightSection) {
   document.body.appendChild(overlay);
 }
 
+function showModal(title, bodyHtml) {
+  document.querySelector('.skill-modal-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'skill-modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.innerHTML = `
+    <div class="skill-modal">
+      <div class="skill-modal-header">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">lightbulb</span>
+          <span class="font-headline font-bold text-lg text-on-surface">${escapeHtml(title)}</span>
+        </div>
+        <button class="skill-modal-close p-1 rounded-lg hover:bg-slate-100 transition-colors">
+          <span class="material-symbols-outlined text-slate-400">close</span>
+        </button>
+      </div>
+      <div class="skill-modal-body prose prose-slate max-w-none">${bodyHtml}</div>
+    </div>`;
+  const closeModal = () => { overlay.remove(); document.removeEventListener('keydown', escHandler); };
+  const escHandler = (e) => { if (e.key === 'Escape') closeModal(); };
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  overlay.querySelector('.skill-modal-close').addEventListener('click', closeModal);
+  document.addEventListener('keydown', escHandler);
+  document.body.appendChild(overlay);
+}
+
 function deleteSkillFile(name) {
   // Skills are file-based, cannot delete via API in MVP
   alert(`Skill "${name}" 是文件系统中的 SKILL.md，请在服务器上手动删除 skills/${name}/SKILL.md`);
@@ -344,10 +372,37 @@ function buildSkillBadge(skillInfo) {
     </div>`;
 }
 
+function buildKnowledgeSkillBadge(knowledgeSkills) {
+  if (!knowledgeSkills || Object.keys(knowledgeSkills).length === 0) return '';
+  const count = Object.keys(knowledgeSkills).length;
+  const idx = _ksBadgeStore.length;
+  _ksBadgeStore.push(knowledgeSkills);
+  return `
+    <div class="ks-badge" data-ks-idx="${idx}" style="margin-bottom:8px;display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:9999px;font-size:12px;background:var(--md-sys-color-tertiary-container,#d4e8d4);color:var(--md-sys-color-on-tertiary-container,#1a3c1a);cursor:pointer;">
+      <span class="material-symbols-outlined" style="font-size:14px;">lightbulb</span>
+      ${count}个知识点技能
+    </div>`;
+}
+
+const _ksBadgeStore = [];
 const _badgeSkillStore = [];
 
-// Delegate all badge clicks at document level
+// Delegate all badge clicks (pedagogy + knowledge skill)
 document.addEventListener('click', function(e) {
+  // Knowledge skill badge
+  const ksBadge = e.target.closest('[data-ks-idx]');
+  if (ksBadge) {
+    const ks = _ksBadgeStore[+ksBadge.dataset.ksIdx];
+    if (!ks) return;
+    const entries = Object.entries(ks).map(([name, skill]) =>
+      `<div style="margin-bottom:12px;">
+        <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(name)}</div>
+        <div style="font-size:13px;white-space:pre-wrap;color:var(--md-sys-color-on-surface-variant,#666);">${escapeHtml(skill)}</div>
+      </div>`
+    ).join('');
+    showModal('知识点教学技能', entries);
+    return;
+  }
   const badge = e.target.closest('[data-badge-idx]');
   if (badge) {
     const info = _badgeSkillStore[+badge.dataset.badgeIdx];
@@ -376,9 +431,13 @@ async function handleSend(text) {
     }
 
     try {
-      await setSkill(currentSessionId, skillName);
+      const skillResp = await setSkill(currentSessionId, skillName);
       if (!_cachedSkills) _cachedSkills = await fetchSkills();
       _activeSkillInfo = (_cachedSkills || []).find(s => s.name === skillName) || null;
+      // Auto-resume: if a topic was pending, send it as the message
+      if (skillResp && skillResp.auto_resume && skillResp.topic) {
+        message = `我想学习${skillResp.topic}`;
+      }
     } catch (err) {
       // Skill set failed, continue without skill
     }
@@ -781,6 +840,9 @@ async function showLessonFormatChoice(sid) {
   if (state.active_skill) {
     if (!_cachedSkills) _cachedSkills = await fetchSkills();
     _activeSkillInfo = (_cachedSkills || []).find(s => s.name === state.active_skill) || null;
+  }
+  if (state.knowledge_skills) {
+    _knowledgeSkills = state.knowledge_skills;
   }
 
   // Rebuild conversation: topic → graph → diagnosis → lesson button
