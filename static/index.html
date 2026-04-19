@@ -8,161 +8,278 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
 <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            colors: {
-              "secondary": "#3c692b",
-              "error": "#ba1a1a",
-              "outline-variant": "#c1c7d3",
-              "secondary-fixed": "#bdf1a3",
-              "on-surface-variant": "#414751",
-              "on-primary-fixed": "#001c39",
-              "surface-container-low": "#f2f4f6",
-              "on-error": "#ffffff",
-              "surface-container": "#eceef0",
-              "secondary-fixed-dim": "#a1d489",
-              "surface-container-high": "#e6e8ea",
-              "surface-dim": "#d8dadc",
-              "primary": "#005da7",
-              "tertiary-fixed-dim": "#adcbda",
-              "on-secondary-fixed": "#052100",
-              "primary-fixed-dim": "#a4c9ff",
-              "surface": "#f7f9fb",
-              "surface-container-highest": "#e0e3e5",
-              "tertiary-fixed": "#c9e7f7",
-              "on-primary": "#ffffff",
-              "surface-variant": "#e0e3e5",
-              "on-tertiary-container": "#fbfdff",
-              "surface-tint": "#0060ac",
-              "on-tertiary": "#ffffff",
-              "primary-container": "#2976c7",
-              "surface-container-lowest": "#ffffff",
-              "inverse-on-surface": "#eff1f3",
-              "tertiary-container": "#5c7987",
-              "on-secondary-fixed-variant": "#255015",
-              "error-container": "#ffdad6",
-              "on-surface": "#191c1e",
-              "on-tertiary-fixed-variant": "#2e4b57",
-              "outline": "#717783",
-              "secondary-container": "#baeea0",
-              "on-tertiary-fixed": "#001f2a",
-              "inverse-surface": "#2d3133",
-              "on-secondary-container": "#406d2f",
-              "inverse-primary": "#a4c9ff",
-              "tertiary": "#43606d",
-              "on-error-container": "#93000a",
-              "on-background": "#191c1e",
-              "surface-bright": "#f7f9fb",
-              "background": "#f7f9fb",
-              "on-primary-container": "#fdfcff",
-              "on-primary-fixed-variant": "#004883"
-            },
-            fontFamily: {
-              "headline": ["Manrope"],
-              "body": ["Inter"],
-              "label": ["Inter"]
-            },
-            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
-          },
-        },
-      }
-    </script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: { sans: ['Inter', 'sans-serif'] },
+    },
+  },
+}
+</script>
 <style>
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-        .knowledge-label {
-            transition: all 0.2s ease-in-out;
-        }
-        .knowledge-label:hover {
-            color: #005da7;
-            transform: translateY(-1px);
-        }
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        /* Chat markdown */
-        .prose h3 { font-weight: 700; margin: 1rem 0 0.5rem; color: #191c1e; }
-        .prose p { margin: 0.5rem 0; }
-        .prose ul, .prose ol { padding-left: 1.5rem; margin: 0.5rem 0; }
-        .prose li { margin: 0.25rem 0; }
-        .prose strong { color: #191c1e; }
-        .prose code { background: #eceef0; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em; }
-        .prose blockquote { border-left: 3px solid #005da7; padding-left: 1rem; color: #414751; margin: 0.5rem 0; }
-        /* Skill popup list */
-        .skill-popup { position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 8px; max-height: 360px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); z-index: 200; }
-        .skill-item { padding: 12px 16px; display: flex; align-items: flex-start; gap: 10px; transition: background 0.15s; }
-        .skill-item:hover { background: #f1f5f9; }
-        .skill-item:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
-        .skill-item-main { flex: 1; cursor: pointer; }
-        .skill-item-actions { display: flex; gap: 2px; flex-shrink: 0; padding-top: 2px; }
-        .skill-action-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; border: none; background: transparent; cursor: pointer; color: #94a3b8; transition: all 0.15s; }
-        .skill-action-btn:hover { background: #e2e8f0; color: #475569; }
-        /* Skill badge on AI messages */
-        .skill-badge { display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; cursor: pointer; transition: background 0.15s; }
-        .skill-badge:hover { background: #dbeafe; }
-        /* Skill detail modal */
-        .skill-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 300; }
-        .skill-modal { background: white; border-radius: 20px; padding: 0; max-width: 560px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-        .skill-modal-header { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
-        .skill-modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; color: #334155; }
-        /* Message action buttons — ChatGPT style */
-        .msg-actions { display: flex; gap: 4px; margin-top: 6px; opacity: 0; transition: opacity 0.15s; }
-        .msg-wrapper:hover .msg-actions { opacity: 1; }
-        .msg-action { border: none; background: transparent; cursor: pointer; padding: 4px; color: #b0b8c4; transition: color 0.15s; }
-        .msg-action:hover { color: #475569; }
-        /* Streaming cursor */
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-        .stream-cursor { display: inline-block; width: 2px; height: 1em; background: #005da7; margin-left: 2px; vertical-align: text-bottom; animation: blink 0.8s step-end infinite; }
-    </style>
+:root {
+  --bg: #FAF9F7;
+  --bg-sidebar: #F0EDE8;
+  --border: #EAE6E0;
+  --border-input: #E0DDD8;
+  --accent: #CF6833;
+  --accent-light: #FFF3EC;
+  --accent-border: #F5D5BF;
+  --accent-dark: #9E4A2A;
+  --text: #1a1a1a;
+  --text-2: #4a4a4a;
+  --text-3: #888;
+  --text-4: #B0A898;
+  --user-bubble: #EDE9E3;
+  --error: #DC2626;
+  --success: #059669;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--text); margin: 0; }
+
+/* ── Sidebar ── */
+#sidebar {
+  width: 210px; height: 100vh; position: fixed; left: 0; top: 0;
+  background: var(--bg-sidebar); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; padding: 16px 12px; gap: 4px;
+  z-index: 40; transition: width 0.2s;
+}
+#sidebar.collapsed { width: 0; padding: 0; overflow: hidden; }
+.sidebar-logo { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 8px; }
+.sidebar-logo-icon {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 15px; font-weight: 800;
+}
+.sidebar-logo-text { font-size: 14px; font-weight: 800; color: var(--text); letter-spacing: -.02em; }
+.new-session-btn {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border: 1.5px dashed #D4CFC8; border-radius: 8px; background: transparent;
+  font-size: 13px; font-weight: 500; color: var(--text-3); cursor: pointer;
+  margin-bottom: 12px; transition: all .15s; width: 100%;
+}
+.new-session-btn:hover { background: white; border-color: #bbb; }
+.sidebar-section-label {
+  font-size: 10px; font-weight: 600; color: var(--text-4);
+  letter-spacing: .06em; text-transform: uppercase;
+  padding: 0 8px; margin: 8px 0 4px;
+}
+.session-item {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  border-radius: 7px; font-size: 13px; color: var(--text-3); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .1s;
+}
+.session-item:hover { background: #E8E4DE; }
+.session-item.active {
+  background: white; color: var(--text); font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,.07);
+}
+.session-dot { width: 6px; height: 6px; border-radius: 50%; background: #D4CFC8; flex-shrink: 0; }
+.session-dot.orange { background: var(--accent); }
+.sidebar-status-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--accent-light); border: 1px solid var(--accent-border);
+  color: var(--accent-dark); font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: 99px; margin-left: auto; flex-shrink: 0;
+}
+
+/* ── Top Nav ── */
+#topNav {
+  height: 50px; position: fixed; top: 0; left: 210px; right: 0; z-index: 30;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+  transition: left 0.2s;
+}
+#sidebar.collapsed ~ #topNav { left: 0; }
+.topnav-left { display: flex; align-items: center; gap: 8px; }
+.topnav-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.topnav-skill-pill {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--accent-light); border: 1px solid var(--accent-border);
+  color: var(--accent-dark); font-size: 11px; font-weight: 600;
+  padding: 4px 10px; border-radius: 99px; cursor: pointer;
+}
+.topnav-skill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+/* ── Main Content ── */
+#mainContent {
+  margin-left: 210px; padding-top: 50px; min-height: 100vh;
+  display: flex; flex-direction: column; transition: margin-left 0.2s;
+}
+#sidebar.collapsed ~ #mainContent { margin-left: 0; }
+
+/* ── Chat Area ── */
+#chatArea { flex: 1; padding: 24px 32px 120px; display: flex; flex-direction: column; gap: 20px; max-width: 760px; width: 100%; margin: 0 auto; }
+.user-msg { display: flex; justify-content: flex-end; }
+.user-bubble {
+  background: var(--user-bubble); border-radius: 18px 18px 4px 18px;
+  padding: 10px 16px; max-width: 70%; font-size: 13.5px; color: var(--text-2); line-height: 1.55;
+}
+.ai-msg { display: flex; gap: 12px; }
+.ai-avatar {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 13px; font-weight: 700;
+}
+.ai-content { flex: 1; }
+.ai-name { font-size: 11px; font-weight: 600; color: var(--text-4); margin-bottom: 5px; letter-spacing: .03em; text-transform: uppercase; }
+.ai-text { font-size: 13.5px; color: var(--text-2); line-height: 1.65; }
+.ai-text strong { color: var(--text); font-weight: 600; }
+
+/* Knowledge graph card */
+.kg-card { background: white; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-top: 8px; }
+.kg-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.kg-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.kg-badge { font-size: 11px; color: var(--accent); background: var(--accent-light); padding: 2px 8px; border-radius: 99px; font-weight: 600; border: 1px solid var(--accent-border); }
+.kg-footer { padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; }
+.kg-legend { display: flex; gap: 12px; }
+.kg-legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-3); }
+.kg-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+.kg-start-btn {
+  background: var(--accent); color: white;
+  font-size: 12px; font-weight: 600; padding: 6px 16px;
+  border-radius: 99px; border: none; cursor: pointer; transition: background .15s;
+}
+.kg-start-btn:hover { background: var(--accent-dark); }
+
+/* ── Input Bar ── */
+#bottomBar {
+  position: fixed; bottom: 0; left: 210px; right: 0; z-index: 30;
+  padding: 12px 20px 16px; background: var(--bg);
+  border-top: 1px solid var(--border); transition: left 0.2s;
+}
+#sidebar.collapsed ~ #bottomBar { left: 0; }
+.input-outer { max-width: 720px; margin: 0 auto; position: relative; }
+.input-wrap {
+  background: white; border: 1.5px solid var(--border-input); border-radius: 14px;
+  padding: 10px 14px; display: flex; align-items: flex-end; gap: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05);
+}
+.input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(207,104,51,.1); }
+#chatInput {
+  flex: 1; font-size: 13px; color: var(--text); font-family: 'Inter', sans-serif;
+  border: none; outline: none; resize: none; background: transparent; min-height: 34px; max-height: 160px;
+}
+#chatInput::placeholder { color: var(--text-4); }
+.send-btn {
+  width: 34px; height: 34px; background: var(--accent); border-radius: 10px; border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0; color: white; transition: background .15s;
+}
+.send-btn:hover { background: var(--accent-dark); }
+.hint-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; max-width: 720px; margin-left: auto; margin-right: auto; }
+
+/* ── Skill popup ── */
+.skill-popup {
+  position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 8px;
+  max-height: 360px; overflow-y: auto; background: white;
+  border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.1); z-index: 200;
+}
+.skill-item { padding: 12px 16px; display: flex; align-items: flex-start; gap: 10px; }
+.skill-item:hover { background: #F7F5F2; }
+.skill-item:not(:last-child) { border-bottom: 1px solid var(--border); }
+.skill-item-main { flex: 1; cursor: pointer; }
+.skill-item-actions { display: flex; gap: 2px; flex-shrink: 0; padding-top: 2px; }
+.skill-action-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; border: none; background: transparent; cursor: pointer; color: var(--text-4); transition: all .15s; }
+.skill-action-btn:hover { background: var(--border); color: var(--text-3); }
+
+/* ── Skill modal ── */
+.skill-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.3); display: flex; align-items: center; justify-content: center; z-index: 300; }
+.skill-modal { background: white; border-radius: 14px; padding: 0; max-width: 560px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+.skill-modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.skill-modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; color: var(--text-2); }
+
+/* ── Prose / Markdown ── */
+.prose h3 { font-weight: 700; margin: 1rem 0 0.5rem; color: var(--text); }
+.prose p { margin: 0.5rem 0; }
+.prose ul, .prose ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+.prose li { margin: 0.25rem 0; }
+.prose strong { color: var(--text); }
+.prose code { background: var(--bg-sidebar); padding: .1rem .35rem; border-radius: .25rem; font-size: .85em; }
+.prose blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; color: var(--text-3); margin: .5rem 0; }
+
+/* ── Message actions ── */
+.msg-actions { display: flex; gap: 4px; margin-top: 6px; opacity: 0; transition: opacity .15s; }
+.msg-wrapper:hover .msg-actions { opacity: 1; }
+.msg-action { border: none; background: transparent; cursor: pointer; padding: 4px; color: var(--text-4); transition: color .15s; }
+.msg-action:hover { color: var(--text-3); }
+
+/* ── Streaming cursor ── */
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.stream-cursor { display: inline-block; width: 2px; height: 1em; background: var(--accent); margin-left: 2px; vertical-align: text-bottom; animation: blink .8s step-end infinite; }
+
+/* ── Sidebar collapse button ── */
+#collapseBtn {
+  position: absolute; top: 50%; transform: translateY(-50%); right: -12px;
+  width: 24px; height: 48px; background: white; border: 1px solid var(--border);
+  border-radius: 0 6px 6px 0; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 50; box-shadow: 1px 0 4px rgba(0,0,0,.06);
+}
+#collapseBtn:hover { background: var(--bg-sidebar); }
+
+/* ── no-scrollbar ── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Skill badge ── */
+.skill-badge { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-light); border: 1px solid var(--accent-border); color: var(--accent-dark); font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; cursor: pointer; transition: background .15s; }
+.skill-badge:hover { background: var(--accent-border); }
+
+/* ── Hint chips ── */
+.hint-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 99px; border: 1px solid var(--border); background: white; font-size: 12px; color: var(--text-3); cursor: pointer; transition: all .15s; white-space: nowrap; }
+.hint-chip:hover { background: var(--bg-sidebar); border-color: var(--accent-border); color: var(--text-2); }
+</style>
 </head>
-<body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
-<!-- Top Navigation Bar -->
-<nav class="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 flex justify-between items-center px-6 py-3">
-<div class="flex items-center gap-8">
-<span class="text-xl font-extrabold tracking-tighter text-blue-800 dark:text-blue-300">OpenAILearning</span>
-</div>
-<div class="flex items-center gap-4"></div>
+<body>
+<nav id="topNav">
+  <div class="topnav-left">
+    <span class="topnav-title" id="topNavTitle">EduAI</span>
+    <span id="topNavSkillPill" class="topnav-skill-pill" style="display:none;" onclick="showSkillModal(_activeSkillInfo?.name)">
+      <span class="topnav-skill-dot"></span>
+      <span id="topNavSkillName"></span>
+    </span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;" id="topNavActions"></div>
 </nav>
-<!-- Permanent Side Navigation -->
-<aside id="sidebar" class="h-screen w-64 fixed left-0 top-0 pt-20 bg-white dark:bg-slate-950 flex flex-col p-4 border-r border-slate-100 dark:border-slate-800 z-40 transition-all duration-300">
-<button onclick="createNewSession()" class="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 px-4 rounded-xl font-headline font-bold text-sm shadow-sm hover:shadow-md hover:bg-primary-container transition-all mb-4">
-<span class="material-symbols-outlined text-lg">add</span>
-<span>New Session</span>
-</button>
-<div class="flex-grow overflow-y-auto space-y-1" id="session-list"></div>
-<!-- Collapse handle -->
-<button onclick="toggleSidebar()" id="collapseBtn" class="absolute top-1/2 -translate-y-1/2 -right-4 w-8 h-16 bg-white border border-slate-200 rounded-r-lg flex items-center justify-center shadow-sm hover:bg-slate-50 transition-colors z-50">
-  <span class="material-symbols-outlined text-sm text-slate-400" id="collapseIcon">chevron_left</span>
-</button>
+<aside id="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-icon">E</div>
+    <span class="sidebar-logo-text">EduAI</span>
+  </div>
+  <button class="new-session-btn" onclick="createNewSession()">
+    <span class="material-symbols-outlined" style="font-size:16px;">add</span>
+    新对话
+  </button>
+  <div style="flex:1;overflow-y:auto;" id="session-list"></div>
+  <button onclick="toggleSidebar()" id="collapseBtn">
+    <span class="material-symbols-outlined" style="font-size:14px;color:var(--text-4);" id="collapseIcon">chevron_left</span>
+  </button>
 </aside>
 <script src="sidebar.js?v=2"></script>
 <script src="api.js?v=6"></script>
-<!-- Main Content -->
-<main id="mainContent" class="ml-64 pt-24 pb-32 px-6 min-h-screen flex flex-col transition-all duration-300">
-<div class="max-w-4xl mx-auto w-full">
-<!-- Chat History (dynamic) -->
-<div class="flex flex-col gap-12" id="chatHistory"></div>
+<main id="mainContent">
+  <div id="chatArea">
+    <div id="chatHistory"></div>
+  </div>
 </main>
-<!-- Chat Input Fixed Bottom -->
-<div id="bottomBar" class="fixed bottom-0 left-64 right-0 p-6 bg-surface/80 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 transition-all duration-300">
-<div class="max-w-[720px] mx-auto relative">
-<textarea id="chatInput" onkeydown="handleInputKeydown(event)" oninput="handleInputChange(event)" rows="1" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-6 pr-14 focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-body text-on-surface shadow-sm resize-none overflow-hidden" placeholder="输入学习主题，例如：我想学习勾股定理 · 输入 /skill 选择教学方法" style="min-height:56px;max-height:160px;"></textarea>
-<div id="skillPopup" class="skill-popup" style="display:none;"></div>
-<button onclick="handleSend()" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-primary text-white rounded-xl shadow-sm hover:shadow-md hover:bg-primary-container transition-all">
-<span class="material-symbols-outlined text-xl">arrow_upward</span>
-</button>
-</div>
-<div class="max-w-[720px] mx-auto mt-3 flex gap-3 overflow-x-auto no-scrollbar pb-1" id="suggestBtns"></div>
+<div id="bottomBar">
+  <div class="input-outer">
+    <div class="input-wrap">
+      <textarea id="chatInput" onkeydown="handleInputKeydown(event)" oninput="handleInputChange(event)" rows="1"
+        placeholder="输入学习主题，或 /skill 选择教学方法…"></textarea>
+      <div id="skillPopup" class="skill-popup" style="display:none;"></div>
+      <button class="send-btn" onclick="handleSend()">
+        <span class="material-symbols-outlined" style="font-size:18px;">arrow_upward</span>
+      </button>
+    </div>
+  </div>
+  <div class="hint-row no-scrollbar" id="suggestBtns"></div>
 </div>
 <script>
 let currentSessionId = getSessionId();
@@ -201,16 +318,16 @@ async function handleInputChange(e) {
   if (val.trim() === '/skill' || val.trim() === '/skill ') {
     if (!_cachedSkills) _cachedSkills = await fetchSkills();
     if (_cachedSkills.length === 0) {
-      popup.innerHTML = '<div class="p-4 text-sm text-slate-400">暂无可用的教学方法</div>';
+      popup.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-3);">暂无可用的教学方法</div>';
     } else {
       popup.innerHTML = _cachedSkills.map((s, i) => `
         <div class="skill-item">
           <div class="skill-item-main" data-skill-idx="${i}">
-            <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-primary text-base">psychology</span>
-              <span class="font-headline font-bold text-sm text-on-surface">${escapeHtml(s.display_name)}</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="material-symbols-outlined" style="color:var(--accent);font-size:16px;">psychology</span>
+              <span style="font-size:13px;font-weight:700;color:var(--text);">${escapeHtml(s.display_name)}</span>
             </div>
-            <p class="text-xs text-on-surface-variant mt-1 line-clamp-2">${escapeHtml(s.description)}</p>
+            <p style="font-size:11px;color:var(--text-3);margin-top:4px;">${escapeHtml(s.description)}</p>
           </div>
           <div class="skill-item-actions">
             <button class="skill-action-btn" data-info-idx="${i}" title="查看详情">
@@ -222,11 +339,11 @@ async function handleInputChange(e) {
           </div>
         </div>
       `).join('') + `
-        <div class="skill-item" style="border-top:1px solid #e2e8f0;">
+        <div class="skill-item" style="border-top:1px solid var(--border);">
           <div class="skill-item-main" data-clear-skill="1">
-            <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-slate-400 text-base">close</span>
-              <span class="font-body text-sm text-slate-500">清除教学方法（恢复默认）</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-4);">close</span>
+              <span style="font-size:13px;color:var(--text-3);">清除教学方法（恢复默认）</span>
             </div>
           </div>
         </div>`;
@@ -281,17 +398,17 @@ function showSkillModal(nameOrInfo, highlightSection) {
     <div class="skill-modal">
       <div class="skill-modal-header">
         <div>
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary">psychology</span>
-            <span class="font-headline font-bold text-lg text-on-surface">${escapeHtml(skill.display_name || skill.name)}</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="material-symbols-outlined" style="color:var(--accent);font-size:20px;">psychology</span>
+            <span style="font-size:16px;font-weight:700;color:var(--text);">${escapeHtml(skill.display_name || skill.name)}</span>
           </div>
-          <p class="text-xs text-on-surface-variant mt-1">${escapeHtml(skill.description || '')}</p>
+          <p style="font-size:11px;color:var(--text-3);margin-top:4px;">${escapeHtml(skill.description || '')}</p>
         </div>
-        <button class="skill-modal-close p-1 rounded-lg hover:bg-slate-100 transition-colors">
-          <span class="material-symbols-outlined text-slate-400">close</span>
+        <button class="skill-modal-close" style="padding:4px;cursor:pointer;border:none;background:transparent;border-radius:6px;">
+          <span class="material-symbols-outlined" style="color:var(--text-4);">close</span>
         </button>
       </div>
-      <div class="skill-modal-body prose prose-slate max-w-none">${body}</div>
+      <div class="skill-modal-body prose">${body}</div>
     </div>`;
 
   // Close handlers
@@ -312,15 +429,15 @@ function showModal(title, bodyHtml) {
   overlay.innerHTML = `
     <div class="skill-modal">
       <div class="skill-modal-header">
-        <div class="flex items-center gap-2">
-          <span class="material-symbols-outlined text-primary">lightbulb</span>
-          <span class="font-headline font-bold text-lg text-on-surface">${escapeHtml(title)}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="material-symbols-outlined" style="color:var(--accent);font-size:20px;">lightbulb</span>
+          <span style="font-size:16px;font-weight:700;color:var(--text);">${escapeHtml(title)}</span>
         </div>
-        <button class="skill-modal-close p-1 rounded-lg hover:bg-slate-100 transition-colors">
-          <span class="material-symbols-outlined text-slate-400">close</span>
+        <button class="skill-modal-close" style="padding:4px;cursor:pointer;border:none;background:transparent;border-radius:6px;">
+          <span class="material-symbols-outlined" style="color:var(--text-4);">close</span>
         </button>
       </div>
-      <div class="skill-modal-body prose prose-slate max-w-none">${bodyHtml}</div>
+      <div class="skill-modal-body prose">${bodyHtml}</div>
     </div>`;
   const closeModal = () => { overlay.remove(); document.removeEventListener('keydown', escHandler); };
   const escHandler = (e) => { if (e.key === 'Escape') closeModal(); };
@@ -415,7 +532,7 @@ async function handleSend(text) {
   const rawMessage = text || input.value.trim();
   if (!rawMessage) return;
   input.value = '';
-  input.style.height = '56px'; // reset to single line
+  input.style.height = 'auto'; // reset to single line
 
   // Handle /skill <name> prefix: extract skill, set it, send the rest as message
   let message = rawMessage;
@@ -449,19 +566,18 @@ async function handleSend(text) {
   const userBubbleContent = escapeHtml(rawMessage);
 
   chatHistory.innerHTML += `
-    <div class="flex justify-end">
-      <div class="bg-surface-container-low px-6 py-4 rounded-3xl rounded-tr-none max-w-[85%] text-on-surface shadow-sm">
-        <p class="font-body leading-relaxed">${userBubbleContent}</p>
-      </div>
+    <div class="user-msg">
+      <div class="user-bubble">${userBubbleContent}</div>
     </div>`;
 
   // Show loading
   chatHistory.innerHTML += `
-    <div class="flex gap-4" id="loading">
-      <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
-        <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+    <div class="ai-msg" id="loading">
+      <div class="ai-avatar">A</div>
+      <div class="ai-content">
+        <div class="ai-name">EduAI</div>
+        <div class="ai-text" style="color:var(--text-4);">思考中…</div>
       </div>
-      <div class="flex-grow"><p class="font-body text-on-surface-variant animate-pulse">思考中...</p></div>
     </div>`;
   chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
@@ -476,13 +592,12 @@ async function handleSend(text) {
     let streamMode = 'chat';
 
     chatHistory.innerHTML += `
-      <div class="flex gap-4 msg-wrapper" id="${responseId}">
-        <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
-          <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
-        </div>
-        <div class="flex-grow">
+      <div class="ai-msg msg-wrapper" id="${responseId}">
+        <div class="ai-avatar">A</div>
+        <div class="ai-content">
+          <div class="ai-name">EduAI</div>
           <div class="stream-badge"></div>
-          <div class="stream-content prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">
+          <div class="stream-content ai-text prose">
             <span class="stream-cursor"></span>
           </div>
         </div>
@@ -548,16 +663,17 @@ async function handleSend(text) {
           }
         } else {
           chatHistory.innerHTML += `
-            <div class="flex gap-4">
-              <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
-                <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+            <div class="ai-msg">
+              <div class="ai-avatar">A</div>
+              <div class="ai-content">
+                <div class="ai-name">EduAI</div>
+                <div class="ai-text prose">${safeMarkdown(d.message || '')}</div>
               </div>
-              <div class="flex-grow prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${safeMarkdown(d.message || '')}</div>
             </div>`;
         }
       },
       error(d) {
-        contentEl.innerHTML = `<span class="text-error">${escapeHtml(d.message || '请求失败')}</span>`;
+        contentEl.innerHTML = `<span style="color:var(--error);">${escapeHtml(d.message || '请求失败')}</span>`;
       },
     });
 
@@ -582,7 +698,7 @@ async function handleSend(text) {
     }
   } catch (err) {
     document.getElementById('loading')?.remove();
-    chatHistory.innerHTML += `<div class="text-error text-sm p-4">请求失败: ${escapeHtml(err.message)}</div>`;
+    chatHistory.innerHTML += `<div style="color:var(--error);font-size:13px;padding:12px;">请求失败: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -597,31 +713,32 @@ function renderKnowledgeGraph(data) {
 
   // Color palette by level — all labels dark for readability
   const levelStyles = {
-    core:         { bg: '#005da7', border: '#004883', size: 28 },
-    prerequisite: { bg: '#a4c9ff', border: '#6ba3e8', size: 20 },
-    extension:    { bg: '#86efac', border: '#4ade80', size: 18 },
+    core:         { bg: '#CF6833', border: '#9E4A2A', size: 28 },
+    prerequisite: { bg: '#F5D5BF', border: '#E8B897', size: 20 },
+    extension:    { bg: '#EDE9E3', border: '#D4CFC8', size: 18 },
   };
 
+  const nodeCount = graphNodes.length;
   chatHistory.innerHTML += `
-    <div class="flex gap-4">
-      <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
-        <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
-      </div>
-      <div class="flex-grow space-y-6">
+    <div class="ai-msg">
+      <div class="ai-avatar">A</div>
+      <div class="ai-content">
+        <div class="ai-name">EduAI</div>
         ${buildSkillBadge(data.active_skill || _activeSkillInfo)}
-        <div class="prose prose-slate max-w-none">
-          <p class="font-headline text-2xl font-bold tracking-tight text-primary">${escapeHtml(graph.topic)} 知识图谱</p>
-          <p class="font-body text-on-surface-variant leading-relaxed">${escapeHtml(data.message)}</p>
-        </div>
-        <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden" style="padding: 0;">
-          <div id="${containerId}" style="height: 420px; width: 100%;"></div>
-          <div class="flex items-center justify-center gap-6 py-3 border-t border-slate-100">
-            <span class="flex items-center gap-1.5 text-xs text-on-surface-variant"><span class="w-3 h-3 rounded-full" style="background:#005da7;"></span>核心知识点</span>
-            <span class="flex items-center gap-1.5 text-xs text-on-surface-variant"><span class="w-3 h-3 rounded-full" style="background:#a4c9ff;"></span>前置知识</span>
-            <span class="flex items-center gap-1.5 text-xs text-on-surface-variant"><span class="w-3 h-3 rounded-full" style="background:#86efac;"></span>拓展知识</span>
+        <div class="ai-text" style="margin-bottom:8px;">${escapeHtml(data.message)}</div>
+        <div class="kg-card">
+          <div class="kg-header">
+            <span class="kg-title">${escapeHtml(graph.topic)} — 知识图谱</span>
+            <span class="kg-badge">${nodeCount} 个节点</span>
           </div>
-          <div class="text-center pb-4">
-            <a href="diagnosis.html?session_id=${currentSessionId}" class="inline-block bg-secondary text-white py-3 px-8 rounded-full font-headline font-bold tracking-wide shadow-md hover:bg-secondary/90 transition-all text-sm">Start Diagnosis</a>
+          <div id="${containerId}" style="height:280px;background:#FAFAF9;"></div>
+          <div class="kg-footer">
+            <div class="kg-legend">
+              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:var(--accent);"></div>核心</div>
+              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:var(--accent-border);"></div>前置</div>
+              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:var(--user-bubble);"></div>拓展</div>
+            </div>
+            <button class="kg-start-btn" onclick="startDiagnosis('${currentSessionId}')">开始诊断 →</button>
           </div>
         </div>
       </div>
@@ -651,14 +768,14 @@ function initGraph(containerId, graphNodes, graphEdges, levelStyles) {
         color: {
           background: style.bg,
           border: style.border,
-          highlight: { background: '#005da7', border: '#004883' },
-          hover: { background: '#005da7', border: '#004883' },
+          highlight: { background: '#CF6833', border: '#9E4A2A' },
+          hover: { background: '#CF6833', border: '#9E4A2A' },
         },
         font: {
-          color: '#191c1e',
+          color: '#1a1a1a',
           size: isCore ? 14 : 12,
-          face: 'Manrope, sans-serif',
-          bold: { color: '#191c1e', size: 14, face: 'Manrope, sans-serif' },
+          face: 'Inter, sans-serif',
+          bold: { color: '#1a1a1a', size: 14, face: 'Inter, sans-serif' },
         },
         borderWidth: isCore ? 3 : 2,
         shadow: { enabled: true, size: 8, color: 'rgba(0,0,0,0.1)' },
@@ -669,7 +786,7 @@ function initGraph(containerId, graphNodes, graphEdges, levelStyles) {
       from: e.source,
       to: e.target,
       arrows: { to: { enabled: true, scaleFactor: 0.6 } },
-      color: { color: '#c1c7d3', highlight: '#005da7', hover: '#005da7' },
+      color: { color: '#D4CFC8', highlight: '#CF6833', hover: '#CF6833' },
       width: 1.5,
       smooth: { type: 'continuous' },
     })));
@@ -698,6 +815,10 @@ function initAllGraphs() {
   }
 }
 
+function startDiagnosis(sid) {
+  window.location.href = 'diagnosis.html?session_id=' + sid;
+}
+
 function renderDiagnosisResults(r, sessionId) {
   const chatHistory = document.getElementById('chatHistory');
   const dashOffset = 326.73 * (1 - r.score / 100);
@@ -705,59 +826,54 @@ function renderDiagnosisResults(r, sessionId) {
 
   const breakdownHtml = r.breakdown.map(item => {
     if (item.status === 'mastered') {
-      return `<div class="flex items-center gap-3"><span class="material-symbols-outlined text-secondary text-lg" style="font-variation-settings:'FILL' 1;">check_circle</span><span class="font-body text-sm text-on-surface flex-grow">${escapeHtml(item.name)}</span><span class="font-label text-xs font-semibold text-secondary bg-secondary/10 px-2.5 py-0.5 rounded-full">${escapeHtml(item.detail)}</span></div>`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;"><span class="material-symbols-outlined" style="color:var(--success);font-size:18px;font-variation-settings:'FILL' 1;">check_circle</span><span style="font-size:13px;color:var(--text);flex:1;">${escapeHtml(item.name)}</span><span style="font-size:11px;font-weight:600;color:var(--success);background:#D1FAE5;padding:2px 8px;border-radius:99px;">${escapeHtml(item.detail)}</span></div>`;
     } else if (item.status === 'weak') {
-      return `<div class="flex items-center gap-3"><span class="material-symbols-outlined text-error text-lg" style="font-variation-settings:'FILL' 1;">cancel</span><span class="font-body text-sm text-on-surface flex-grow">${escapeHtml(item.name)}</span><span class="font-label text-xs font-semibold text-error bg-error/10 px-2.5 py-0.5 rounded-full">${escapeHtml(item.detail)}</span></div>`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;"><span class="material-symbols-outlined" style="color:var(--error);font-size:18px;font-variation-settings:'FILL' 1;">cancel</span><span style="font-size:13px;color:var(--text);flex:1;">${escapeHtml(item.name)}</span><span style="font-size:11px;font-weight:600;color:var(--error);background:#FEE2E2;padding:2px 8px;border-radius:99px;">${escapeHtml(item.detail)}</span></div>`;
     } else {
-      return `<div class="flex items-center gap-3"><span class="material-symbols-outlined text-slate-400 text-lg" style="font-variation-settings:'FILL' 1;">radio_button_unchecked</span><span class="font-body text-sm text-on-surface flex-grow">${escapeHtml(item.name)}</span><span class="font-label text-xs font-semibold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">${escapeHtml(item.detail)}</span></div>`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;"><span class="material-symbols-outlined" style="color:var(--text-4);font-size:18px;font-variation-settings:'FILL' 1;">radio_button_unchecked</span><span style="font-size:13px;color:var(--text);flex:1;">${escapeHtml(item.name)}</span><span style="font-size:11px;font-weight:600;color:var(--text-3);background:var(--bg-sidebar);padding:2px 8px;border-radius:99px;">${escapeHtml(item.detail)}</span></div>`;
     }
   }).join('');
 
   chatHistory.innerHTML += `
-    <div class="flex gap-4">
-      <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
-        <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
-      </div>
-      <div class="flex-grow space-y-6">
+    <div class="ai-msg">
+      <div class="ai-avatar">A</div>
+      <div class="ai-content">
+        <div class="ai-name">EduAI</div>
         ${buildSkillBadge(_activeSkillInfo ? {..._activeSkillInfo, current_section: 'quiz'} : null)}
-        <div class="prose prose-slate max-w-none">
-          <p class="font-headline text-2xl font-bold tracking-tight text-primary">诊断结果</p>
-        </div>
-        <div class="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
-          <div class="flex items-center gap-8 mb-8">
-            <div class="relative w-28 h-28 shrink-0">
-              <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="52" fill="none" stroke="#e6e8ea" stroke-width="8"/>
-                <circle cx="60" cy="60" r="52" fill="none" stroke="#005da7" stroke-width="8" stroke-linecap="round" stroke-dasharray="326.73" stroke-dashoffset="${dashOffset}"/>
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:12px;">诊断结果</div>
+        <div style="background:white;border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;">
+            <div style="position:relative;width:100px;height:100px;flex-shrink:0;">
+              <svg style="width:100%;height:100%;transform:rotate(-90deg);" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" stroke-width="8"/>
+                <circle cx="60" cy="60" r="52" fill="none" stroke="var(--accent)" stroke-width="8" stroke-linecap="round" stroke-dasharray="326.73" stroke-dashoffset="${dashOffset}"/>
               </svg>
-              <div class="absolute inset-0 flex flex-col items-center justify-center">
-                <span class="font-headline text-3xl font-extrabold text-primary">${r.score}%</span>
-                <span class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest">Accuracy</span>
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <span style="font-size:22px;font-weight:800;color:var(--accent);">${r.score}%</span>
+                <span style="font-size:9px;color:var(--text-4);text-transform:uppercase;letter-spacing:.05em;">准确率</span>
               </div>
             </div>
-            <div class="flex-grow space-y-3">
-              <div class="flex items-center justify-between"><span class="font-body text-sm text-on-surface-variant">Total</span><span class="font-headline font-bold text-on-surface">${r.total}</span></div>
-              <div class="flex items-center justify-between"><span class="font-body text-sm text-on-surface-variant">Correct</span><span class="font-headline font-bold text-secondary">${r.correct}</span></div>
-              <div class="flex items-center justify-between"><span class="font-body text-sm text-on-surface-variant">Incorrect</span><span class="font-headline font-bold text-error">${r.incorrect}</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--text-3);">总计</span><span style="font-size:13px;font-weight:700;color:var(--text);">${r.total}</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--text-3);">正确</span><span style="font-size:13px;font-weight:700;color:var(--success);">${r.correct}</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--text-3);">错误</span><span style="font-size:13px;font-weight:700;color:var(--error);">${r.incorrect}</span></div>
             </div>
           </div>
-          <div class="space-y-3">
-            <p class="font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest mb-4">Knowledge Breakdown</p>
-            ${breakdownHtml}
-          </div>
+          <div style="font-size:10px;font-weight:700;color:var(--text-4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">知识点详情</div>
+          ${breakdownHtml}
         </div>
-        ${weakNames ? `<div class="bg-error/5 rounded-3xl border border-error/10 p-8">
-          <div class="flex items-start gap-3">
-            <span class="material-symbols-outlined text-error text-xl mt-0.5">warning</span>
+        ${weakNames ? `<div style="background:#FFF5F5;border:1px solid #FECACA;border-radius:12px;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;align-items:flex-start;gap:8px;">
+            <span class="material-symbols-outlined" style="color:var(--error);font-size:18px;margin-top:1px;">warning</span>
             <div>
-              <p class="font-headline font-bold text-on-surface mb-1">薄弱知识点</p>
-              <p class="font-body text-sm text-on-surface-variant">需要加强 <strong>${escapeHtml(weakNames)}</strong> 的理解。</p>
+              <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">薄弱知识点</div>
+              <div style="font-size:12px;color:var(--text-3);">需要加强 <strong style="color:var(--text);">${escapeHtml(weakNames)}</strong> 的理解。</div>
             </div>
           </div>
         </div>` : ''}
-        <div class="text-center pt-2">
-          <button onclick="showLessonFormatChoice('${sessionId}')" class="inline-flex items-center gap-2 bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg hover:bg-primary-container transition-all">
-            <span class="material-symbols-outlined text-lg">school</span>Start Learning
+        <div style="text-align:center;padding-top:8px;">
+          <button onclick="showLessonFormatChoice('${sessionId}')" style="display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:white;padding:10px 24px;border-radius:99px;border:none;font-size:13px;font-weight:600;cursor:pointer;">
+            <span class="material-symbols-outlined" style="font-size:16px;">school</span>开始学习
           </button>
         </div>
       </div>
@@ -782,31 +898,32 @@ async function showLessonFormatChoice(sid) {
   } catch(e) {}
 
   function statusBadge(s) {
-    if (s === 'done') return '<span class="text-xs text-green-600 font-medium flex items-center gap-1"><span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:\'FILL\' 1;">check_circle</span>Ready</span>';
-    if (s === 'running') return '<span class="text-xs text-blue-600 font-medium flex items-center gap-1 animate-pulse"><span class="material-symbols-outlined" style="font-size:14px;">sync</span>Generating...</span>';
-    if (s === 'error') return '<span class="text-xs text-red-600 font-medium flex items-center gap-1"><span class="material-symbols-outlined" style="font-size:14px;">error</span>Failed — click to retry</span>';
-    return '<span class="text-xs text-slate-400">Click to generate</span>';
+    if (s === 'done') return '<span style="font-size:11px;color:var(--success);font-weight:600;display:flex;align-items:center;gap:3px;"><span class="material-symbols-outlined" style="font-size:13px;font-variation-settings:\'FILL\' 1;">check_circle</span>已准备好</span>';
+    if (s === 'running') return '<span style="font-size:11px;color:#2563EB;font-weight:600;display:flex;align-items:center;gap:3px;"><span class="material-symbols-outlined" style="font-size:13px;">sync</span>生成中...</span>';
+    if (s === 'error') return '<span style="font-size:11px;color:var(--error);font-weight:600;display:flex;align-items:center;gap:3px;"><span class="material-symbols-outlined" style="font-size:13px;">error</span>失败 — 点击重试</span>';
+    return '<span style="font-size:11px;color:var(--text-4);">点击生成</span>';
   }
 
   const overlay = document.createElement('div');
-  overlay.className = 'lesson-format-overlay fixed inset-0 bg-black/30 flex items-center justify-center z-[100]';
+  overlay.className = 'lesson-format-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;z-index:100;';
   overlay.innerHTML = `
-    <div class="bg-white rounded-3xl p-8 max-w-md mx-4 shadow-xl">
-      <h3 class="font-headline font-bold text-lg text-on-surface mb-2">Choose Format</h3>
-      <p class="font-body text-sm text-on-surface-variant mb-6">Select a lesson format. You can generate both!</p>
-      <div class="flex gap-4">
-        <button id="chooseMarkdown" class="flex-1 flex flex-col items-center gap-3 p-6 rounded-2xl border-2 ${lessonStatus === 'done' ? 'border-green-300 bg-green-50' : 'border-slate-200 hover:border-primary hover:bg-primary/5'} transition-all cursor-pointer">
-          <span class="material-symbols-outlined text-3xl text-primary">article</span>
-          <span class="font-headline font-bold text-sm">Markdown</span>
+    <div style="background:white;border-radius:16px;padding:28px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">选择格式</div>
+      <p style="font-size:13px;color:var(--text-3);margin-bottom:20px;">选择学习材料格式，可以同时生成两种！</p>
+      <div style="display:flex;gap:12px;">
+        <button id="chooseMarkdown" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:10px;padding:20px;border-radius:12px;border:2px solid ${lessonStatus === 'done' ? '#6EE7B7' : 'var(--border)'};background:${lessonStatus === 'done' ? '#ECFDF5' : 'white'};cursor:pointer;">
+          <span class="material-symbols-outlined" style="font-size:28px;color:var(--accent);">article</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text);">Markdown</span>
           ${statusBadge(lessonStatus)}
         </button>
-        <button id="chooseSlides" class="flex-1 flex flex-col items-center gap-3 p-6 rounded-2xl border-2 ${slidesStatus === 'done' ? 'border-green-300 bg-green-50' : 'border-slate-200 hover:border-primary hover:bg-primary/5'} transition-all cursor-pointer">
-          <span class="material-symbols-outlined text-3xl text-primary">slideshow</span>
-          <span class="font-headline font-bold text-sm">PPT Slides</span>
+        <button id="chooseSlides" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:10px;padding:20px;border-radius:12px;border:2px solid ${slidesStatus === 'done' ? '#6EE7B7' : 'var(--border)'};background:${slidesStatus === 'done' ? '#ECFDF5' : 'white'};cursor:pointer;">
+          <span class="material-symbols-outlined" style="font-size:28px;color:var(--accent);">slideshow</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text);">PPT Slides</span>
           ${statusBadge(slidesStatus)}
         </button>
       </div>
-      <button id="cancelFormatChoice" class="w-full mt-4 text-sm text-on-surface-variant hover:bg-slate-100 py-2.5 rounded-xl transition-colors">Cancel</button>
+      <button id="cancelFormatChoice" style="width:100%;margin-top:12px;font-size:13px;color:var(--text-3);padding:10px;border-radius:10px;border:none;background:transparent;cursor:pointer;">取消</button>
     </div>`;
   document.body.appendChild(overlay);
 
@@ -848,12 +965,9 @@ async function showLessonFormatChoice(sid) {
   // Rebuild conversation: topic → graph → diagnosis → lesson button
   if (state.topic) {
     // User message with skill badge if active
-    const userBadge = _activeSkillInfo ? buildSkillBadge({..._activeSkillInfo, current_section: null}) : '';
     chatHistory.innerHTML += `
-      <div class="flex justify-end">
-        <div class="bg-surface-container-low px-6 py-4 rounded-3xl rounded-tr-none max-w-[85%] text-on-surface shadow-sm">
-          <p class="font-body leading-relaxed">${userBadge ? `<span style="vertical-align:middle;margin-right:4px;">${userBadge}</span>` : ''}我想学习${escapeHtml(state.topic)}</p>
-        </div>
+      <div class="user-msg">
+        <div class="user-bubble">我想学习${escapeHtml(state.topic)}</div>
       </div>`;
 
     if (state.graph) {
@@ -887,23 +1001,20 @@ async function showLessonFormatChoice(sid) {
       const msg = state.messages[i];
       if (msg.role === 'user') {
         chatHistory.innerHTML += `
-          <div class="flex justify-end">
-            <div class="bg-surface-container-low px-6 py-4 rounded-3xl rounded-tr-none max-w-[85%] text-on-surface shadow-sm">
-              <p class="font-body leading-relaxed">${escapeHtml(msg.content)}</p>
-            </div>
+          <div class="user-msg">
+            <div class="user-bubble">${escapeHtml(msg.content)}</div>
           </div>`;
       } else if (msg.role === 'ai') {
         const badge = buildSkillBadge(_activeSkillInfo ? {..._activeSkillInfo, current_section: 'chat'} : null);
         const msgIdx = _msgStore.length;
         _msgStore.push({ text: msg.content, raw: null });
         chatHistory.innerHTML += `
-          <div class="flex gap-4 msg-wrapper">
-            <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
-            </div>
-            <div class="flex-grow">
+          <div class="ai-msg msg-wrapper">
+            <div class="ai-avatar">A</div>
+            <div class="ai-content">
+              <div class="ai-name">EduAI</div>
               ${badge}
-              <div class="prose prose-slate max-w-none font-body text-on-surface-variant leading-relaxed">${safeMarkdown(msg.content)}</div>
+              <div class="ai-text prose">${safeMarkdown(msg.content)}</div>
               <div class="msg-actions">
                 <button class="msg-action" data-copy-idx="${msgIdx}" title="Copy">
                   <span class="material-symbols-outlined" style="font-size:18px;">content_copy</span>
@@ -974,7 +1085,7 @@ document.addEventListener('click', function(e) {
         }
       },
       error(d) {
-        contentEl.innerHTML = `<span class="text-error">${escapeHtml(d.message || 'Regeneration failed')}</span>`;
+        contentEl.innerHTML = `<span style="color:var(--error);">${escapeHtml(d.message || 'Regeneration failed')}</span>`;
       },
       skill() {},
       start() {},
@@ -992,24 +1103,11 @@ document.addEventListener('click', function(e) {
   }
 });
 
-let sidebarOpen = true;
 function toggleSidebar() {
-  sidebarOpen = !sidebarOpen;
   const sidebar = document.getElementById('sidebar');
-  const main = document.getElementById('mainContent');
-  const bottom = document.getElementById('bottomBar');
   const icon = document.getElementById('collapseIcon');
-  if (sidebarOpen) {
-    sidebar.style.marginLeft = '0';
-    main.style.marginLeft = '16rem';
-    bottom.style.left = '16rem';
-    icon.textContent = 'chevron_left';
-  } else {
-    sidebar.style.marginLeft = '-15rem';
-    main.style.marginLeft = '0';
-    bottom.style.left = '0';
-    icon.textContent = 'chevron_right';
-  }
+  sidebar.classList.toggle('collapsed');
+  icon.textContent = sidebar.classList.contains('collapsed') ? 'chevron_right' : 'chevron_left';
 }
 </script>
 </body></html>
