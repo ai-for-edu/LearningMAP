@@ -5,147 +5,228 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>OpenAILearning - Diagnosis</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script>
-  tailwind.config = {
-    darkMode: "class",
-    theme: {
-      extend: {
-        colors: {
-          "secondary": "#3c692b",
-          "error": "#ba1a1a",
-          "on-surface-variant": "#414751",
-          "surface-container-low": "#f2f4f6",
-          "surface-container": "#eceef0",
-          "surface-container-high": "#e6e8ea",
-          "primary": "#005da7",
-          "surface": "#f7f9fb",
-          "on-primary": "#ffffff",
-          "on-surface": "#191c1e",
-          "outline": "#717783",
-          "primary-fixed": "#d4e3ff",
-          "primary-container": "#2976c7",
-          "surface-container-lowest": "#ffffff",
-          "on-primary-container": "#fdfcff",
-        },
-        fontFamily: {
-          "headline": ["Manrope"],
-          "body": ["Inter"],
-          "label": ["Inter"]
-        },
-      },
-    },
-  }
+tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'] } } } }
 </script>
 <style>
-  .material-symbols-outlined {
-    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-  }
-  .option-btn {
-    transition: all 0.15s ease-in-out;
-  }
-  .option-btn:hover {
-    border-color: #005da7;
-    background-color: #d4e3ff;
-  }
-  .option-btn.selected {
-    border-color: #005da7;
-    background-color: #005da7;
-    color: white;
-  }
-  .option-btn.selected .option-letter {
-    background-color: white;
-    color: #005da7;
-  }
+:root {
+  --bg: #FAF9F7; --bg-sidebar: #F0EDE8;
+  --border: #EAE6E0; --border-input: #E0DDD8;
+  --accent: #CF6833; --accent-light: #FFF3EC; --accent-border: #F5D5BF; --accent-dark: #9E4A2A;
+  --text: #1a1a1a; --text-2: #4a4a4a; --text-3: #888; --text-4: #B0A898;
+  --error: #DC2626; --success: #059669;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--text); margin: 0; }
+
+/* ── Sidebar ── */
+#sidebar {
+  width: 210px; height: 100vh; position: fixed; left: 0; top: 0;
+  background: var(--bg-sidebar); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; padding: 16px 12px; gap: 4px; z-index: 40;
+}
+.sidebar-logo { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 8px; }
+.sidebar-logo-icon {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 15px; font-weight: 800;
+}
+.sidebar-logo-text { font-size: 14px; font-weight: 800; color: var(--text); letter-spacing: -.02em; }
+.new-session-btn {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border: 1.5px dashed #D4CFC8; border-radius: 8px; background: transparent;
+  font-size: 13px; font-weight: 500; color: var(--text-3); cursor: pointer;
+  margin-bottom: 12px; width: 100%;
+}
+.new-session-btn:hover { background: white; }
+.sidebar-section-label { font-size: 10px; font-weight: 600; color: var(--text-4); letter-spacing: .06em; text-transform: uppercase; padding: 0 8px; margin: 8px 0 4px; }
+.session-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 7px; font-size: 13px; color: var(--text-3); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-item:hover { background: #E8E4DE; }
+.session-item.active { background: white; color: var(--text); font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+.session-dot { width: 6px; height: 6px; border-radius: 50%; background: #D4CFC8; flex-shrink: 0; }
+.session-dot.orange { background: var(--accent); }
+
+/* ── Top Nav ── */
+#topNav {
+  height: 50px; position: fixed; top: 0; left: 210px; right: 0; z-index: 30;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+}
+.topnav-left { display: flex; align-items: center; gap: 8px; }
+.topnav-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.topnav-actions { display: flex; align-items: center; gap: 8px; }
+.topnav-ghost-btn {
+  display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500;
+  color: var(--text-3); background: transparent; border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 99px; cursor: pointer; transition: all .15s;
+  text-decoration: none;
+}
+.topnav-ghost-btn:hover { background: white; color: var(--text-2); }
+.topnav-ghost-btn .material-symbols-outlined { font-size: 15px; }
+
+/* ── Step Nav ── */
+#stepNav {
+  height: 44px; position: fixed; top: 50px; left: 210px; right: 0; z-index: 29;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 0;
+}
+.step-item {
+  display: flex; align-items: center; gap: 6px; padding: 0 8px; height: 44px;
+  font-size: 13px; font-weight: 500; color: var(--text-4); cursor: default;
+  border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.step-item.done { color: var(--accent); }
+.step-item.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.step-num {
+  width: 20px; height: 20px; border-radius: 50%; background: #E8E4DE; color: var(--text-4);
+  display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
+}
+.step-item.done .step-num { background: var(--accent); color: white; }
+.step-item.active .step-num { background: var(--accent); color: white; }
+.step-sep { color: #D4CFC8; font-size: 14px; padding: 0 4px; }
+
+/* ── Main ── */
+#mainContent { margin-left: 210px; padding-top: 94px; min-height: 100vh; padding-bottom: 40px; }
+.content-area { max-width: 860px; margin: 0 auto; padding: 24px; }
+
+/* ── Graph canvas card ── */
+.graph-card { background: white; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.graph-card-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.graph-card-title { font-size: 14px; font-weight: 600; color: var(--text); }
+#graphContainer { min-height: 340px; background: #FAFAF9; }
+.graph-card-footer { padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); }
+.graph-legend { display: flex; gap: 14px; }
+.graph-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); }
+.graph-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+.start-diag-btn {
+  background: var(--accent); color: white; font-size: 13px; font-weight: 600;
+  padding: 8px 20px; border-radius: 99px; border: none; cursor: pointer; transition: background .15s;
+}
+.start-diag-btn:hover { background: var(--accent-dark); }
+
+/* ── Quiz progress bar ── */
+.quiz-progress-wrap { margin-bottom: 16px; }
+.quiz-progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 4px; }
+.quiz-progress-fill { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent-dark)); transition: width .3s; }
+.quiz-progress-label { font-size: 11px; color: var(--text-4); text-align: right; }
+
+/* ── Question card ── */
+.question-card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; }
+.question-label { font-size: 10px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.question-text { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.55; margin-bottom: 18px; }
+.option-btn {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 10px;
+  background: white; cursor: pointer; margin-bottom: 10px; transition: all .15s; text-align: left;
+}
+.option-btn:hover { border-color: var(--accent); background: var(--accent-light); }
+.option-btn.selected { border-color: var(--accent); background: var(--accent-light); }
+.option-letter {
+  width: 26px; height: 26px; border-radius: 50%; background: var(--bg-sidebar); color: var(--text-3);
+  display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;
+  flex-shrink: 0;
+}
+.option-btn.selected .option-letter { background: var(--accent); color: white; }
+.option-btn.correct { border-color: var(--success); background: #ECFDF5; }
+.option-btn.correct .option-letter { background: var(--success); color: white; }
+.option-btn.incorrect { border-color: var(--error); background: #FEF2F2; }
+.option-btn.incorrect .option-letter { background: var(--error); color: white; }
+.option-text { font-size: 13.5px; color: var(--text-2); line-height: 1.5; }
+.quiz-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; }
+.quiz-prev-btn {
+  font-size: 13px; font-weight: 500; color: var(--text-3);
+  background: transparent; border: 1px solid var(--border);
+  padding: 8px 18px; border-radius: 99px; cursor: pointer; transition: all .15s;
+}
+.quiz-prev-btn:hover { background: white; color: var(--text-2); }
+.quiz-next-btn {
+  font-size: 13px; font-weight: 600; color: white;
+  background: var(--accent); border: none;
+  padding: 8px 20px; border-radius: 99px; cursor: pointer; transition: background .15s;
+}
+.quiz-next-btn:hover { background: var(--accent-dark); }
+
+/* ── Status/loading ── */
+.status-card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 40px 24px; text-align: center; }
+.status-text { font-size: 14px; color: var(--text-3); }
+
+/* ── No-scrollbar ── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Legacy progress bar (hidden, kept for JS compat) ── */
+#_legacyProgress { display: none; }
 </style>
 </head>
-<body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
+<body>
 
-<!-- Top Navigation Bar -->
-<nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 flex justify-between items-center px-6 py-3">
-  <div class="flex items-center gap-4">
-    <span class="text-xl font-extrabold tracking-tighter text-blue-800">OpenAILearning</span>
-    <span class="text-slate-300">|</span>
-    <span class="font-headline font-bold text-sm text-on-surface-variant">Diagnosis Mode</span>
+<!-- Sidebar -->
+<aside id="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-icon">E</div>
+    <span class="sidebar-logo-text">EduAI</span>
   </div>
-  <div class="flex items-center gap-2">
-    <button id="navStopBtn" onclick="stopQuiz()" class="flex items-center gap-1 text-sm text-slate-500 hover:text-error transition-colors" title="Stop generating" style="display:none;">
-      <span class="material-symbols-outlined text-lg">stop_circle</span>
+  <button class="new-session-btn" onclick="window.location.href='index.html'">
+    <span class="material-symbols-outlined" style="font-size:16px;">add</span>
+    新对话
+  </button>
+  <div style="flex:1;overflow-y:auto;" id="session-list"></div>
+</aside>
+
+<!-- Top Nav -->
+<nav id="topNav">
+  <div class="topnav-left">
+    <span class="topnav-title" id="topNavTitle">知识图谱 · 诊断</span>
+  </div>
+  <div class="topnav-actions">
+    <button id="navStopBtn" onclick="stopQuiz()" class="topnav-ghost-btn" style="display:none;">
+      <span class="material-symbols-outlined" style="font-size:15px;">stop_circle</span>停止
     </button>
-    <button id="navRegenBtn" onclick="retryQuiz()" class="flex items-center gap-1 text-sm text-slate-500 hover:text-primary transition-colors" title="Regenerate" style="display:none;">
-      <span class="material-symbols-outlined text-lg">refresh</span>
+    <button id="navRegenBtn" onclick="retryQuiz()" class="topnav-ghost-btn" style="display:none;">
+      <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>重试
     </button>
-    <a id="navExitBtn" href="index.html" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors p-1 rounded-lg hover:bg-slate-100" title="Close">
-      <span class="material-symbols-outlined text-lg">close</span>
+    <a id="navExitBtn" href="index.html" class="topnav-ghost-btn">
+      <span class="material-symbols-outlined" style="font-size:15px;">close</span>
     </a>
   </div>
 </nav>
 
-<!-- Progress Bar -->
-<div class="fixed top-[53px] left-0 right-0 z-40 bg-white border-b border-slate-100 px-6 py-3">
-  <div class="max-w-6xl mx-auto flex items-center gap-4">
-    <span class="font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest" id="progressText">Question 1 / 10</span>
-    <div class="flex-grow h-1.5 bg-slate-100 rounded-full overflow-hidden">
-      <div class="h-full bg-primary rounded-full transition-all duration-300" id="progressBar" style="width: 10%"></div>
-    </div>
+<!-- Step Nav -->
+<div id="stepNav">
+  <div class="step-item done" id="step1">
+    <span class="step-num">✓</span>话题
+  </div>
+  <span class="step-sep">›</span>
+  <div class="step-item active" id="step2">
+    <span class="step-num">2</span>知识图谱
+  </div>
+  <span class="step-sep">›</span>
+  <div class="step-item" id="step3">
+    <span class="step-num">3</span>诊断
+  </div>
+  <span class="step-sep">›</span>
+  <div class="step-item" id="step4">
+    <span class="step-num">4</span>课程
   </div>
 </div>
 
-<!-- Main Split Layout -->
-<main class="pt-[110px] pb-8 px-6 min-h-screen flex">
-  <div class="max-w-6xl mx-auto w-full flex gap-8">
+<!-- Hidden legacy progress elements for JS compatibility -->
+<div id="_legacyProgress">
+  <span id="progressText"></span>
+  <div><div id="progressBar" style="width:0%"></div></div>
+</div>
 
-    <!-- Left: Question Area -->
-    <div class="flex-1 flex flex-col">
-      <div class="bg-white rounded-3xl border border-slate-100 p-10 flex-grow shadow-sm">
-        <!-- Knowledge Point Tag -->
-        <div class="mb-6">
-          <span class="inline-flex items-center gap-1.5 bg-primary-fixed text-primary px-3 py-1 rounded-full text-xs font-headline font-bold" id="knowledgeTag">
-            <span class="material-symbols-outlined text-sm">label</span>
-            <span id="knowledgeTagText">一元一次方程</span>
-          </span>
-        </div>
-        <!-- Question Text -->
-        <p class="font-headline text-xl font-bold text-on-surface leading-relaxed mb-2" id="questionText">
-          解方程：2x + 5 = 11，x 的值是多少？
-        </p>
-        <p class="font-body text-sm text-on-surface-variant" id="questionHint">Select one answer</p>
-      </div>
-    </div>
-
-    <!-- Right: Answer Area -->
-    <div class="w-[420px] flex flex-col gap-4">
-      <!-- Options -->
-      <div class="flex flex-col gap-3" id="optionsContainer">
-        <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 0)">
-          <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">A</span>
-          <span class="font-body text-sm leading-relaxed text-on-surface" id="optA">x = 2</span>
-        </button>
-        <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 1)">
-          <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">B</span>
-          <span class="font-body text-sm leading-relaxed text-on-surface" id="optB">x = 3</span>
-        </button>
-        <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 2)">
-          <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">C</span>
-          <span class="font-body text-sm leading-relaxed text-on-surface" id="optC">x = 4</span>
-        </button>
-        <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 3)">
-          <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">D</span>
-          <span class="font-body text-sm leading-relaxed text-on-surface" id="optD">x = 8</span>
-        </button>
-      </div>
-
-      <!-- Next Button -->
-      <button class="w-full bg-primary text-white py-4 px-8 rounded-2xl font-headline font-bold text-sm shadow-sm hover:shadow-md hover:bg-primary-container transition-all disabled:opacity-40 disabled:cursor-not-allowed mt-2" id="nextBtn" disabled onclick="nextQuestion()">
-        <span id="nextBtnText">Next Question</span>
-        <span class="material-symbols-outlined text-lg align-middle ml-1">arrow_forward</span>
-      </button>
-    </div>
-
+<!-- Main content -->
+<main id="mainContent">
+  <div class="content-area" id="contentArea">
+    <!-- Quiz content rendered here by JS -->
   </div>
 </main>
 
+<script src="sidebar.js?v=2"></script>
 <script src="api.js?v=7"></script>
 <script>
 let sessionId = getSessionId();
@@ -159,49 +240,57 @@ if (sessionId) {
   document.getElementById('navExitBtn').href = '/?session_id=' + sessionId;
 }
 
+function updateStepNav(activeStep) {
+  ['step1','step2','step3','step4'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const num = el.querySelector('.step-num');
+    if (i + 1 < activeStep) {
+      el.className = 'step-item done';
+      num.textContent = '✓';
+    } else if (i + 1 === activeStep) {
+      el.className = 'step-item active';
+      num.textContent = String(activeStep);
+    } else {
+      el.className = 'step-item';
+      num.textContent = String(i + 1);
+    }
+  });
+}
+
 function buildQuizUI() {
+  updateStepNav(3);
   document.querySelector('main').innerHTML = `
-    <div class="max-w-6xl mx-auto w-full flex gap-8">
-      <div class="flex-1 flex flex-col">
-        <div class="bg-white rounded-3xl border border-slate-100 p-10 flex-grow shadow-sm">
-          <div class="mb-6 flex items-center gap-3">
-            <span class="inline-flex items-center gap-1.5 bg-primary-fixed text-primary px-3 py-1 rounded-full text-xs font-headline font-bold">
-              <span class="material-symbols-outlined text-sm">label</span>
-              <span id="knowledgeTagText"></span>
-            </span>
-            <span class="text-xs text-slate-400" id="loadingHint"></span>
-          </div>
-          <p class="font-headline text-xl font-bold text-on-surface leading-relaxed mb-2" id="questionText"></p>
-          <p class="font-body text-sm text-on-surface-variant">Select one answer</p>
-        </div>
+    <div class="content-area">
+      <div class="quiz-progress-wrap">
+        <div class="quiz-progress-bar"><div class="quiz-progress-fill" id="quizProgressFill" style="width:10%"></div></div>
+        <div class="quiz-progress-label" id="quizProgressLabel">题目 1 / ?</div>
       </div>
-      <div class="w-[420px] flex flex-col gap-4">
-        <div class="flex flex-col gap-3" id="optionsContainer">
-          <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 0)">
-            <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">A</span>
-            <span class="font-body text-sm leading-relaxed text-on-surface" id="optA"></span>
+      <div class="question-card">
+        <div class="question-label" id="knowledgeTagText"></div>
+        <div class="question-text" id="questionText"></div>
+        <div id="optionsContainer">
+          <button class="option-btn" onclick="selectOption(this, 0)">
+            <span class="option-letter">A</span>
+            <span class="option-text" id="optA"></span>
           </button>
-          <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 1)">
-            <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">B</span>
-            <span class="font-body text-sm leading-relaxed text-on-surface" id="optB"></span>
+          <button class="option-btn" onclick="selectOption(this, 1)">
+            <span class="option-letter">B</span>
+            <span class="option-text" id="optB"></span>
           </button>
-          <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 2)">
-            <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">C</span>
-            <span class="font-body text-sm leading-relaxed text-on-surface" id="optC"></span>
+          <button class="option-btn" onclick="selectOption(this, 2)">
+            <span class="option-letter">C</span>
+            <span class="option-text" id="optC"></span>
           </button>
-          <button class="option-btn w-full flex items-start gap-4 bg-white border-2 border-slate-200 rounded-2xl p-5 text-left" onclick="selectOption(this, 3)">
-            <span class="option-letter w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-headline font-bold text-sm text-slate-500 shrink-0">D</span>
-            <span class="font-body text-sm leading-relaxed text-on-surface" id="optD"></span>
+          <button class="option-btn" onclick="selectOption(this, 3)">
+            <span class="option-letter">D</span>
+            <span class="option-text" id="optD"></span>
           </button>
         </div>
-        <div class="flex gap-3 mt-2">
-          <button class="flex-1 bg-surface-container-high text-on-surface-variant py-4 px-6 rounded-2xl font-headline font-bold text-sm hover:bg-surface-container-highest transition-all disabled:opacity-30 disabled:cursor-not-allowed" id="prevBtn" disabled onclick="prevQuestion()">
-            <span class="material-symbols-outlined text-lg align-middle mr-1">arrow_back</span>
-            <span>Previous</span>
-          </button>
-          <button class="flex-1 bg-primary text-white py-4 px-6 rounded-2xl font-headline font-bold text-sm shadow-sm hover:shadow-md hover:bg-primary-container transition-all disabled:opacity-40 disabled:cursor-not-allowed" id="nextBtn" disabled onclick="nextQuestion()">
-            <span id="nextBtnText">Next Question</span>
-            <span class="material-symbols-outlined text-lg align-middle ml-1">arrow_forward</span>
+        <div class="quiz-nav">
+          <button class="quiz-prev-btn" id="prevBtn" disabled onclick="prevQuestion()">← 上一题</button>
+          <button class="quiz-next-btn" id="nextBtn" disabled onclick="nextQuestion()">
+            <span id="nextBtnText">下一题</span>
           </button>
         </div>
       </div>
@@ -217,6 +306,8 @@ async function initDiagnosis() {
     window.location.href = '/';
     return;
   }
+
+  updateStepNav(3);
 
   // Check if questions already exist (returning to page)
   try {
@@ -237,16 +328,16 @@ async function initDiagnosis() {
 
   // Show loading
   document.querySelector('main').innerHTML = `
-    <div class="max-w-6xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh]">
-      <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-      </svg>
-      <p class="font-headline font-bold text-lg text-on-surface">Generating Questions</p>
-      <p class="font-body text-sm text-on-surface-variant mt-2">AI is generating questions from the knowledge graph...</p>
+    <div class="content-area">
+      <div class="status-card">
+        <svg class="animate-spin" style="width:40px;height:40px;color:var(--accent);margin:0 auto 16px;display:block;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <p style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">正在生成题目</p>
+        <p class="status-text">AI 正在根据知识图谱生成诊断题目…</p>
+      </div>
     </div>`;
-  document.getElementById('progressText').textContent = 'Generating...';
-  document.getElementById('progressBar').style.width = '0%';
   document.getElementById('navStopBtn').style.display = '';
 
   _forceRegen = false;
@@ -313,10 +404,12 @@ function startPolling() {
       if (hint) hint.textContent = '';
       if (status.status === 'error') {
         document.querySelector('main').innerHTML = `
-          <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
-            <span class="material-symbols-outlined text-4xl text-error mb-4">error</span>
-            <p class="font-headline font-bold text-on-surface mb-2">Generation Failed</p>
-            <button onclick="retryQuiz()" class="text-primary font-headline font-bold text-sm hover:underline">Retry</button>
+          <div class="content-area">
+            <div class="status-card">
+              <span class="material-symbols-outlined" style="font-size:36px;color:var(--error);margin-bottom:12px;display:block;">error</span>
+              <p style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:12px;">生成失败</p>
+              <button onclick="retryQuiz()" style="font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline;">重试</button>
+            </div>
           </div>`;
       }
     },
@@ -367,8 +460,19 @@ function showQuestion() {
 
   const q = allQuestions[currentIndex];
   const totalLabel = quizFullyLoaded ? allQuestions.length : allQuestions.length + '+';
-  document.getElementById('progressText').textContent = `Question ${currentIndex + 1} / ${totalLabel}`;
-  document.getElementById('progressBar').style.width = `${((currentIndex + 1) / allQuestions.length) * 100}%`;
+
+  // Update new-style progress
+  const fill = document.getElementById('quizProgressFill');
+  const label = document.getElementById('quizProgressLabel');
+  if (fill) fill.style.width = `${((currentIndex + 1) / allQuestions.length) * 100}%`;
+  if (label) label.textContent = `题目 ${currentIndex + 1} / ${totalLabel}`;
+
+  // Legacy compat (elements are hidden but JS still writes to them)
+  const pt = document.getElementById('progressText');
+  const pb = document.getElementById('progressBar');
+  if (pt) pt.textContent = `Question ${currentIndex + 1} / ${totalLabel}`;
+  if (pb) pb.style.width = `${((currentIndex + 1) / allQuestions.length) * 100}%`;
+
   document.getElementById('knowledgeTagText').textContent = q.knowledge_point;
   document.getElementById('questionText').textContent = q.question;
   document.getElementById('optA').textContent = q.options[0];
@@ -376,7 +480,7 @@ function showQuestion() {
   document.getElementById('optC').textContent = q.options[2];
   document.getElementById('optD').textContent = q.options[3];
   const isLast = quizFullyLoaded && currentIndex >= allQuestions.length - 1;
-  document.getElementById('nextBtnText').textContent = isLast ? 'Finish' : 'Next Question';
+  document.getElementById('nextBtnText').textContent = isLast ? '完成' : '下一题';
 
   // Previous button
   const prevBtn = document.getElementById('prevBtn');
@@ -437,22 +541,29 @@ async function nextQuestion() {
     });
     if (!resp.ok) throw new Error(`API error: ${resp.status}`);
 
+    updateStepNav(4);
     document.querySelector('main').innerHTML = `
-      <div class="max-w-2xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <span class="material-symbols-outlined text-6xl text-secondary mb-6" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-        <p class="font-headline text-3xl font-extrabold text-on-surface mb-3">Diagnosis Complete</p>
-        <p class="font-body text-on-surface-variant mb-8">所有题目已作答完毕，点击下方查看诊断结果。</p>
-        <a href="/?session_id=${sessionId}&show=results" class="inline-block bg-primary text-white py-4 px-10 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">View Results</a>
+      <div class="content-area">
+        <div class="status-card">
+          <span class="material-symbols-outlined" style="font-size:48px;color:var(--success);margin-bottom:12px;display:block;font-variation-settings:'FILL' 1;">check_circle</span>
+          <p style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px;">诊断完成</p>
+          <p class="status-text" style="margin-bottom:24px;">所有题目已作答完毕，点击下方查看诊断结果。</p>
+          <a href="/?session_id=${sessionId}&show=results" style="display:inline-block;background:var(--accent);color:white;padding:10px 28px;border-radius:99px;font-size:13px;font-weight:600;text-decoration:none;">查看结果</a>
+        </div>
       </div>`;
-    document.getElementById('progressBar').style.width = '100%';
-    document.getElementById('progressText').textContent = 'Completed';
+    // Legacy compat
+    const pb = document.getElementById('progressBar');
+    const pt = document.getElementById('progressText');
+    if (pb) pb.style.width = '100%';
+    if (pt) pt.textContent = 'Completed';
   } catch (err) {
-    document.getElementById('nextBtnText').textContent = 'Finish';
+    document.getElementById('nextBtnText').textContent = '完成';
     document.getElementById('nextBtn').disabled = false;
     alert('Submit failed: ' + err.message);
   }
 }
 
+updateStepNav(3);
 initDiagnosis();
 </script>
 
