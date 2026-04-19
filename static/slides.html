@@ -320,7 +320,7 @@ function startSlidePolling() {
             if (allSlides[currentSlideIndex]) showSlide(currentSlideIndex);
             // Re-highlight
             document.querySelectorAll('.thumb').forEach(function(t, i) {
-              t.style.borderColor = i === currentSlideIndex ? '#005da7' : '#e6e8ea';
+              t.style.borderColor = i === currentSlideIndex ? 'var(--accent)' : 'var(--border)';
               t.style.opacity = i === currentSlideIndex ? '1' : '0.6';
             });
           }
@@ -365,8 +365,8 @@ function updateLoadingProgress(current, total) {
   if (!existing) {
     var bar = document.createElement('div');
     bar.id = 'slideProgress';
-    bar.style.cssText = 'position:fixed;top:53px;left:0;right:0;z-index:100;padding:4px 24px;background:white;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;font-size:12px;color:#64748b;';
-    bar.innerHTML = '<span>Generating...</span><div style="flex:1;height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden"><div id="slideProgressBar" style="height:100%;background:#005da7;border-radius:4px;transition:width 0.3s"></div></div><span id="slideProgressText"></span>';
+    bar.style.cssText = 'position:fixed;top:53px;left:0;right:0;z-index:100;padding:4px 24px;background:white;border-bottom:1px solid var(--text-4);display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-3);';
+    bar.innerHTML = '<span>Generating...</span><div style="flex:1;height:4px;background:var(--text-4);border-radius:4px;overflow:hidden"><div id="slideProgressBar" style="height:100%;background:var(--accent);border-radius:4px;transition:width 0.3s"></div></div><span id="slideProgressText"></span>';
     document.body.appendChild(bar);
   }
   var pct = total > 0 ? Math.round((current / total) * 100) : 0;
@@ -382,7 +382,7 @@ function updateThumbnail(index) {
   // Re-highlight current
   var thumbs = document.querySelectorAll('.thumb');
   thumbs.forEach(function(t, i) {
-    t.style.borderColor = i === currentSlideIndex ? '#005da7' : '#e6e8ea';
+    t.style.borderColor = i === currentSlideIndex ? 'var(--accent)' : 'var(--border)';
     t.style.opacity = i === currentSlideIndex ? '1' : '0.6';
   });
 }
@@ -423,8 +423,8 @@ function showSlide(index) {
     canvas.innerHTML = '';
     canvas.style.background = '#f8fafc';
     canvas.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">' +
-      '<svg class="animate-spin" style="width:40px;height:40px;color:#005da7;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>' +
-      '<span style="font-size:14px;color:#64748b;">Slide ' + (index + 1) + ' generating...</span></div>';
+      '<svg class="animate-spin" style="width:40px;height:40px;color:var(--accent);" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>' +
+      '<span style="font-size:14px;color:var(--text-3);">Slide ' + (index + 1) + ' generating...</span></div>';
   } else {
     renderSlide(canvas, slide);
   }
@@ -437,7 +437,7 @@ function showSlide(index) {
 
   // Update thumbnail highlight
   document.querySelectorAll('.thumb').forEach(function(t, i) {
-    t.style.borderColor = i === index ? '#005da7' : '#e6e8ea';
+    t.style.borderColor = i === index ? 'var(--accent)' : 'var(--border)';
     t.style.opacity = i === index ? '1' : '0.6';
   });
 }
@@ -455,7 +455,7 @@ function buildThumbnails() {
     thumb.className = 'thumb flex-shrink-0 rounded-lg border-2 overflow-hidden bg-white';
     thumb.style.width = '120px';
     thumb.style.height = '67.5px';
-    thumb.style.borderColor = '#e6e8ea';
+    thumb.style.borderColor = 'var(--border)';
     thumb.style.opacity = '0.6';
     thumb.style.position = 'relative';
     thumb.onclick = function() { showSlide(i); };
@@ -510,7 +510,7 @@ function buildThumbnails() {
 
     // Page number overlay
     var num = document.createElement('span');
-    num.className = 'absolute bottom-0 right-0 bg-black/50 text-white text-[8px] px-1 rounded-tl';
+    num.style.cssText = 'position:absolute;bottom:0;right:0;background:rgba(0,0,0,0.5);color:white;font-size:8px;padding:2px 4px;border-radius:4px 0 0 0;';
     num.textContent = i + 1;
     thumb.appendChild(num);
 
@@ -522,7 +522,7 @@ function buildThumbnails() {
 function renderSlide(container, slideData) {
   container.innerHTML = '';
   if (!slideData) {
-    container.innerHTML = '<div class="flex items-center justify-center h-full text-on-surface-variant">此页生成失败</div>';
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-3);">此页生成失败</div>';
     return;
   }
 
