@@ -495,7 +495,7 @@ function buildKnowledgeSkillBadge(knowledgeSkills) {
   const idx = _ksBadgeStore.length;
   _ksBadgeStore.push(knowledgeSkills);
   return `
-    <div class="ks-badge" data-ks-idx="${idx}" style="margin-bottom:8px;display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:9999px;font-size:12px;background:var(--md-sys-color-tertiary-container,#d4e8d4);color:var(--md-sys-color-on-tertiary-container,#1a3c1a);cursor:pointer;">
+    <div class="ks-badge" data-ks-idx="${idx}" style="margin-bottom:8px;display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:9999px;font-size:12px;background:#F0FDF4;color:#15803D;cursor:pointer;">
       <span class="material-symbols-outlined" style="font-size:14px;">lightbulb</span>
       ${count}个知识点技能
     </div>`;
@@ -514,7 +514,7 @@ document.addEventListener('click', function(e) {
     const entries = Object.entries(ks).map(([name, skill]) =>
       `<div style="margin-bottom:12px;">
         <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(name)}</div>
-        <div style="font-size:13px;white-space:pre-wrap;color:var(--md-sys-color-on-surface-variant,#666);">${escapeHtml(skill)}</div>
+        <div style="font-size:13px;white-space:pre-wrap;color:var(--text-3);">${escapeHtml(skill)}</div>
       </div>`
     ).join('');
     showModal('知识点教学技能', entries);
