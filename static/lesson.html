@@ -107,9 +107,15 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 }
 .toc-header { font-size: 10px; font-weight: 600; color: var(--text-4); text-transform: uppercase; letter-spacing: .06em; padding: 0 16px; margin-bottom: 8px; }
 .toc-item {
-  padding: 7px 16px; font-size: 13px; color: var(--text-3); cursor: pointer;
+  padding: 6px 16px; font-size: 13px; font-weight: 500; color: var(--text-2); cursor: pointer;
   transition: all .1s; border-left: 3px solid transparent;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.toc-item.h3 {
+  padding: 4px 16px 4px 26px; font-size: 12px; font-weight: 400; color: var(--text-3);
+}
+.toc-item.h4 {
+  padding: 3px 16px 3px 36px; font-size: 11px; font-weight: 400; color: var(--text-4);
 }
 .toc-item:hover { color: var(--text-2); background: #F0EDE8; }
 .toc-item.active { color: var(--accent); background: var(--accent-light); border-left-color: var(--accent); font-weight: 500; }
@@ -570,13 +576,13 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 
   // Build TOC from rendered headings
   const sectionEl = document.getElementById('section-1');
-  const headings = sectionEl.querySelectorAll('h2, h3');
+  const headings = sectionEl.querySelectorAll('h2, h3, h4');
   let tocHtml = '';
   headings.forEach((h, i) => {
     const id = 'heading-' + i;
     h.id = id;
-    const isH3 = h.tagName === 'H3';
-    tocHtml += '<div class="toc-item' + (isH3 ? ' sub' : '') + '" data-section="' + id + '" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' +
+    const levelClass = h.tagName === 'H4' ? ' h4' : h.tagName === 'H3' ? ' h3' : '';
+    tocHtml += '<div class="toc-item' + levelClass + '" data-section="' + id + '" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' +
       escapeHtml(h.textContent) + '</div>';
   });
   if (!tocHtml) {
