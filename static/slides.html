@@ -9,116 +9,221 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script>
-tailwind.config = {
-  theme: {
-    extend: {
-      colors: {
-        "primary": "#005da7",
-        "on-primary": "#ffffff",
-        "surface": "#f7f9fb",
-        "on-surface": "#191c1e",
-        "on-surface-variant": "#414751",
-        "surface-container": "#eceef0",
-        "secondary": "#3c692b",
-        "error": "#ba1a1a",
-      },
-      fontFamily: {
-        "headline": ["Manrope"],
-        "body": ["Inter"],
-      },
-    },
-  },
-}
+tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'] } } } }
 </script>
 <style>
+:root {
+  --bg: #FAF9F7; --bg-sidebar: #F0EDE8;
+  --border: #EAE6E0;
+  --accent: #CF6833; --accent-light: #FFF3EC; --accent-border: #F5D5BF; --accent-dark: #9E4A2A;
+  --text: #1a1a1a; --text-2: #4a4a4a; --text-3: #888; --text-4: #B0A898;
+  --error: #DC2626;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--text); margin: 0; }
+
+/* ── Sidebar ── */
+#sidebar {
+  width: 210px; height: 100vh; position: fixed; left: 0; top: 0;
+  background: var(--bg-sidebar); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; padding: 16px 12px; gap: 4px; z-index: 40;
+}
+.sidebar-logo { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 8px; }
+.sidebar-logo-icon {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 15px; font-weight: 800;
+}
+.sidebar-logo-text { font-size: 14px; font-weight: 800; color: var(--text); letter-spacing: -.02em; }
+.new-session-btn {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border: 1.5px dashed #D4CFC8; border-radius: 8px; background: transparent;
+  font-size: 13px; font-weight: 500; color: var(--text-3); cursor: pointer;
+  margin-bottom: 12px; width: 100%;
+}
+.new-session-btn:hover { background: white; }
+.session-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 7px; font-size: 13px; color: var(--text-3); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-item:hover { background: #E8E4DE; }
+.session-item.active { background: white; color: var(--text); font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+
+/* ── Top Nav ── */
+#topNav {
+  height: 50px; position: fixed; top: 0; left: 210px; right: 0; z-index: 30;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+}
+.topnav-left { display: flex; align-items: center; gap: 8px; }
+.topnav-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.topnav-actions { display: flex; align-items: center; gap: 8px; }
+.topnav-ghost-btn {
+  display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500;
+  color: var(--text-3); background: transparent; border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 99px; cursor: pointer; text-decoration: none;
+}
+.topnav-ghost-btn:hover { background: white; color: var(--text-2); }
+.topnav-ghost-btn .material-symbols-outlined { font-size: 15px; }
+
+/* ── Step Nav ── */
+#stepNav {
+  height: 44px; position: fixed; top: 50px; left: 210px; right: 0; z-index: 29;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 0;
+}
+.step-item {
+  display: flex; align-items: center; gap: 6px; padding: 0 8px; height: 44px;
+  font-size: 13px; font-weight: 500; color: var(--text-4); cursor: default;
+  border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.step-item.done { color: var(--accent); }
+.step-item.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.step-num {
+  width: 20px; height: 20px; border-radius: 50%; background: #E8E4DE; color: var(--text-4);
+  display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
+}
+.step-item.done .step-num { background: var(--accent); color: white; }
+.step-item.active .step-num { background: var(--accent); color: white; }
+.step-sep { color: #D4CFC8; font-size: 14px; padding: 0 4px; }
+
+/* ── Slides area ── */
+#mainContent {
+  margin-left: 210px; margin-top: 94px; min-height: calc(100vh - 94px);
+  display: flex; flex-direction: column; align-items: center; padding-bottom: 40px;
+}
+.slides-shell { width: 100%; max-width: 1060px; padding: 24px; }
+.slide-wrapper { display: flex; justify-content: center; margin-bottom: 16px; }
 .slide-canvas {
-  width: 1000px;
-  height: 562.5px;
-  position: relative;
-  overflow: hidden;
-  border-radius: 8px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  width: 1000px; height: 562.5px; position: relative; overflow: hidden;
+  border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,.12);
+  background: white;
 }
-.slide-canvas * {
-  box-sizing: border-box;
+.slide-canvas * { box-sizing: border-box; }
+.slide-nav-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.slide-nav-btn {
+  font-size: 13px; font-weight: 500; color: var(--text-3);
+  background: transparent; border: 1px solid var(--border);
+  padding: 7px 18px; border-radius: 99px; cursor: pointer; transition: all .15s;
 }
+.slide-nav-btn:hover { background: white; color: var(--text-2); }
+.slide-dot-row { display: flex; gap: 6px; align-items: center; }
+.slide-dot { width: 6px; height: 6px; border-radius: 50%; background: #D4CFC8; cursor: pointer; transition: background .15s; }
+.slide-dot.active { background: var(--accent); width: 8px; height: 8px; }
+.slide-counter { font-size: 12px; color: var(--text-4); }
+
+/* Status messages */
+.slides-status { text-align: center; padding: 60px 20px; }
+.slides-status-text { font-size: 14px; color: var(--text-3); }
+
+/* Slide viewer inner layout */
+.slide-viewer-inner { display: flex; flex-direction: column; align-items: center; }
+.hidden { display: none !important; }
 </style>
 </head>
-<body class="bg-surface font-body text-on-surface">
+<body>
+
+<!-- Sidebar -->
+<aside id="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-icon">E</div>
+    <span class="sidebar-logo-text">EduAI</span>
+  </div>
+  <button class="new-session-btn" onclick="window.location.href='index.html'">
+    <span class="material-symbols-outlined" style="font-size:16px;">add</span>
+    新对话
+  </button>
+  <div style="flex:1;overflow-y:auto;" id="session-list"></div>
+</aside>
 
 <!-- Top Nav -->
-<nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 flex justify-between items-center px-6 py-3">
-  <div class="flex items-center gap-4">
-    <span class="text-xl font-extrabold tracking-tighter text-blue-800">OpenAILearning</span>
-    <span class="text-slate-300">|</span>
-    <span class="font-headline font-bold text-sm text-on-surface-variant">Slide Mode</span>
+<nav id="topNav">
+  <div class="topnav-left">
+    <span class="topnav-title" id="topNavTitle">课程 PPT</span>
   </div>
-  <div class="flex items-center gap-2">
-    <button id="navStopBtn" onclick="cancelSlides()" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors" title="Stop generating" style="display:none;">
-      <span class="material-symbols-outlined text-lg">stop_circle</span>
+  <div class="topnav-actions">
+    <button id="navStopBtn" onclick="cancelSlides()" class="topnav-ghost-btn" style="display:none;">
+      <span class="material-symbols-outlined" style="font-size:15px;">stop_circle</span>停止
     </button>
-    <button id="navRegenBtn" onclick="regenSlides()" class="flex items-center text-sm text-slate-500 hover:text-primary transition-colors" title="Regenerate" style="display:none;">
-      <span class="material-symbols-outlined text-lg">refresh</span>
+    <button id="navRegenBtn" onclick="regenSlides()" class="topnav-ghost-btn" style="display:none;">
+      <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>重试
     </button>
-    <a id="backLink" href="/" class="flex items-center text-sm text-slate-500 hover:text-error transition-colors p-1 rounded-lg hover:bg-slate-100" title="Close">
-      <span class="material-symbols-outlined text-lg">close</span>
+    <button id="navExportBtn" onclick="exportPptx()" class="topnav-ghost-btn" style="display:none;">
+      <span class="material-symbols-outlined" style="font-size:15px;">download</span>导出 PPTX
+    </button>
+    <a id="backLink" href="/" class="topnav-ghost-btn">
+      <span class="material-symbols-outlined" style="font-size:15px;">close</span>
     </a>
   </div>
 </nav>
 
-<!-- Main Content -->
-<main class="pt-[70px] min-h-screen flex flex-col items-center justify-center px-6 pb-24">
-  <!-- Loading -->
-  <div id="loadingView" class="flex flex-col items-center justify-center py-20">
-    <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-    </svg>
-    <p class="font-headline font-bold text-lg text-on-surface">正在生成幻灯片</p>
-    <p class="font-body text-sm text-on-surface-variant mt-2">AI 正在制作 PPT 教案，请稍候...</p>
+<!-- Step Nav -->
+<div id="stepNav">
+  <div class="step-item done"><span class="step-num">✓</span>话题</div>
+  <span class="step-sep">›</span>
+  <div class="step-item done"><span class="step-num">✓</span>知识图谱</div>
+  <span class="step-sep">›</span>
+  <div class="step-item done"><span class="step-num">✓</span>诊断</div>
+  <span class="step-sep">›</span>
+  <div class="step-item active"><span class="step-num">4</span>课程</div>
+</div>
+
+<!-- Main content -->
+<div id="mainContent">
+  <div class="slides-shell">
+    <!-- Loading -->
+    <div id="loadingView" class="slides-status">
+      <svg class="animate-spin" style="width:48px;height:48px;color:var(--accent);margin:0 auto 16px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      <div class="slides-status-text">正在生成幻灯片</div>
+      <div class="slides-status-text" style="margin-top:6px;font-size:12px;color:var(--text-4);">AI 正在制作 PPT 教案，请稍候...</div>
+    </div>
+
+    <!-- Slide Viewer (hidden until loaded) -->
+    <div id="slideViewer" class="hidden slide-viewer-inner">
+      <!-- Slide title -->
+      <p id="slideTitle" style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:12px;text-align:center;"></p>
+
+      <!-- Canvas wrapper for scaling -->
+      <div class="slide-wrapper">
+        <div id="canvasWrapper" style="position:relative;">
+          <div id="slideCanvas" class="slide-canvas"></div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="slide-nav-row" style="margin-top:16px;">
+        <button id="prevBtn" onclick="goSlide(-1)" class="slide-nav-btn" disabled>
+          ← 上一页
+        </button>
+        <span id="pageIndicator" class="slide-counter">1 / 1</span>
+        <button id="nextBtn" onclick="goSlide(1)" class="slide-nav-btn">
+          下一页 →
+        </button>
+      </div>
+
+      <!-- Thumbnail strip -->
+      <div id="thumbnailStrip" style="display:flex;gap:12px;margin-top:20px;overflow-x:auto;padding-bottom:8px;max-width:90vw;"></div>
+
+      <!-- Action buttons -->
+      <div style="margin-top:24px;display:flex;gap:12px;">
+        <button onclick="exportPptx()" class="topnav-ghost-btn" style="padding:8px 20px;font-size:13px;">
+          <span class="material-symbols-outlined" style="font-size:16px;">download</span>
+          导出 PPTX
+        </button>
+        <a id="finishBtn" href="/" class="topnav-ghost-btn" style="padding:8px 20px;font-size:13px;">
+          <span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1;">check_circle</span>
+          完成学习
+        </a>
+      </div>
+    </div>
   </div>
+</div>
 
-  <!-- Slide Viewer (hidden until loaded) -->
-  <div id="slideViewer" class="hidden w-full flex flex-col items-center">
-    <!-- Slide title -->
-    <p id="slideTitle" class="font-headline font-bold text-lg text-on-surface mb-4"></p>
-
-    <!-- Canvas wrapper for scaling -->
-    <div id="canvasWrapper" class="relative">
-      <div id="slideCanvas" class="slide-canvas bg-white"></div>
-    </div>
-
-    <!-- Controls -->
-    <div class="flex items-center gap-6 mt-6">
-      <button id="prevBtn" onclick="goSlide(-1)" class="flex items-center gap-1 px-5 py-2.5 rounded-xl bg-surface-container text-on-surface-variant font-headline font-bold text-sm hover:bg-slate-200 transition-all disabled:opacity-30" disabled>
-        <span class="material-symbols-outlined text-lg">arrow_back</span> Previous
-      </button>
-      <span id="pageIndicator" class="font-headline font-bold text-sm text-on-surface-variant">1 / 1</span>
-      <button id="nextBtn" onclick="goSlide(1)" class="flex items-center gap-1 px-5 py-2.5 rounded-xl bg-primary text-white font-headline font-bold text-sm hover:bg-primary/90 transition-all disabled:opacity-30">
-        Next <span class="material-symbols-outlined text-lg">arrow_forward</span>
-      </button>
-    </div>
-
-    <!-- Thumbnail strip -->
-    <div id="thumbnailStrip" class="flex gap-3 mt-6 overflow-x-auto pb-2 max-w-[90vw]"></div>
-
-    <!-- Action buttons -->
-    <div class="mt-8 flex gap-4">
-      <button onclick="exportPptx()" class="inline-flex items-center gap-2 bg-primary text-white py-3 px-8 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">
-        <span class="material-symbols-outlined text-lg">download</span>
-        Export PPTX
-      </button>
-      <a id="finishBtn" href="/" class="inline-flex items-center gap-2 bg-secondary text-white py-3 px-8 rounded-2xl font-headline font-bold text-sm shadow-md hover:shadow-lg transition-all">
-        <span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-        Finish Learning
-      </a>
-    </div>
-  </div>
-</main>
-
+<script src="sidebar.js?v=2"></script>
 <script src="api.js?v=7"></script>
 <script>
 var sessionId = getSessionId();
@@ -138,12 +243,15 @@ var _slidePoller = null;
 function updateSlideNavButtons() {
   var stop = document.getElementById('navStopBtn');
   var regen = document.getElementById('navRegenBtn');
+  var exportBtn = document.getElementById('navExportBtn');
   if (slidesFullyLoaded) {
     if (stop) stop.style.display = 'none';
     if (regen) regen.style.display = '';
+    if (exportBtn) exportBtn.style.display = '';
   } else {
     if (stop) stop.style.display = '';
     if (regen) regen.style.display = 'none';
+    if (exportBtn) exportBtn.style.display = 'none';
   }
 }
 
@@ -177,13 +285,13 @@ async function init() {
 
   // Nothing yet — trigger background generation
   document.getElementById('loadingView').innerHTML = `
-    <div class="flex flex-col items-center justify-center">
-      <svg class="animate-spin h-12 w-12 text-primary mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <div class="slides-status">
+      <svg class="animate-spin" style="width:48px;height:48px;color:var(--accent);margin:0 auto 16px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
       </svg>
-      <p class="font-headline font-bold text-lg text-on-surface">Generating Slides</p>
-      <p class="font-body text-sm text-on-surface-variant mt-2">Creating outlines and slides...</p>
+      <div class="slides-status-text">正在生成幻灯片</div>
+      <div class="slides-status-text" style="margin-top:6px;font-size:12px;color:var(--text-4);">正在创建大纲和幻灯片...</div>
     </div>`;
 
   try { await startGeneration(sessionId, 'slides'); } catch(e) {}
