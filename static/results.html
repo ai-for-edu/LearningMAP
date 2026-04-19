@@ -105,10 +105,12 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 }
 .breakdown-icon.correct { background: #ECFDF5; color: var(--success); }
 .breakdown-icon.incorrect { background: #FEF2F2; color: var(--error); }
+.breakdown-icon.skipped { background: #F0EDE8; color: var(--text-4); }
 .breakdown-name { flex: 1; font-size: 13px; color: var(--text-2); }
 .breakdown-tag { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
 .breakdown-tag.mastered { background: #ECFDF5; color: var(--success); }
 .breakdown-tag.weak { background: #FEF2F2; color: var(--error); }
+.breakdown-tag.skipped { background: #F0EDE8; color: var(--text-4); }
 
 /* ── Weak-point callout ── */
 .weak-callout { background: var(--accent-light); border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; padding: 14px 18px; margin-bottom: 20px; }
@@ -175,12 +177,8 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 </div>
 
 <script src="api.js?v=3"></script>
-<script src="sidebar.js"></script>
+<script src="sidebar.js?v=2"></script>
 <script>
-function escapeHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
 function startLesson() {
   const sessionId = getSessionId();
   if (sessionId) window.location.href = 'lesson.html?session_id=' + sessionId;
@@ -226,17 +224,17 @@ function startLesson() {
   // Knowledge breakdown card
   html += `<div class="breakdown-card">
   <div class="breakdown-title">知识点掌握情况</div>
-  ${r.breakdown.map(item => `
-    <div class="breakdown-item">
-      <div class="breakdown-icon ${item.status === 'mastered' ? 'correct' : 'incorrect'}">
-        ${item.status === 'mastered' ? '✓' : '✗'}
-      </div>
+  ${r.breakdown.map(item => {
+    const iconClass = item.status === 'mastered' ? 'correct' : item.status === 'weak' ? 'incorrect' : 'skipped';
+    const iconGlyph = item.status === 'mastered' ? '✓' : item.status === 'weak' ? '✗' : '–';
+    const tagClass  = item.status === 'mastered' ? 'mastered' : item.status === 'weak' ? 'weak' : 'skipped';
+    const tagLabel  = item.status === 'mastered' ? '已掌握' : item.status === 'weak' ? '需加强' : '已跳过';
+    return `<div class="breakdown-item">
+      <div class="breakdown-icon ${iconClass}">${iconGlyph}</div>
       <span class="breakdown-name">${escapeHtml(item.name)}</span>
-      <span class="breakdown-tag ${item.status === 'mastered' ? 'mastered' : 'weak'}">
-        ${item.status === 'mastered' ? '已掌握' : '需加强'}
-      </span>
-    </div>
-  `).join('')}
+      <span class="breakdown-tag ${tagClass}">${tagLabel}</span>
+    </div>`;
+  }).join('')}
 </div>`;
 
   // Weak-point callout
