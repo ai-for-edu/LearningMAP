@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import pytest
 from pathlib import Path
@@ -12,6 +13,7 @@ from run.build_kc_skills import (
     group_questions_by_route,
     load_manifest,
     lookup_kc_ids_for_route,
+    retry_with_backoff,
     sample_questions,
     save_manifest,
 )
@@ -199,3 +201,41 @@ def test_lookup_kc_ids_returns_match_for_known_leaf():
     leaf_to_ids = {"乘法原理里的其他类型": [0]}
     route = "拓展思维----计数模块----加乘原理----乘法原理----乘法原理里的其他类型"
     assert lookup_kc_ids_for_route(route, leaf_to_ids) == [0]
+
+
+def test_retry_with_backoff_succeeds_first_try():
+    calls = {"n": 0}
+
+    async def fn():
+        calls["n"] += 1
+        return "ok"
+
+    result = asyncio.run(retry_with_backoff(fn, attempts=3, base_delay=0))
+    assert result == "ok"
+    assert calls["n"] == 1
+
+
+def test_retry_with_backoff_retries_then_succeeds():
+    calls = {"n": 0}
+
+    async def fn():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise RuntimeError("transient")
+        return "ok"
+
+    result = asyncio.run(retry_with_backoff(fn, attempts=3, base_delay=0))
+    assert result == "ok"
+    assert calls["n"] == 3
+
+
+def test_retry_with_backoff_raises_after_exhaustion():
+    calls = {"n": 0}
+
+    async def fn():
+        calls["n"] += 1
+        raise RuntimeError("permanent")
+
+    with pytest.raises(RuntimeError, match="permanent"):
+        asyncio.run(retry_with_backoff(fn, attempts=3, base_delay=0))
+    assert calls["n"] == 3

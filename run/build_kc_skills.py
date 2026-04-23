@@ -5,14 +5,19 @@ See docs/superpowers/specs/2026-04-23-xes3g5m-kc-skills-design.md for design.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable, TypeVar
 
 from src.llm.schemas import KCSkill
 from src.prompts.loader import render_prompt
+
+logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
 
 def group_questions_by_route(questions: dict) -> dict[str, list[dict]]:
@@ -162,3 +167,26 @@ def lookup_kc_ids_for_route(route: str, leaf_to_ids: dict[str, list[int]]) -> li
     """Return the KC ids for the leaf of `route`, or [] if unknown."""
     leaf = route.rsplit("----", 1)[-1]
     return list(leaf_to_ids.get(leaf, []))
+
+
+async def retry_with_backoff(
+    fn: Callable[[], Awaitable[T]],
+    *,
+    attempts: int = 3,
+    base_delay: float = 2.0,
+) -> T:
+    """Call `fn()` up to `attempts` times with exponential backoff (2s/4s/8s)."""
+    last_exc: Exception | None = None
+    for i in range(attempts):
+        try:
+            return await fn()
+        except Exception as exc:  # noqa: BLE001 — propagate after exhaustion
+            last_exc = exc
+            if i == attempts - 1:
+                break
+            delay = base_delay * (2**i)
+            logger.warning("attempt %d/%d failed: %s — retrying in %.1fs", i + 1, attempts, exc, delay)
+            if delay > 0:
+                await asyncio.sleep(delay)
+    assert last_exc is not None
+    raise last_exc
