@@ -144,3 +144,21 @@ def generate_kc_skill(
         messages=[{"role": "user", "content": prompt}],
         response_model=KCSkill,
     )
+
+
+def build_leaf_to_ids(kc_routes_map: dict[str, str]) -> dict[str, list[int]]:
+    """Invert kc_routes_map.json (id -> leaf_name) to leaf_name -> [ids].
+
+    Values in the source map are globally unique leaf names in the XES3G5M
+    dataset, so lists usually have length 1. Built as list to be safe.
+    """
+    result: dict[str, list[int]] = {}
+    for k, v in kc_routes_map.items():
+        result.setdefault(v, []).append(int(k))
+    return result
+
+
+def lookup_kc_ids_for_route(route: str, leaf_to_ids: dict[str, list[int]]) -> list[int]:
+    """Return the KC ids for the leaf of `route`, or [] if unknown."""
+    leaf = route.rsplit("----", 1)[-1]
+    return list(leaf_to_ids.get(leaf, []))

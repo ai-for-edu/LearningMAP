@@ -7,9 +7,11 @@ from pathlib import Path
 from src.llm.schemas import KCSkill
 from run.build_kc_skills import (
     atomic_write_json,
+    build_leaf_to_ids,
     generate_kc_skill,
     group_questions_by_route,
     load_manifest,
+    lookup_kc_ids_for_route,
     sample_questions,
     save_manifest,
 )
@@ -179,3 +181,21 @@ def test_generate_kc_skill_renders_prompt_and_uses_schema():
     assert call["response_model"] is KCSkill
     assert "root----A" in call["messages"][0]["content"]
     assert "题目 1" in call["messages"][0]["content"]
+
+
+def test_build_leaf_to_ids_inverts_map():
+    kc_map = {"0": "乘法原理里的其他类型", "1": "加乘原理综合"}
+    result = build_leaf_to_ids(kc_map)
+    assert result == {"乘法原理里的其他类型": [0], "加乘原理综合": [1]}
+
+
+def test_lookup_kc_ids_returns_empty_for_unknown_leaf():
+    leaf_to_ids = {"乘法原理里的其他类型": [0]}
+    route = "拓展思维----计数模块----加乘原理----乘法原理----未登记的 leaf"
+    assert lookup_kc_ids_for_route(route, leaf_to_ids) == []
+
+
+def test_lookup_kc_ids_returns_match_for_known_leaf():
+    leaf_to_ids = {"乘法原理里的其他类型": [0]}
+    route = "拓展思维----计数模块----加乘原理----乘法原理----乘法原理里的其他类型"
+    assert lookup_kc_ids_for_route(route, leaf_to_ids) == [0]
