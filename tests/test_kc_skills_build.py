@@ -14,6 +14,7 @@ from run.build_kc_skills import (
     load_manifest,
     lookup_kc_ids_for_route,
     retry_with_backoff,
+    run_build,
     sample_questions,
     save_manifest,
 )
@@ -239,3 +240,164 @@ def test_retry_with_backoff_raises_after_exhaustion():
     with pytest.raises(RuntimeError, match="permanent"):
         asyncio.run(retry_with_backoff(fn, attempts=3, base_delay=0))
     assert calls["n"] == 3
+
+
+def test_run_build_processes_all_routes_and_writes_outputs(tmp_path, monkeypatch):
+    questions = {
+        "0": {
+            "content": "c0",
+            "options": {},
+            "answer": ["a0"],
+            "analysis": "x",
+            "type": "填空",
+            "kc_routes": ["root----A"],
+        },
+        "1": {
+            "content": "c1",
+            "options": {},
+            "answer": ["a1"],
+            "analysis": "y",
+            "type": "单选",
+            "kc_routes": ["root----B"],
+        },
+    }
+    kc_map = {"0": "A", "1": "B"}
+
+    questions_path = tmp_path / "questions.json"
+    kc_map_path = tmp_path / "kc_routes_map.json"
+    out_path = tmp_path / "kc_skills.json"
+    manifest_path = tmp_path / "kc_skills.manifest.json"
+    questions_path.write_text(json.dumps(questions, ensure_ascii=False), encoding="utf-8")
+    kc_map_path.write_text(json.dumps(kc_map, ensure_ascii=False), encoding="utf-8")
+
+    fake_skill = KCSkill(
+        考察重点="r1", 考察形式="r2", 易错点="r3", 难度提示="r4",
+    )
+    client = _FakeClient(fake_skill)
+
+    asyncio.run(run_build(
+        questions_path=questions_path,
+        kc_routes_map_path=kc_map_path,
+        out_path=out_path,
+        manifest_path=manifest_path,
+        client=client,
+        model="fake-model",
+        concurrency=2,
+        limit=None,
+        only_module=None,
+        resume=False,
+    ))
+
+    out = json.loads(out_path.read_text(encoding="utf-8"))
+    assert set(out.keys()) == {"root----A", "root----B"}
+    entry_a = out["root----A"]
+    assert entry_a["route"] == "root----A"
+    assert entry_a["leaf"] == "A"
+    assert entry_a["kc_ids"] == [0]
+    assert entry_a["question_count"] == 1
+    assert entry_a["sampled_count"] == 1
+    assert entry_a["sampled_question_ids"] == ["0"]
+    assert entry_a["skill"] == fake_skill.model_dump()
+    assert entry_a["source_model"] == "fake-model"
+    assert "generated_at" in entry_a
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert set(manifest["completed_routes"]) == {"root----A", "root----B"}
+    assert manifest["failed"] == []
+
+
+def test_run_build_records_failures_and_continues(tmp_path):
+    questions = {
+        "0": {"content": "c0", "options": {}, "answer": ["a0"], "analysis": "x", "type": "填空", "kc_routes": ["root----A"]},
+        "1": {"content": "c1", "options": {}, "answer": ["a1"], "analysis": "y", "type": "填空", "kc_routes": ["root----B"]},
+    }
+    questions_path = tmp_path / "questions.json"
+    kc_map_path = tmp_path / "kc_routes_map.json"
+    out_path = tmp_path / "out.json"
+    manifest_path = tmp_path / "m.json"
+    questions_path.write_text(json.dumps(questions), encoding="utf-8")
+    kc_map_path.write_text(json.dumps({}), encoding="utf-8")
+
+    class _FailingCompletions:
+        def create(self, **_):
+            raise RuntimeError("always fails")
+
+    class _FailingForOneRoute:
+        """Fail only on route A, succeed on route B."""
+        def __init__(self):
+            self.chat = self
+            self.completions = self
+
+        def create(self, **kwargs):
+            prompt = kwargs["messages"][0]["content"]
+            if "root----A" in prompt:
+                raise RuntimeError("fail A")
+            return KCSkill(考察重点="ok", 考察形式="ok", 易错点="ok", 难度提示="ok")
+
+    client = _FailingForOneRoute()
+
+    asyncio.run(run_build(
+        questions_path=questions_path,
+        kc_routes_map_path=kc_map_path,
+        out_path=out_path,
+        manifest_path=manifest_path,
+        client=client,
+        model="m",
+        concurrency=2,
+        limit=None,
+        only_module=None,
+        resume=False,
+        retry_base_delay=0,
+    ))
+
+    out = json.loads(out_path.read_text(encoding="utf-8"))
+    assert list(out.keys()) == ["root----B"]  # A failed
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["completed_routes"] == ["root----B"]
+    failed_routes = [f["route"] for f in manifest["failed"]]
+    assert failed_routes == ["root----A"]
+    assert manifest["failed"][0]["attempts"] == 3
+
+
+def test_run_build_resume_skips_completed_routes(tmp_path):
+    questions = {
+        "0": {"content": "c0", "options": {}, "answer": ["a0"], "analysis": "x", "type": "填空", "kc_routes": ["root----A"]},
+    }
+    questions_path = tmp_path / "questions.json"
+    kc_map_path = tmp_path / "kc_routes_map.json"
+    out_path = tmp_path / "out.json"
+    manifest_path = tmp_path / "m.json"
+    questions_path.write_text(json.dumps(questions), encoding="utf-8")
+    kc_map_path.write_text(json.dumps({}), encoding="utf-8")
+    # pre-seed manifest + output
+    out_path.write_text(json.dumps({"root----A": {"skill": {"pre": "existing"}}}), encoding="utf-8")
+    manifest_path.write_text(json.dumps({
+        "version": 1,
+        "completed_routes": ["root----A"],
+        "failed": [],
+    }), encoding="utf-8")
+
+    class _ShouldNotCall:
+        def __init__(self):
+            self.chat = self
+            self.completions = self
+
+        def create(self, **_):
+            raise AssertionError("LLM must not be called for a completed route")
+
+    asyncio.run(run_build(
+        questions_path=questions_path,
+        kc_routes_map_path=kc_map_path,
+        out_path=out_path,
+        manifest_path=manifest_path,
+        client=_ShouldNotCall(),
+        model="m",
+        concurrency=1,
+        limit=None,
+        only_module=None,
+        resume=True,
+    ))
+
+    out = json.loads(out_path.read_text(encoding="utf-8"))
+    assert out == {"root----A": {"skill": {"pre": "existing"}}}

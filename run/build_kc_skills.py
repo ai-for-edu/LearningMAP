@@ -5,11 +5,14 @@ See docs/superpowers/specs/2026-04-23-xes3g5m-kc-skills-design.md for design.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import logging
 import os
+import sys
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable, TypeVar
 
@@ -190,3 +193,162 @@ async def retry_with_backoff(
                 await asyncio.sleep(delay)
     assert last_exc is not None
     raise last_exc
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+async def _process_one_route(
+    *,
+    route: str,
+    all_route_items: list[dict],
+    leaf_to_ids: dict[str, list[int]],
+    client,
+    model: str,
+    cap: int,
+    retry_base_delay: float,
+) -> dict:
+    """Run sampling + LLM for a single route. Returns the output entry on
+    success; raises on final failure (caller records the failure)."""
+    samples = sample_questions(all_route_items, cap=cap)
+
+    async def _call():
+        return await asyncio.to_thread(
+            generate_kc_skill,
+            route=route,
+            samples=samples,
+            total_count=len(all_route_items),
+            client=client,
+            model=model,
+        )
+
+    skill = await retry_with_backoff(_call, attempts=3, base_delay=retry_base_delay)
+    leaf = route.rsplit("----", 1)[-1]
+    return {
+        "route": route,
+        "leaf": leaf,
+        "kc_ids": lookup_kc_ids_for_route(route, leaf_to_ids),
+        "question_count": len(all_route_items),
+        "sampled_count": len(samples),
+        "sampled_question_ids": [s["id"] for s in samples],
+        "skill": skill.model_dump(),
+        "source_model": model,
+        "generated_at": _now_iso(),
+    }
+
+
+async def run_build(
+    *,
+    questions_path: Path,
+    kc_routes_map_path: Path,
+    out_path: Path,
+    manifest_path: Path,
+    client,
+    model: str,
+    concurrency: int = 8,
+    cap: int = 12,
+    limit: int | None = None,
+    only_module: str | None = None,
+    resume: bool = True,
+    retry_base_delay: float = 2.0,
+) -> None:
+    """Main orchestration: load data → fan out routes under a semaphore →
+    write each successful result to `out_path` atomically; record failures
+    in `manifest_path`."""
+    questions = json.loads(Path(questions_path).read_text(encoding="utf-8"))
+    kc_routes_map = json.loads(Path(kc_routes_map_path).read_text(encoding="utf-8"))
+    leaf_to_ids = build_leaf_to_ids(kc_routes_map)
+    groups = group_questions_by_route(questions)
+
+    if only_module:
+        groups = {
+            r: items for r, items in groups.items()
+            if len(r.split("----")) >= 2 and r.split("----")[1] == only_module
+        }
+
+    manifest = load_manifest(manifest_path) if resume else {
+        "version": 1, "completed_routes": [], "failed": [],
+    }
+    manifest.setdefault("completed_routes", [])
+    manifest.setdefault("failed", [])
+    manifest["model"] = model
+    manifest.setdefault("started_at", _now_iso())
+
+    completed_set = set(manifest["completed_routes"])
+    todo_routes = [r for r in groups.keys() if r not in completed_set]
+    if limit is not None:
+        todo_routes = todo_routes[:limit]
+
+    output = json.loads(Path(out_path).read_text(encoding="utf-8")) if Path(out_path).exists() else {}
+    output_lock = asyncio.Lock()
+    sem = asyncio.Semaphore(concurrency)
+    total = len(todo_routes)
+
+    async def _worker(idx: int, route: str) -> None:
+        async with sem:
+            try:
+                entry = await _process_one_route(
+                    route=route,
+                    all_route_items=groups[route],
+                    leaf_to_ids=leaf_to_ids,
+                    client=client,
+                    model=model,
+                    cap=cap,
+                    retry_base_delay=retry_base_delay,
+                )
+            except Exception as exc:  # noqa: BLE001
+                async with output_lock:
+                    manifest["failed"].append({
+                        "route": route,
+                        "error": str(exc),
+                        "attempts": 3,
+                        "last_at": _now_iso(),
+                    })
+                    save_manifest(manifest_path, manifest)
+                print(f"[{idx}/{total}] {route} ✗ {exc}", file=sys.stderr)
+                return
+            async with output_lock:
+                output[route] = entry
+                manifest["completed_routes"].append(route)
+                atomic_write_json(out_path, output)
+                save_manifest(manifest_path, manifest)
+            print(f"[{idx}/{total}] {route} ✓", file=sys.stderr)
+
+    await asyncio.gather(*[_worker(i + 1, r) for i, r in enumerate(todo_routes)])
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Offline KC-skill generator for XES3G5M")
+    parser.add_argument("--concurrency", type=int, default=8)
+    parser.add_argument("--limit", type=int, default=None, help="only process the first N routes")
+    parser.add_argument("--only-module", type=str, default=None, help="filter by route's 2nd segment, e.g. 计数模块")
+    parser.add_argument("--no-resume", action="store_true", help="overwrite manifest instead of resuming")
+    parser.add_argument("--questions", type=Path, default=Path("XES3G5M/metadata/questions.json"))
+    parser.add_argument("--kc-map", type=Path, default=Path("XES3G5M/metadata/kc_routes_map.json"))
+    parser.add_argument("--out", type=Path, default=Path("XES3G5M/metadata/kc_skills.json"))
+    parser.add_argument("--manifest", type=Path, default=Path("XES3G5M/metadata/kc_skills.manifest.json"))
+    args = parser.parse_args(argv)
+
+    from src.llm.client import get_llm_client, get_model_name
+
+    client = get_llm_client()
+    model = get_model_name()
+
+    asyncio.run(run_build(
+        questions_path=args.questions,
+        kc_routes_map_path=args.kc_map,
+        out_path=args.out,
+        manifest_path=args.manifest,
+        client=client,
+        model=model,
+        concurrency=args.concurrency,
+        limit=args.limit,
+        only_module=args.only_module,
+        resume=not args.no_resume,
+    ))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
