@@ -1,4 +1,4 @@
-from src.llm.schemas import KnowledgeNode, KnowledgeEdge, KnowledgeGraph, QuizQuestion, DiagnosisBreakdown, DiagnosisResult
+from src.llm.schemas import KnowledgeNode, KnowledgeEdge, KnowledgeGraph, QuizQuestion, DiagnosisBreakdown, DiagnosisResult, KCSkill
 
 
 def test_knowledge_graph_schema():
@@ -38,3 +38,14 @@ def test_diagnosis_result_schema():
     )
     assert result.score == 70
     assert result.breakdown[1].status == "weak"
+
+
+def test_kc_skill_schema():
+    skill = KCSkill(
+        考察重点="理解乘法原理：分步计数中各步方案数相乘得到总方案数。",
+        考察形式="以填空题为主，题干给出若干类对象和选择步骤，要求计算方案数。",
+        易错点="学生常把分步（乘）和分类（加）混淆，导致用加法代替乘法。",
+        难度提示="数字量级 2-5，步骤数 2-4 步，偶见带限制条件的情境。",
+    )
+    assert skill.考察重点.startswith("理解")
+    assert "填空" in skill.考察形式
