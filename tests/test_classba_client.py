@@ -17,6 +17,7 @@ from src.llm.schemas import KCSkill
 # ---------------------------------------------------------------------------
 
 _VALID_SKILL_DICT = {
+    "description": "demo skill for tests",
     "考察重点": "A",
     "考察形式": "B",
     "易错点": "C",

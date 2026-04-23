@@ -155,6 +155,7 @@ class _FakeClient:
 
 def test_generate_kc_skill_renders_prompt_and_uses_schema():
     expected = KCSkill(
+        description="when multi-step counting appears, distinguish 分步 from 分类",
         考察重点="乘法原理核心概念",
         考察形式="填空为主",
         易错点="分步分类混淆",
@@ -271,7 +272,7 @@ def test_run_build_processes_all_routes_and_writes_outputs(tmp_path, monkeypatch
     kc_map_path.write_text(json.dumps(kc_map, ensure_ascii=False), encoding="utf-8")
 
     fake_skill = KCSkill(
-        考察重点="r1", 考察形式="r2", 易错点="r3", 难度提示="r4",
+        description="d1", 考察重点="r1", 考察形式="r2", 易错点="r3", 难度提示="r4",
     )
     client = _FakeClient(fake_skill)
 
@@ -332,7 +333,7 @@ def test_run_build_records_failures_and_continues(tmp_path):
             prompt = kwargs["messages"][0]["content"]
             if "root----A" in prompt:
                 raise RuntimeError("fail A")
-            return KCSkill(考察重点="ok", 考察形式="ok", 易错点="ok", 难度提示="ok")
+            return KCSkill(description="ok", 考察重点="ok", 考察形式="ok", 易错点="ok", 难度提示="ok")
 
     client = _FailingForOneRoute()
 

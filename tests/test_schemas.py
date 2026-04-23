@@ -42,6 +42,7 @@ def test_diagnosis_result_schema():
 
 def test_kc_skill_schema():
     skill = KCSkill(
+        description="当学生处理多步骤计数问题且出现分步与分类混淆时使用。构建在乘法原理。",
         考察重点="理解乘法原理：分步计数中各步方案数相乘得到总方案数。",
         考察形式="以填空题为主，题干给出若干类对象和选择步骤，要求计算方案数。",
         易错点="学生常把分步（乘）和分类（加）混淆，导致用加法代替乘法。",
@@ -49,3 +50,4 @@ def test_kc_skill_schema():
     )
     assert skill.考察重点.startswith("理解")
     assert "填空" in skill.考察形式
+    assert "使用" in skill.description or "skill" in skill.description.lower()

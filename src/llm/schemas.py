@@ -43,8 +43,22 @@ class DiagnosisResult(BaseModel):
 
 
 class KCSkill(BaseModel):
-    """LLM-generated, question-bank-grounded context for one knowledge component."""
+    """LLM-generated, question-bank-grounded context for one knowledge component.
 
+    The ``description`` field mirrors the ``description`` frontmatter of
+    ``skills/*/SKILL.md`` — a one-line index string a consuming model can
+    read to decide how / when this skill applies. The other four Chinese
+    fields are the subject-matter payload.
+    """
+
+    description: str = Field(
+        ...,
+        description=(
+            "英文或中文皆可的一句话索引 + 适用场景，40-100 字。必须同时说明"
+            "『这个 skill 讲什么』和『什么时候该调用它』。示例：『当学生处理"
+            "多步骤计数问题且出现分步与分类混淆时使用。构建在乘法原理。』"
+        ),
+    )
     考察重点: str = Field(..., description="核心概念 / 子技能 / 思维点，80-150 字")
     考察形式: str = Field(..., description="题型分布 + 常见题干模式 + 情境套路，80-150 字")
     易错点: str = Field(..., description="从 analysis 归纳的高频错误，50-120 字")

@@ -56,3 +56,6 @@ def test_render_kc_skill_from_bank_prompt():
     # must instruct JSON-only output so the Classba backend returns parseable text
     assert "JSON" in result
     assert "只输出一个 JSON 对象" in result
+    # must instruct the model to emit the new description field
+    assert "description" in result
+    assert "适用场景" in result
