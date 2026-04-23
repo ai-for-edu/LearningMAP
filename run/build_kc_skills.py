@@ -5,7 +5,11 @@ See docs/superpowers/specs/2026-04-23-xes3g5m-kc-skills-design.md for design.
 
 from __future__ import annotations
 
+import json
+import os
 from collections import defaultdict
+from pathlib import Path
+from typing import Any
 
 
 def group_questions_by_route(questions: dict) -> dict[str, list[dict]]:
@@ -76,3 +80,35 @@ def sample_questions(items: list[dict], cap: int = 12) -> list[dict]:
         picked.extend(bucket[i * step] for i in range(q))
 
     return sorted(picked, key=sort_key)
+
+
+def atomic_write_json(path: Path, data: Any) -> None:
+    """Write JSON to `path` atomically: dump to .tmp then os.replace.
+
+    Guarantees that `path` is either the old contents or the new contents,
+    never partially-written.
+    """
+    path = Path(path)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        tmp.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        os.replace(tmp, path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+
+def load_manifest(path: Path) -> dict:
+    """Load manifest or return an empty skeleton if the file is missing."""
+    path = Path(path)
+    if not path.exists():
+        return {"version": 1, "completed_routes": [], "failed": []}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def save_manifest(path: Path, manifest: dict) -> None:
+    """Atomic write for the manifest."""
+    atomic_write_json(path, manifest)

@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import json
+import pytest
+from pathlib import Path
+
 from run.build_kc_skills import (
+    atomic_write_json,
     group_questions_by_route,
+    load_manifest,
     sample_questions,
+    save_manifest,
 )
 
 
@@ -76,3 +83,44 @@ def test_sample_questions_distributes_remainder_to_largest_group():
     types = [s["type"] for s in result]
     assert types.count("填空") == 4
     assert types.count("单选") == 1
+
+
+def test_atomic_write_json_creates_file_with_utf8(tmp_path: Path):
+    target = tmp_path / "out.json"
+    data = {"路径": {"skill": {"考察重点": "测试中文"}}}
+    atomic_write_json(target, data)
+    assert json.loads(target.read_text(encoding="utf-8")) == data
+    # no leftover .tmp file
+    assert not (tmp_path / "out.json.tmp").exists()
+
+
+def test_atomic_write_json_preserves_on_failure(tmp_path: Path, monkeypatch):
+    target = tmp_path / "out.json"
+    atomic_write_json(target, {"before": 1})
+
+    def boom(src, dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("os.replace", boom)
+    with pytest.raises(OSError):
+        atomic_write_json(target, {"after": 2})
+
+    # main file unchanged
+    assert json.loads(target.read_text(encoding="utf-8")) == {"before": 1}
+
+
+def test_load_manifest_returns_empty_when_missing(tmp_path: Path):
+    m = load_manifest(tmp_path / "nope.json")
+    assert m == {"version": 1, "completed_routes": [], "failed": []}
+
+
+def test_manifest_roundtrip(tmp_path: Path):
+    path = tmp_path / "m.json"
+    m = {
+        "version": 1,
+        "completed_routes": ["r1", "r2"],
+        "failed": [{"route": "r3", "error": "boom", "attempts": 3}],
+        "model": "deepseek-chat",
+    }
+    save_manifest(path, m)
+    assert load_manifest(path) == m
