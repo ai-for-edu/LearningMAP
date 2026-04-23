@@ -190,6 +190,8 @@ def test_create_raises_on_unparseable_data():
 
 
 def test_from_env_reads_env_vars(monkeypatch):
+    # stub load_dotenv so the real .env doesn't bleed into the test
+    monkeypatch.setattr("run.classba_client.load_dotenv", lambda *a, **kw: False)
     monkeypatch.setenv("CLASSBA_AUTH", "tok")
     monkeypatch.setenv("CLASSBA_API_URL", "https://example.com")
     # default agent name
@@ -208,6 +210,8 @@ def test_from_env_reads_env_vars(monkeypatch):
 
 
 def test_from_env_raises_when_auth_missing(monkeypatch):
+    # stub load_dotenv so the real .env doesn't repopulate CLASSBA_AUTH
+    monkeypatch.setattr("run.classba_client.load_dotenv", lambda *a, **kw: False)
     monkeypatch.delenv("CLASSBA_AUTH", raising=False)
     monkeypatch.delenv("CLASSBA_API_URL", raising=False)
 

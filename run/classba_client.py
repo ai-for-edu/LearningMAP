@@ -24,6 +24,8 @@ import os
 from typing import Any, TypeVar
 from urllib.parse import urlparse
 
+from dotenv import load_dotenv
+
 from src.utils.json_repair import parse_json_response
 
 logger = logging.getLogger(__name__)
@@ -133,6 +135,7 @@ class ClassbaClient:
         ``CLASSBA_AGENT_NAME``
             Agent name (default ``"Skiller"``).
         """
+        load_dotenv()
         auth_token = os.environ.get("CLASSBA_AUTH")
         if not auth_token:
             raise RuntimeError(
