@@ -320,6 +320,8 @@ async def run_build(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Offline KC-skill generator for XES3G5M")
+    parser.add_argument("--backend", choices=["classba", "openai"], default="classba",
+                        help="LLM backend to use (default: classba)")
     parser.add_argument("--concurrency", type=int, default=8)
     parser.add_argument("--limit", type=int, default=None, help="only process the first N routes")
     parser.add_argument("--only-module", type=str, default=None, help="filter by route's 2nd segment, e.g. 计数模块")
@@ -330,10 +332,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, default=Path("XES3G5M/metadata/kc_skills.manifest.json"))
     args = parser.parse_args(argv)
 
-    from src.llm.client import get_llm_client, get_model_name
+    if args.backend == "classba":
+        from run.classba_client import ClassbaClient
 
-    client = get_llm_client()
-    model = get_model_name()
+        client = ClassbaClient.from_env()
+        model = client.agent_name
+    else:
+        from src.llm.client import get_llm_client, get_model_name
+
+        client = get_llm_client()
+        model = get_model_name()
 
     asyncio.run(run_build(
         questions_path=args.questions,
