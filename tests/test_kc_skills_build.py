@@ -4,8 +4,10 @@ import json
 import pytest
 from pathlib import Path
 
+from src.llm.schemas import KCSkill
 from run.build_kc_skills import (
     atomic_write_json,
+    generate_kc_skill,
     group_questions_by_route,
     load_manifest,
     sample_questions,
@@ -27,11 +29,13 @@ def _q(qid: str, kc_routes: list[str], qtype: str = "填空") -> tuple[str, dict
 def test_group_questions_by_route_flattens_multi_route_questions():
     route_a = "root----A"
     route_b = "root----B"
-    questions = dict([
-        _q("0", [route_a]),
-        _q("1", [route_a, route_b]),
-        _q("2", [route_b]),
-    ])
+    questions = dict(
+        [
+            _q("0", [route_a]),
+            _q("1", [route_a, route_b]),
+            _q("2", [route_b]),
+        ]
+    )
     groups = group_questions_by_route(questions)
     assert set(groups.keys()) == {route_a, route_b}
     assert [s["id"] for s in groups[route_a]] == ["0", "1"]
@@ -48,10 +52,9 @@ def test_sample_questions_returns_all_when_under_cap():
 
 def test_sample_questions_stratifies_by_type_when_over_cap():
     # 10 填空 + 5 单选, cap=6 → ratio 2:1 → 4 填空 + 2 单选
-    items = (
-        [{"id": f"fill-{i}", "type": "填空"} for i in range(10)]
-        + [{"id": f"choice-{i}", "type": "单选"} for i in range(5)]
-    )
+    items = [{"id": f"fill-{i}", "type": "填空"} for i in range(10)] + [
+        {"id": f"choice-{i}", "type": "单选"} for i in range(5)
+    ]
     result = sample_questions(items, cap=6)
     assert len(result) == 6
     types = [s["type"] for s in result]
@@ -75,10 +78,9 @@ def test_sample_questions_uses_uniform_step_within_group():
 
 def test_sample_questions_distributes_remainder_to_largest_group():
     # 7 填空 + 4 单选 = 11, cap=5 → floor 5*7/11 = 3, floor 5*4/11 = 1, remainder 1 → to 填空 (larger)
-    items = (
-        [{"id": f"fill-{i}", "type": "填空"} for i in range(7)]
-        + [{"id": f"choice-{i}", "type": "单选"} for i in range(4)]
-    )
+    items = [{"id": f"fill-{i}", "type": "填空"} for i in range(7)] + [
+        {"id": f"choice-{i}", "type": "单选"} for i in range(4)
+    ]
     result = sample_questions(items, cap=5)
     types = [s["type"] for s in result]
     assert types.count("填空") == 4
@@ -124,3 +126,56 @@ def test_manifest_roundtrip(tmp_path: Path):
     }
     save_manifest(path, m)
     assert load_manifest(path) == m
+
+
+class _FakeCompletions:
+    def __init__(self, result: KCSkill):
+        self.result = result
+        self.calls: list[dict] = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return self.result
+
+
+class _FakeChat:
+    def __init__(self, result: KCSkill):
+        self.completions = _FakeCompletions(result)
+
+
+class _FakeClient:
+    def __init__(self, result: KCSkill):
+        self.chat = _FakeChat(result)
+
+
+def test_generate_kc_skill_renders_prompt_and_uses_schema():
+    expected = KCSkill(
+        考察重点="乘法原理核心概念",
+        考察形式="填空为主",
+        易错点="分步分类混淆",
+        难度提示="2-4 步",
+    )
+    client = _FakeClient(expected)
+    samples = [
+        {
+            "id": "0",
+            "type": "填空",
+            "content": "c0",
+            "options": {},
+            "answer": "a0",
+            "analysis": "x",
+        },
+    ]
+    result = generate_kc_skill(
+        route="root----A",
+        samples=samples,
+        total_count=42,
+        client=client,
+        model="test-model",
+    )
+    assert result == expected
+    call = client.chat.completions.create.__self__.calls[0]  # type: ignore[attr-defined]
+    assert call["model"] == "test-model"
+    assert call["response_model"] is KCSkill
+    assert "root----A" in call["messages"][0]["content"]
+    assert "题目 1" in call["messages"][0]["content"]

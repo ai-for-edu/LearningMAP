@@ -11,6 +11,9 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from src.llm.schemas import KCSkill
+from src.prompts.loader import render_prompt
+
 
 def group_questions_by_route(questions: dict) -> dict[str, list[dict]]:
     """Invert questions dict so each KC full-route maps to its questions.
@@ -38,6 +41,7 @@ def sample_questions(items: list[dict], cap: int = 12) -> list[dict]:
       name for determinism), then within each group take a uniform-step
       slice of the id-sorted items.
     """
+
     def sort_key(item: dict) -> tuple:
         """Sort by id, trying numeric sort first, falling back to string."""
         item_id = item["id"]
@@ -112,3 +116,31 @@ def load_manifest(path: Path) -> dict:
 def save_manifest(path: Path, manifest: dict) -> None:
     """Atomic write for the manifest."""
     atomic_write_json(path, manifest)
+
+
+def generate_kc_skill(
+    *,
+    route: str,
+    samples: list[dict],
+    total_count: int,
+    client,
+    model: str,
+) -> KCSkill:
+    """Render the prompt and call the LLM with Instructor response_model=KCSkill.
+
+    `client` must be an instructor-wrapped client (or fake with the same
+    .chat.completions.create(..., response_model=...) contract).
+    """
+    prompt = render_prompt(
+        "kc_skill_from_bank",
+        route=route,
+        samples=samples,
+        sample_count=len(samples),
+        total_count=total_count,
+    )
+    return client.chat.completions.create(
+        model=model,
+        max_tokens=1024,
+        messages=[{"role": "user", "content": prompt}],
+        response_model=KCSkill,
+    )
