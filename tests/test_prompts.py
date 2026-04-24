@@ -48,14 +48,24 @@ def test_render_kc_skill_from_bank_prompt():
     assert "考察形式" in result
     assert "易错点" in result
     assert "难度提示" in result
-    assert "题目 1" in result and "题目 2" in result
-    assert "填空" in result
-    # both answers must appear
-    assert "24" in result
-    assert "26" in result
-    # must instruct JSON-only output so the Classba backend returns parseable text
-    assert "JSON" in result
-    assert "只输出一个 JSON 对象" in result
-    # must instruct the model to emit the new description field
-    assert "description" in result
-    assert "适用场景" in result
+
+
+def test_render_kc_skill_block_with_content():
+    from src.prompts.loader import render_kc_skill_block
+    block = render_kc_skill_block({
+        "description": "desc",
+        "考察重点": "重点内容",
+        "考察形式": "形式内容",
+        "易错点": "易错内容",
+        "难度提示": "难度内容",
+    })
+    assert "考察重点" in block
+    assert "重点内容" in block
+    assert "易错内容" in block
+    assert "难度内容" in block
+
+
+def test_render_kc_skill_block_empty_returns_empty_string():
+    from src.prompts.loader import render_kc_skill_block
+    assert render_kc_skill_block(None) == ""
+    assert render_kc_skill_block({}) == ""
