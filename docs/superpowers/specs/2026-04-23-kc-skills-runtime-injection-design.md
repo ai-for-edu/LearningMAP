@@ -57,8 +57,8 @@ intent ─→ knowledge_graph  (LLM 自由生成图节点)
 | `kc_skill_resolver` 节点 | `src/agent/nodes/kc_skill_resolver.py` | 对图节点执行规则匹配 + LLM 兜底，填 `state.kc_skills` |
 | `kc_skill_block` 模板 | `src/prompts/kc_skill_block.j2` | 把 `KCSkill` 对象渲染为提示文本（空对象→空字符串） |
 | `kc_resolver` 模板 | `src/prompts/kc_resolver.j2` | LLM 兜底用：给定未命中节点 + 候选 leaf 列表，输出映射 |
-| prompt 消费者 | 4 个既有 `.j2` 加一行 `{{ kc_skill_block }}` | quiz_generate / lesson_point / diagnosis / slide_outline + slide_content_draft |
-| 节点消费者 | 4 个既有 `.py` 加 3 行取值 + 传 ctx | quiz / diagnosis / lesson / slides |
+| prompt 消费者 | 4 个既有 `.j2` 加一行 `{{ kc_skill_block }}` | quiz_generate / lesson_point / slide_outline / slide_content_draft |
+| 节点消费者 | 3 个既有 `.py` 加 3 行取值 + 传 ctx | quiz / lesson / slides |
 | 前端卡片 | `static/lesson.html` | `<details>` 可折叠，展示 3 个 KC skill 字段 |
 | 开关 | `.env` 的 `USE_KC_SKILLS`（默认 true） | 全局关掉时 resolver 短路、prompt 变量空 |
 
@@ -211,7 +211,9 @@ def render_kc_skill_block(kc_skill: dict | None) -> str:
 
 下游节点统一调这个 helper，返回字符串塞进模板上下文的 `kc_skill_block` 变量。
 
-### 消费节点改动（4 处，模式一致）
+### 消费节点改动（3 处 LLM 调用节点，模式一致）
+
+> **说明**：`diagnosis.py` 是纯数据汇总（按 KP 统计正确率），**不调 LLM**，没有 prompt 可供注入。因此 KC skill 在"诊断"这一步没有 Python 侧 hook；对"全链路"的覆盖通过 **quiz 生成 → lesson 讲解 → slides 呈现** 三段 LLM 环节实现，学生看到的 lesson/slides 内容已经考虑过易错点。诊断页也不展示 KC skill（已在非目标中声明）。
 
 每个节点在已经拿到 `knowledge_point_name` 的位置加 3 行：
 
@@ -225,10 +227,9 @@ kc_skill_block = render_kc_skill_block(kc_skill)
 
 | 节点 | 改动点 |
 |---|---|
-| `quiz.py` | 按 KP 循环生成每题的位置 |
-| `diagnosis.py` | 分析每个薄弱 KP 的位置 |
-| `lesson.py` | `_generate_kc_skill()` / 每点课件生成 |
-| `slides.py` | outline 阶段 + 每页 content draft 阶段（两处都要加；layout JSON 阶段**不加**） |
+| `quiz.py` | `quiz_node` 批量生成 + `quiz_generate_progressive` 逐点生成两处 |
+| `lesson.py` | `generate_lesson_per_point` + `lesson_node_stream` 两处（每点 prompt 渲染时） |
+| `slides.py` | `generate_slide_outlines` + `_generate_content_draft` 两处（layout JSON 阶段**不加**） |
 
 对应的 prompt 模板改动：仅在合适位置（通常靠近"任务说明 / 知识点名"之后、"输出格式"之前）加一行：
 
