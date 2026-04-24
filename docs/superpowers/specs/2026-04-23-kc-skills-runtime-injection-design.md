@@ -57,7 +57,7 @@ intent ─→ knowledge_graph  (LLM 自由生成图节点)
 | `kc_skill_resolver` 节点 | `src/agent/nodes/kc_skill_resolver.py` | 对图节点执行规则匹配 + LLM 兜底，填 `state.kc_skills` |
 | `kc_skill_block` 模板 | `src/prompts/kc_skill_block.j2` | 把 `KCSkill` 对象渲染为提示文本（空对象→空字符串） |
 | `kc_resolver` 模板 | `src/prompts/kc_resolver.j2` | LLM 兜底用：给定未命中节点 + 候选 leaf 列表，输出映射 |
-| prompt 消费者 | 4 个既有 `.j2` 加一行 `{{ kc_skill_block }}` | quiz_generate / lesson_point / slide_outline / slide_content_draft |
+| prompt 消费者 | 3 个既有 `.j2` 加一行 `{{ kc_skill_block }}` | quiz_generate / lesson_point / slide_outline |
 | 节点消费者 | 3 个既有 `.py` 加 3 行取值 + 传 ctx | quiz / lesson / slides |
 | 前端卡片 | `static/lesson.html` | `<details>` 可折叠，展示 3 个 KC skill 字段 |
 | 开关 | `.env` 的 `USE_KC_SKILLS`（默认 true） | 全局关掉时 resolver 短路、prompt 变量空 |
@@ -229,7 +229,7 @@ kc_skill_block = render_kc_skill_block(kc_skill)
 |---|---|
 | `quiz.py` | `quiz_node` 批量生成 + `quiz_generate_progressive` 逐点生成两处 |
 | `lesson.py` | `generate_lesson_per_point` + `lesson_node_stream` 两处（每点 prompt 渲染时） |
-| `slides.py` | `generate_slide_outlines` + `_generate_content_draft` 两处（layout JSON 阶段**不加**） |
+| `slides.py` | `generate_slide_outlines` 一处（outline 阶段）；content draft 阶段因无 KP 映射跳过，layout JSON 阶段**不加** |
 
 对应的 prompt 模板改动：仅在合适位置（通常靠近"任务说明 / 知识点名"之后、"输出格式"之前）加一行：
 
@@ -239,9 +239,24 @@ kc_skill_block = render_kc_skill_block(kc_skill)
 
 ### Slides 的特别说明
 
-slides 的 layout JSON prompt 负责的是结构化元素生成，不是内容导向——**不注入** KC skill block，避免无关文本污染 JSON 模式。只注入到：
-1. `slide_outline.j2`（决定每页讲什么）
-2. `slide_content_draft.j2`（决定每页具体内容）
+slides 的 layout JSON prompt 负责结构化元素生成，不是内容导向——**不注入** KC skill block，避免无关文本污染 JSON 模式。content draft 阶段是**单 outline 的扩写**，outline 并不携带干净的 KP 名称（只有 title/description/keyPoints），因此很难决定"这页对应哪个 KP 的 KC skill"。综合考虑只注入到：
+
+1. `slide_outline.j2`（此阶段能拿到 weak_points 列表，将所有相关 KC skill block **聚合**成一段注入）
+
+`slides.py` 里的注入逻辑：
+
+```python
+def generate_slide_outlines(state):
+    ...
+    kc_skills = state.get("kc_skills") or {}
+    blocks = []
+    for wp in weak_points:
+        b = render_kc_skill_block(kc_skills.get(wp["name"]))
+        if b:
+            blocks.append(b)
+    kc_skill_block = "\n\n".join(blocks)   # 聚合后单个字符串
+    prompt = render_prompt("slide_outline", ..., kc_skill_block=kc_skill_block)
+```
 
 ### 前端：lesson.html 可折叠卡
 
