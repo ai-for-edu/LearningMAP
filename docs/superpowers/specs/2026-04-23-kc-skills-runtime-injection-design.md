@@ -38,15 +38,15 @@ intent ─→ knowledge_graph  (LLM 自由生成图节点)
               ├── Step 1: leaf 名规则匹配（无 token 成本，主力）
               └── Step 2: 未命中节点 → 一次 LLM 批量判定（兜底）
               ↓
-         state.knowledge_skills: {kp_name: KCSkill}   # 仅键入命中的节点
+         state["kc_skills"]: {kp_name: dict}   # 仅键入命中的节点；值是 KCSkill.model_dump()
               ↓
   ┌───────────┼───────────┬───────────┐
   quiz     diagnosis    lesson      slides
-  └── 每个消费点：render_kc_skill_block(kc_skill) → {{ kc_skill_block }}
+  └── 每个消费点：render_kc_skill_block(kc_skill_dict) → {{ kc_skill_block }}
                                ↓
                           前端 lesson.html
-                          读 state.knowledge_skills
-                          渲染 <details> 可折叠技能卡
+                          读 state.kc_skills
+                          渲染 <details> 可折叠技能卡（独立于现有 inline-ks-card）
 ```
 
 ### 单元边界
@@ -54,7 +54,7 @@ intent ─→ knowledge_graph  (LLM 自由生成图节点)
 | 单元 | 位置 | 职责 |
 |---|---|---|
 | `kc_loader` | `src/skills/kc_loader.py` | 读 `kc_skills.json`，按 route 和 leaf 名建立正向 + 倒排索引，单例缓存 |
-| `kc_skill_resolver` 节点 | `src/agent/nodes/kc_skill_resolver.py` | 对图节点执行规则匹配 + LLM 兜底，填 `state.knowledge_skills` |
+| `kc_skill_resolver` 节点 | `src/agent/nodes/kc_skill_resolver.py` | 对图节点执行规则匹配 + LLM 兜底，填 `state.kc_skills` |
 | `kc_skill_block` 模板 | `src/prompts/kc_skill_block.j2` | 把 `KCSkill` 对象渲染为提示文本（空对象→空字符串） |
 | `kc_resolver` 模板 | `src/prompts/kc_resolver.j2` | LLM 兜底用：给定未命中节点 + 候选 leaf 列表，输出映射 |
 | prompt 消费者 | 4 个既有 `.j2` 加一行 `{{ kc_skill_block }}` | quiz_generate / lesson_point / diagnosis / slide_outline + slide_content_draft |
@@ -66,23 +66,28 @@ intent ─→ knowledge_graph  (LLM 自由生成图节点)
 
 ## 数据流 / state 形状
 
-### 复用已有槽位（不改 schema）
+### 新增独立字段（避免和已有 `knowledge_skills` 冲突）
 
-`src/agent/state.py` 已预留：
+**重要**：现有 `knowledge_skills: dict | None` 字段已被 `lesson.py` 的 `retrieve_skills()` 使用——存"按教学法动态生成的 per-KP 微技能文本"，`dict[str, str]`，默认开启，并有 `/toggle-knowledge-skills` API 和前端卡片。**不能复用**。KC skill 要另立一个字段。
+
+在 `src/agent/state.py` 的 `LearningState` 中新增：
 
 ```python
-knowledge_skills: dict[str, KCSkill] | None = None   # {图节点 name: KCSkill}
-use_knowledge_skills: bool = False
+# KC skills loaded from kc_skills.json (orthogonal to pedagogy skills)
+kc_skills: dict | None          # {kp_name: KCSkill.model_dump()} 即 dict[str, dict]
+use_kc_skills: bool             # 是否激活 KC skill resolver + 注入
 ```
 
+同步在 `src/api/chat.py` 的 `_DEFAULT_STATE` 中加入这两个键的默认值（`None` 和从 env 读取的布尔）。
+
 - **键**：图谱节点 `name`（如 "乘法原理"、"染色计数问题"）。以 name 而非 route 为键，是因为下游消费者已拿到 `kp_name`，一次命中，省去二次查表
-- **值**：完整 `KCSkill` Pydantic 对象
+- **值**：`KCSkill.model_dump()` 的结果，即 `dict`。**不存 Pydantic 对象**——这样 `src/api/store.py` 的 `json.dumps(..., default=str)` 可以直接处理，无需在 `_deserialize_state` 里做特殊恢复
 - **未命中的节点不写键**（不填 `None`）——下游用 `dict.get(name)` 判断
-- **开关语义**：`use_knowledge_skills=True` 时 resolver 才跑；`.env` 的 `USE_KC_SKILLS=false` 整体关掉
+- **开关语义**：`use_kc_skills=True` 时 resolver 才跑；`.env` 的 `USE_KC_SKILLS=false` 让默认 state 里 `use_kc_skills=False`，整条链路静默
 
 ### session 持久化
 
-`KCSkill` 已是 Pydantic，现有 `src/api/store.py` 的 `model_dump()` 路径直接处理 `state.knowledge_skills`。刷新页面时 `GET /api/chat/{id}/state` 回传的 state 自动带上这份数据，前端不需要新端点。
+因为 state 里存的是纯 dict（不是 Pydantic 对象），`src/api/store.py` 现有的 `_serialize_state`（走 JSON else 分支）和 `_deserialize_state`（直接保留为 dict）**零改动**即可工作。刷新页面时 `GET /api/chat/{id}/state` 回传的 state 自动带上 `kc_skills`。
 
 ## 组件详述
 
@@ -110,36 +115,44 @@ JSON 缺失或解析失败时 `load_kc_skills()` 写一条 warning 日志，返�
 
 ### `kc_skill_resolver` 节点
 
-```python
-async def kc_skill_resolver(state: LearningState) -> LearningState:
-    if not state.use_knowledge_skills or not state.knowledge_graph:
-        return state
+与现有节点一致用**同步 `def`**（LangGraph 调用者是同步 `graph.invoke`），返回 dict patch：
 
-    resolved: dict[str, KCSkill] = {}
+```python
+def kc_skill_resolver_node(state: LearningState) -> dict:
+    if not state.get("use_kc_skills"):
+        return {}
+    graph = state.get("knowledge_graph")
+    if not graph:
+        return {}
+
+    nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
+
+    resolved: dict[str, dict] = {}   # kp_name -> KCSkill.model_dump()
     unresolved: list[str] = []
 
     # Step 1: 规则匹配
-    for node in state.knowledge_graph.nodes:
-        hit = resolve_by_leaf(node.name)
-        if hit:
-            resolved[node.name] = hit
+    for node in nodes:
+        name = node.name if hasattr(node, "name") else node["name"]
+        hit = resolve_by_leaf(name)   # returns KCSkill | None
+        if hit is not None:
+            resolved[name] = hit.model_dump()
         else:
-            unresolved.append(node.name)
+            unresolved.append(name)
 
     # Step 2: LLM 兜底（一次调用，批量处理）
     # 候选列表为空（JSON 缺失或全空）时直接跳过，避免浪费一次 LLM 调用
     if unresolved and leaf_index():
         try:
-            llm_map = await _llm_resolve(unresolved, list(leaf_index().keys()))
+            llm_map = _llm_resolve(unresolved, list(leaf_index().keys()))
+            kc = get_kc_skills()
             for name, route in llm_map.items():
-                if route and route in get_kc_skills():
-                    resolved[name] = get_kc_skills()[route]
+                if route and route in kc:
+                    resolved[name] = kc[route].model_dump()
         except Exception as e:
             logger.warning("KC skill LLM resolver failed: %s", e)
             # 仅保留规则匹配的结果，不抛
 
-    state.knowledge_skills = resolved
-    return state
+    return {"kc_skills": resolved}
 ```
 
 LLM 兜底的结构化输出：
@@ -155,9 +168,10 @@ class ResolverMapping(BaseModel):
 - 输出约束：严格返回 `ResolverMapping` JSON
 
 **错误处理与降级**：
-- `kc_skills.json` 缺失 → loader 返回 `{}` → resolver 所有节点都 unresolved → `leaf_index()` 为空，Step 2 跳过 → `state.knowledge_skills = {}`
-- 图谱为空 → resolver 短路返回
+- `kc_skills.json` 缺失 → loader 返回 `{}` → resolver 所有节点都 unresolved → `leaf_index()` 为空，Step 2 跳过 → `{"kc_skills": {}}`
+- 图谱为空 → resolver 返回 `{}`（state 不变）
 - LLM 异常 → 保留规则结果，warning 日志
+- `use_kc_skills=False` → 返回 `{}`（state 不变，`kc_skills` 保持 `None`）
 
 ### LangGraph 布线
 
@@ -185,15 +199,14 @@ knowledge_graph --> kc_skill_resolver --> (既有下游分支)
 
 ### `render_kc_skill_block` helper
 
-放在 `src/prompts/loader.py`（保持模板加载统一入口）：
+放在 `src/prompts/loader.py`（保持模板加载统一入口）。输入是**纯 dict**（与 state 里存的一致），不是 Pydantic：
 
 ```python
-def render_kc_skill_block(kc_skill: KCSkill | None) -> str:
-    if kc_skill is None:
+def render_kc_skill_block(kc_skill: dict | None) -> str:
+    """kc_skill is the dict form (KCSkill.model_dump()) or None."""
+    if not kc_skill:
         return ""
-    return env.get_template("kc_skill_block.j2").render(
-        kc_skill=kc_skill.model_dump()
-    )
+    return render_prompt("kc_skill_block", kc_skill=kc_skill)
 ```
 
 下游节点统一调这个 helper，返回字符串塞进模板上下文的 `kc_skill_block` 变量。
@@ -203,9 +216,9 @@ def render_kc_skill_block(kc_skill: KCSkill | None) -> str:
 每个节点在已经拿到 `knowledge_point_name` 的位置加 3 行：
 
 ```python
-kc_skill = (state.knowledge_skills or {}).get(kp_name)
+kc_skill = (state.get("kc_skills") or {}).get(kp_name)
 kc_skill_block = render_kc_skill_block(kc_skill)
-ctx = {..., "kc_skill_block": kc_skill_block, ...}
+# ... render_prompt(..., kc_skill_block=kc_skill_block)
 ```
 
 变动位置：
@@ -231,32 +244,45 @@ slides 的 layout JSON prompt 负责的是结构化元素生成，不是内容�
 
 ### 前端：lesson.html 可折叠卡
 
-渲染逻辑：
+现有 `lesson.html` 已经在 `h2` 之后注入一种 pedagogy-derived 的 "inline-ks-card"（读 `state.knowledge_skills`）。**新增**一张不同的 "kc-skill-card" 读 `state.kc_skills`，与其并列但样式区分（不同 summary 图标与颜色），避免学生误以为是同一张卡。
 
-```html
-<!-- 在"当前知识点"区域下方 -->
-<details class="kc-skill-card mt-2">
-  <summary class="cursor-pointer text-sm text-slate-500">
-    AI 教学提示
-  </summary>
-  <div class="mt-2 space-y-1 text-sm">
-    <p><strong>考察重点：</strong><span data-field="考察重点"></span></p>
-    <p><strong>常见易错点：</strong><span data-field="易错点"></span></p>
-    <p><strong>难度提示：</strong><span data-field="难度提示"></span></p>
-  </div>
-</details>
+在 `static/lesson.html` 渲染 lesson 段落后、对 `h2` 做 `forEach` 注入的循环中，**额外**判断 `state.kc_skills` 并为每个 KP name 注入一张：
+
+```javascript
+const kcSkills = state.kc_skills || {};
+// ... 在同一个 h2s.forEach 里
+if (Object.keys(kcSkills).length > 0) {
+  const matchedKey = Object.keys(kcSkills).find(function(k) {
+    return headingText.indexOf(k) !== -1 || k.indexOf(headingText) !== -1;
+  });
+  if (matchedKey) {
+    const kc = kcSkills[matchedKey];
+    const card = document.createElement('div');
+    card.innerHTML =
+      '<details class="kc-skill-card">' +
+        '<summary>📘 出题考察提示：' + escapeHtml(matchedKey) + '</summary>' +
+        '<div class="kc-skill-card-body">' +
+          '<p><strong>考察重点：</strong>' + escapeHtml(kc['考察重点'] || '') + '</p>' +
+          '<p><strong>常见易错点：</strong>' + escapeHtml(kc['易错点'] || '') + '</p>' +
+          '<p><strong>难度提示：</strong>' + escapeHtml(kc['难度提示'] || '') + '</p>' +
+        '</div>' +
+      '</details>';
+    h2.parentNode.insertBefore(card, h2.nextSibling);
+  }
+}
 ```
 
 - `<details>` 原生折叠，不引入 JS 库
-- 所有字段通过 `escapeHtml()` 注入（遵守仓库 XSS 纪律）
-- 对应 KP 在 `state.knowledge_skills` 中查不到 → 整张 `<details>` 不挂载
+- 所有字段通过 `escapeHtml()` 注入（遵守仓库 XSS 纪律）——三个字段都是 LLM 生成的中文文本，无需 markdown
+- `state.kc_skills` 空 / 该 KP 无匹配 → 不挂载任何卡
 - 卡片默认折叠，学生点开才展示——避免"剧透答案"
+- 新增 CSS 类 `.kc-skill-card` 和 `.kc-skill-card-body`（蓝紫色系，区别于橙色 inline-ks-card）
 
 ## 开关与发布
 
 - `.env` 增加 `USE_KC_SKILLS=true`（默认 true）
-- `run/serve.py` 在创建新 session 时把环境变量写进 `state.use_knowledge_skills`
-- 关闭路径：`USE_KC_SKILLS=false` → resolver 短路 → `state.knowledge_skills` 保持 None → 下游 `render_kc_skill_block(None) == ""` → prompt 模板 `{{ kc_skill_block }}` 为空字符串 → 全链路无感降级
+- `src/api/chat.py` 的 `_DEFAULT_STATE` 中 `use_kc_skills` 的默认值从 `os.environ.get("USE_KC_SKILLS", "true").lower() == "true"` 派生（在文件顶部读一次）
+- 关闭路径：`USE_KC_SKILLS=false` → `_DEFAULT_STATE["use_kc_skills"] = False` → 新 session 的 resolver 短路 → `state["kc_skills"]` 保持 `None` → 下游 `render_kc_skill_block(None) == ""` → prompt 模板 `{{ kc_skill_block }}` 为空字符串 → 全链路无感降级
 
 ## 测试
 
@@ -264,16 +290,18 @@ slides 的 layout JSON prompt 负责的是结构化元素生成，不是内容�
   - 正常加载 JSON；
   - `normalize` 的边界（空白/标点/大小写）；
   - 精确匹配 vs 包含匹配；
-  - 多候选时最长 route 优先；
+  - 多候选时最长 route 优先，段数相同按字典序；
   - JSON 缺失 / 损坏 → 返回 `{}` 不抛。
 - `tests/test_kc_skill_resolver.py`
   - 图谱全部节点命中规则 → LLM 不调用；
   - 部分节点走 LLM 兜底（mock Instructor）；
   - LLM 抛错 → 仅保留规则结果，state 不变坏；
-  - `use_knowledge_skills=False` → 节点短路，state 不变。
-- `tests/test_quiz.py` / 现有节点测试扩展
-  - 给定 `state.knowledge_skills` 非空 → 断言渲染后的 prompt 含 "考察重点"；
-  - 空 `knowledge_skills` → 断言 prompt 不含 KC skill 段落标题。
+  - `use_kc_skills=False` → 节点短路，返回 `{}`；
+  - `kc_skills.json` 为空（`leaf_index()` 空）且有 unresolved → LLM 也不调用。
+- `tests/test_prompts.py` 扩展 `kc_skill_block`
+  - 非空 dict → 断言渲染结果含 "考察重点"；
+  - None / 空 dict → 断言返回空字符串。
+- `tests/test_skills.py` 不动（pedagogy 逻辑未变）
 - 不做端到端集成测试（会话层测试已覆盖 graph 主链路）
 
 ## 风险与权衡
