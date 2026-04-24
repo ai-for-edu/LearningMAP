@@ -80,3 +80,29 @@ def test_render_kc_skill_block_empty_returns_empty_string():
     from src.prompts.loader import render_kc_skill_block
     assert render_kc_skill_block(None) == ""
     assert render_kc_skill_block({}) == ""
+
+
+def test_quiz_generate_renders_kc_skill_block():
+    block = "## KC 测试块\n- 易错点：示例"
+    result = render_prompt(
+        "quiz_generate",
+        knowledge_points=[{"name": "乘法原理", "description": "desc"}],
+        questions_per_point=2,
+        skill_instructions="",
+        kc_skill_block=block,
+    )
+    assert "KC 测试块" in result
+    assert "易错点：示例" in result
+
+
+def test_quiz_generate_omits_kc_skill_block_when_empty():
+    result = render_prompt(
+        "quiz_generate",
+        knowledge_points=[{"name": "乘法原理", "description": "desc"}],
+        questions_per_point=2,
+        skill_instructions="",
+        kc_skill_block="",
+    )
+    # The block would have a distinctive heading — verify it's absent
+    assert "当前知识点的出题" not in result
+    assert "KC 测试块" not in result

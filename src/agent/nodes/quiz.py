@@ -4,7 +4,7 @@ import logging
 from src.agent.state import LearningState
 from src.llm.client import get_llm_client, get_model_name
 from src.llm.schemas import QuizQuestion
-from src.prompts.loader import render_prompt
+from src.prompts.loader import render_prompt, render_kc_skill_block
 from src.skills.loader import get_skill_section
 from langchain_core.messages import AIMessage
 
@@ -30,11 +30,19 @@ def quiz_node(state: LearningState) -> dict:
                    for n in nodes]
 
         skill_instructions = get_skill_section(state, "quiz")
+        kc_skills_state = state.get("kc_skills") or {}
+        blocks = []
+        for p in points:
+            b = render_kc_skill_block(kc_skills_state.get(p["name"]))
+            if b:
+                blocks.append(b)
+        kc_skill_block = "\n\n".join(blocks)
         prompt = render_prompt(
             "quiz_generate",
             knowledge_points=points,
             questions_per_point=QUESTIONS_PER_POINT,
             skill_instructions=skill_instructions,
+            kc_skill_block=kc_skill_block,
         )
         client = get_llm_client()
         generated = client.chat.completions.create(
@@ -84,12 +92,14 @@ def quiz_generate_progressive(state: dict):
         name = node.name if hasattr(node, "name") else node["name"]
         desc = node.description if hasattr(node, "description") else node.get("description", "")
         point = {"name": name, "description": desc}
+        kc_skill_block = render_kc_skill_block((state.get("kc_skills") or {}).get(name))
 
         prompt = render_prompt(
             "quiz_generate",
             knowledge_points=[point],
             questions_per_point=QUESTIONS_PER_POINT,
             skill_instructions=skill_instructions,
+            kc_skill_block=kc_skill_block,
         )
 
         try:

@@ -6,6 +6,7 @@ You are a quiz generator for adaptive learning. Generate multiple-choice questio
 Apply the above method when designing questions.
 
 {% endif %}
+{{ kc_skill_block }}
 Knowledge points to test:
 {% for point in knowledge_points %}
 - {{ point.name }}: {{ point.description }}
