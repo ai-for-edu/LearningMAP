@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import uuid
 from typing import Any
 
@@ -31,6 +32,8 @@ def _get_graph():
     return _graph
 
 
+_USE_KC_SKILLS_DEFAULT = os.environ.get("USE_KC_SKILLS", "true").lower() == "true"
+
 _DEFAULT_STATE = {
     "messages": [],
     "mode": "chat",
@@ -48,6 +51,8 @@ _DEFAULT_STATE = {
     "active_skill_content": None,
     "knowledge_skills": None,
     "use_knowledge_skills": True,
+    "kc_skills": None,
+    "use_kc_skills": _USE_KC_SKILLS_DEFAULT,
     "pending_topic": None,
     "quiz_task_status": None,
     "quiz_task_progress": None,

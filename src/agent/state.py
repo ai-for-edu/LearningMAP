@@ -35,5 +35,10 @@ class LearningState(MessagesState):
         bool  # whether to generate knowledge point skills (user toggle)
     )
 
+    # KC skills (knowledge-component metadata loaded from XES3G5M/metadata/kc_skills.json)
+    # Orthogonal to the existing knowledge_skills field (which holds pedagogy-derived text).
+    kc_skills: dict | None  # {kp_name: KCSkill.model_dump()}
+    use_kc_skills: bool     # whether kc_skill_resolver should run + prompts inject
+
     # Pending topic waiting for skill selection
     pending_topic: str | None
