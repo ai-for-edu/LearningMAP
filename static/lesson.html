@@ -177,6 +177,39 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 .inline-ks-card summary::marker, .inline-ks-card summary::-webkit-details-marker { display: none; }
 .inline-ks-card-body { padding: 0 14px 12px; font-size: 11px; color: #166534; line-height: 1.55; }
 
+.kc-skill-card {
+  margin: 12px 0;
+  border: 1px solid #C7D4E8;
+  border-radius: 8px;
+  background: #F1F5FB;
+  overflow: hidden;
+}
+.kc-skill-card summary {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3B5A8A;
+  cursor: pointer;
+  list-style: none;
+}
+.kc-skill-card summary::-webkit-details-marker { display: none; }
+.kc-skill-card summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.15s;
+}
+.kc-skill-card[open] summary::before { transform: rotate(90deg); }
+.kc-skill-card-body {
+  padding: 10px 14px 14px 26px;
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.6;
+  background: white;
+}
+.kc-skill-card-body p { margin: 4px 0; }
+.kc-skill-card-body strong { color: #3B5A8A; }
+
 /* Pedagogy skill card */
 .pedagogy-skill-card { background: var(--accent-light); border: 1.5px solid var(--accent-border); border-radius: 10px; margin-bottom: 16px; }
 .pedagogy-skill-card summary { padding: 12px 16px; font-size: 13px; font-weight: 600; color: var(--accent-dark); cursor: pointer; display: flex; align-items: center; gap: 8px; list-style: none; }
@@ -571,6 +604,39 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
           '</details>';
         h2.parentNode.insertBefore(card, h2.nextSibling);
       }
+    });
+  }
+
+  // --- KC skill cards (from state.kc_skills, independent of pedagogy knowledge_skills) ---
+  const kcSkills = state.kc_skills || {};
+  if (Object.keys(kcSkills).length > 0) {
+    const sectionElKc = document.getElementById('section-1');
+    const h2sKc = sectionElKc.querySelectorAll('h2');
+    h2sKc.forEach(function(h2) {
+      const headingText = h2.textContent.trim();
+      const matchedKey = Object.keys(kcSkills).find(function(k) {
+        return headingText.indexOf(k) !== -1 || k.indexOf(headingText) !== -1;
+      });
+      if (!matchedKey) return;
+      const kc = kcSkills[matchedKey] || {};
+      const card = document.createElement('div');
+      card.innerHTML =
+        '<details class="kc-skill-card">' +
+          '<summary>📘 出题考察提示：' + escapeHtml(matchedKey) + '</summary>' +
+          '<div class="kc-skill-card-body">' +
+            '<p><strong>考察重点：</strong>' + escapeHtml(kc['考察重点'] || '') + '</p>' +
+            '<p><strong>常见易错点：</strong>' + escapeHtml(kc['易错点'] || '') + '</p>' +
+            '<p><strong>难度提示：</strong>' + escapeHtml(kc['难度提示'] || '') + '</p>' +
+          '</div>' +
+        '</details>';
+      // Insert after any existing inline-ks-card that's already a sibling
+      let insertAfter = h2;
+      let next = h2.nextSibling;
+      while (next && next.nodeType === 1 && next.querySelector && next.querySelector('.inline-ks-card')) {
+        insertAfter = next;
+        next = next.nextSibling;
+      }
+      insertAfter.parentNode.insertBefore(card, insertAfter.nextSibling);
     });
   }
 
