@@ -9,5 +9,8 @@ def test_build_graph_compiles():
 def test_graph_has_expected_nodes():
     graph = build_graph()
     node_names = set(graph.nodes.keys())
-    expected = {"intent", "chat", "knowledge_graph", "quiz", "grading", "diagnosis", "lesson"}
+    expected = {
+        "intent", "chat", "knowledge_graph", "kc_skill_resolver",
+        "quiz", "grading", "diagnosis", "lesson",
+    }
     assert expected.issubset(node_names)

@@ -6,6 +6,7 @@ from src.agent.nodes import (
     intent_node,
     chat_node,
     knowledge_graph_node,
+    kc_skill_resolver_node,
     quiz_node,
     grading_node,
     diagnosis_node,
@@ -53,6 +54,7 @@ def build_graph() -> StateGraph:
     builder.add_node("intent", intent_node)
     builder.add_node("chat", chat_node)
     builder.add_node("knowledge_graph", knowledge_graph_node)
+    builder.add_node("kc_skill_resolver", kc_skill_resolver_node)
     builder.add_node("quiz", quiz_node)
     builder.add_node("grading", grading_node)
     builder.add_node("diagnosis", diagnosis_node)
@@ -73,7 +75,8 @@ def build_graph() -> StateGraph:
 
     # Terminal edges
     builder.add_edge("chat", END)
-    builder.add_edge("knowledge_graph", END)
+    builder.add_edge("knowledge_graph", "kc_skill_resolver")
+    builder.add_edge("kc_skill_resolver", END)
     builder.add_edge("quiz", END)
 
     # Grading → quiz or diagnosis
