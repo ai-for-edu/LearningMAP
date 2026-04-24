@@ -63,3 +63,16 @@ class KCSkill(BaseModel):
     考察形式: str = Field(..., description="题型分布 + 常见题干模式 + 情境套路，80-150 字")
     易错点: str = Field(..., description="从 analysis 归纳的高频错误，50-120 字")
     难度提示: str = Field(..., description="数字量级 / 嵌套深度 / 多步性，50-100 字")
+
+
+class ResolverMapping(BaseModel):
+    """LLM output for the kc_skill_resolver fallback call.
+
+    Maps figure-node names to the best-matching kc_skills.json route,
+    or None if no reasonable match exists.
+    """
+
+    mapping: dict[str, str | None] = Field(
+        ...,
+        description="{node_name: full_route | null} — one entry per unresolved node.",
+    )

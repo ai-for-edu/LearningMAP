@@ -1,0 +1,22 @@
+你是一个知识点路径匹配器。下面给出 N 个自由生成的知识点名称，以及 M 个来自题库的候选 leaf 路径。对每个知识点名称，从候选 leaf 中选择**最匹配**的一个，返回它对应的完整 route 字符串；如果没有合理匹配，返回 null。
+
+## 判断标准
+- 完整语义对应（不是字面包含即视为匹配）
+- 细分程度优先：候选里既有"乘法原理"又有"乘法原理里的其他类型"时，若节点语义更接近具体子类，选子类；若只是泛指，选泛化版
+- 不确定时宁可返回 null，也不要强行匹配
+
+## 待匹配的图节点
+{% for name in unresolved_nodes %}
+- {{ name }}
+{% endfor %}
+
+## 候选 leaf → route 映射
+{% for leaf, routes in candidates.items() %}
+- leaf "{{ leaf }}":
+  {% for r in routes %}
+  - {{ r }}
+  {% endfor %}
+{% endfor %}
+
+## 输出要求
+严格返回一个 `ResolverMapping` 对象，字段 `mapping` 是 `{node_name: route | null}`。每个输入 node_name 都必须出现在 `mapping` 里。
