@@ -24,7 +24,7 @@ from src.llm.slide_schemas import (
     TableElement,
     TextElement,
 )
-from src.prompts.loader import render_prompt
+from src.prompts.loader import render_prompt, render_kc_skill_block
 from src.utils.json_repair import parse_json_response
 from src.utils.text import has_cjk
 
@@ -75,7 +75,16 @@ def generate_slide_outlines(state: dict) -> list[SlideOutline]:
                     )
                 weak_points.append({"name": name, "description": desc})
 
-    prompt = render_prompt("slide_outline", topic=topic, weak_points=weak_points)
+    kc_skills = state.get("kc_skills") or {}
+    blocks = [render_kc_skill_block(kc_skills.get(wp["name"])) for wp in weak_points]
+    kc_skill_block = "\n\n".join(b for b in blocks if b)
+
+    prompt = render_prompt(
+        "slide_outline",
+        topic=topic,
+        weak_points=weak_points,
+        kc_skill_block=kc_skill_block,
+    )
 
     try:
         client = get_llm_client()

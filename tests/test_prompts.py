@@ -123,3 +123,15 @@ def test_lesson_point_renders_kc_skill_block():
     )
     assert "KC 课件块" in result
     assert "难度提示：示例" in result
+
+
+def test_slide_outline_renders_kc_skill_block():
+    block = "## KC 课件块\n- 难度提示：slide 测试"
+    result = render_prompt(
+        "slide_outline",
+        topic="计数",
+        weak_points=[{"name": "乘法原理", "description": "desc"}],
+        kc_skill_block=block,
+    )
+    assert "KC 课件块" in result
+    assert "slide 测试" in result
