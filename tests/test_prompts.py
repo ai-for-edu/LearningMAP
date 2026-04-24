@@ -106,3 +106,20 @@ def test_quiz_generate_omits_kc_skill_block_when_empty():
     # The block would have a distinctive heading — verify it's absent
     assert "当前知识点的出题" not in result
     assert "KC 测试块" not in result
+
+
+def test_lesson_point_renders_kc_skill_block():
+    block = "## KC 课件块\n- 难度提示：示例"
+    result = render_prompt(
+        "lesson_point",
+        topic="勾股定理",
+        knowledge_point_name="直角三角形",
+        knowledge_point_description="desc",
+        pedagogy_instructions="无特定教学法要求",
+        knowledge_skill="无额外教学技能",
+        point_index=1,
+        total_points=1,
+        kc_skill_block=block,
+    )
+    assert "KC 课件块" in result
+    assert "难度提示：示例" in result

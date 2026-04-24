@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from src.agent.state import LearningState
 from src.llm.client import get_raw_client, get_model_name
-from src.prompts.loader import render_prompt
+from src.prompts.loader import render_prompt, render_kc_skill_block
 from src.skills.loader import get_skill_section
 from langchain_core.messages import AIMessage
 
@@ -125,6 +125,7 @@ def generate_lesson_per_point(
     weak_points: list[dict],
     pedagogy_instructions: str,
     knowledge_skills: dict[str, str],
+    kc_skills: dict | None = None,
 ) -> str:
     """Step 2: Generate lesson content per knowledge point, then concatenate."""
     client = get_raw_client()
@@ -132,6 +133,7 @@ def generate_lesson_per_point(
     total = len(weak_points)
 
     for i, wp in enumerate(weak_points):
+        kc_skill_block = render_kc_skill_block((kc_skills or {}).get(wp["name"]))
         prompt = render_prompt(
             "lesson_point",
             topic=topic,
@@ -141,6 +143,7 @@ def generate_lesson_per_point(
             knowledge_skill=knowledge_skills.get(wp["name"], "无额外教学技能"),
             point_index=i + 1,
             total_points=total,
+            kc_skill_block=kc_skill_block,
         )
         response = client.chat.completions.create(
             model=get_model_name(),
@@ -203,7 +206,8 @@ def lesson_node(state: LearningState) -> dict:
 
     # Step 2: Generate per-point content
     lesson_text = generate_lesson_per_point(
-        topic, weak_points, pedagogy_instructions, knowledge_skills
+        topic, weak_points, pedagogy_instructions, knowledge_skills,
+        kc_skills=state.get("kc_skills"),
     )
 
     return {
@@ -326,6 +330,7 @@ def lesson_node_stream(state: dict):
         if i > 0:
             yield "\n\n---\n\n"
 
+        kc_skill_block = render_kc_skill_block((state.get("kc_skills") or {}).get(wp["name"]))
         prompt = render_prompt(
             "lesson_point",
             topic=topic,
@@ -335,6 +340,7 @@ def lesson_node_stream(state: dict):
             knowledge_skill=knowledge_skills.get(wp["name"], "无额外教学技能"),
             point_index=i + 1,
             total_points=total,
+            kc_skill_block=kc_skill_block,
         )
         stream = client.chat.completions.create(
             model=get_model_name(),
