@@ -112,15 +112,16 @@ def _extract_subgraph(
             break
         selected[anc] = "prerequisite"
 
-    # Siblings (other children of immediate parent)
+    # Siblings (other children of immediate parent). Reserve a slot for descendants
+    # only when r* actually has children — otherwise leaf graphs get cheated.
     parent = parent_of.get(route)
+    has_descendants = bool(children_of.get(route))
+    sib_cap = max_nodes - 1 if has_descendants else max_nodes
     if parent is not None:
         for sib in children_of.get(parent, []):
             if sib == route:
                 continue
-            if (
-                len(selected) >= max_nodes - 1
-            ):  # keep at least 1 slot for descendants if possible
+            if len(selected) >= sib_cap:
                 break
             selected.setdefault(sib, "extension")
 
@@ -134,17 +135,17 @@ def _extract_subgraph(
             if len(selected) >= max_nodes:
                 break
 
-    # Leaf-match degradation: pull uncles until ≥ _LEAF_MIN_NODES (capped by max_nodes)
-    if not children_of.get(route):  # leaf
-        if parent is not None:
-            grandparent = parent_of.get(parent)
-            if grandparent is not None:
-                for uncle in children_of.get(grandparent, []):
-                    if uncle == parent:
-                        continue
-                    if len(selected) >= max_nodes:
-                        break
-                    selected.setdefault(uncle, "extension")
+    # Leaf-match degradation: if r* is a leaf, pull in uncles (siblings of parent)
+    # until the graph reaches _LEAF_MIN_NODES nodes. This prevents single-point graphs.
+    if not children_of.get(route) and parent is not None:
+        grandparent = parent_of.get(parent)
+        if grandparent is not None:
+            for uncle in children_of.get(grandparent, []):
+                if uncle == parent:
+                    continue
+                if len(selected) >= _LEAF_MIN_NODES or len(selected) >= max_nodes:
+                    break
+                selected.setdefault(uncle, "extension")
 
     # Build nodes
     nodes = [
@@ -158,11 +159,10 @@ def _extract_subgraph(
     ]
 
     # Build edges: parent→child within selection
-    selected_ids = set(selected)
     edges = [
         KnowledgeEdge(source=parent_of[c], target=c, relation="prerequisite")
-        for c in selected_ids
-        if parent_of.get(c) in selected_ids
+        for c in selected
+        if parent_of.get(c) in selected
     ]
 
     return KnowledgeGraph(

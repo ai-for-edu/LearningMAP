@@ -134,8 +134,11 @@ def test_leaf_match_falls_back_to_uncle_nodes(tmp_path):
     kc_loader._LEAF_INDEX = None
     kc_loader._TREE_CACHE = {}
     sample = {
-        "知识点----A----只有一个孩子----叶子": {
-            "route": "知识点----A----只有一个孩子----叶子",
+        # Route is 3 segments deep so only 1 ancestor is selectable (grandparent
+        # is the root and is skipped). With core+1 ancestor = 2 nodes, the
+        # leaf-degradation step must pull an uncle to reach _LEAF_MIN_NODES (3).
+        "知识点----A----叶子": {
+            "route": "知识点----A----叶子",
             "leaf": "叶子",
             "skill": {
                 "description": "d",
@@ -145,9 +148,9 @@ def test_leaf_match_falls_back_to_uncle_nodes(tmp_path):
                 "难度提示": "x",
             },
         },
-        "知识点----A----另一个分支": {
-            "route": "知识点----A----另一个分支",
-            "leaf": "另一个分支",
+        "知识点----B----另一个孩子": {
+            "route": "知识点----B----另一个孩子",
+            "leaf": "另一个孩子",
             "skill": {
                 "description": "d",
                 "考察重点": "x",
@@ -160,11 +163,11 @@ def test_leaf_match_falls_back_to_uncle_nodes(tmp_path):
     p = tmp_path / "kc_skills.json"
     p.write_text(json.dumps(sample, ensure_ascii=False), encoding="utf-8")
     kc_loader.load_kc_skills(p)
-    g = _extract_subgraph("知识点----A----只有一个孩子----叶子", max_nodes=10)
+    g = _extract_subgraph("知识点----A----叶子", max_nodes=10)
     assert len(g.nodes) >= 3
     ext_ids = {n.id for n in g.nodes if n.level == "extension"}
-    # Uncle "另一个分支" reached
-    assert "知识点----A----另一个分支" in ext_ids
+    # Uncle "知识点----B" (sibling of parent 知识点----A under root 知识点) is reached.
+    assert "知识点----B" in ext_ids
 
 
 def test_edges_only_for_parent_child():
@@ -196,3 +199,117 @@ def test_node_description_falls_back_for_synthetic():
     synthetic = [n for n in g.nodes if n.id == "拓展思维----计数模块"]
     if synthetic:
         assert synthetic[0].description == "计数模块"
+
+
+def test_leaf_degradation_stops_at_leaf_min_nodes(tmp_path):
+    """When r* is a leaf with many uncles available, only fill uncles until ≥ _LEAF_MIN_NODES (3)."""
+    kc_loader._KC_SKILLS = None
+    kc_loader._LEAF_INDEX = None
+    kc_loader._TREE_CACHE = {}
+    sample = {
+        "知识点----A----只有一个孩子----叶子": {
+            "route": "知识点----A----只有一个孩子----叶子",
+            "leaf": "叶子",
+            "skill": {
+                "description": "d",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+        "知识点----A----分支1": {
+            "route": "知识点----A----分支1",
+            "leaf": "分支1",
+            "skill": {
+                "description": "d",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+        "知识点----A----分支2": {
+            "route": "知识点----A----分支2",
+            "leaf": "分支2",
+            "skill": {
+                "description": "d",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+        "知识点----A----分支3": {
+            "route": "知识点----A----分支3",
+            "leaf": "分支3",
+            "skill": {
+                "description": "d",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+        "知识点----A----分支4": {
+            "route": "知识点----A----分支4",
+            "leaf": "分支4",
+            "skill": {
+                "description": "d",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+    }
+    p = tmp_path / "kc_skills.json"
+    p.write_text(json.dumps(sample, ensure_ascii=False), encoding="utf-8")
+    kc_loader.load_kc_skills(p)
+    g = _extract_subgraph("知识点----A----只有一个孩子----叶子", max_nodes=10)
+    # core (1) + ancestor "只有一个孩子" (1) + at most one uncle to reach 3 nodes total.
+    # NOT all 4 uncles even though max_nodes=10 leaves room.
+    assert len(g.nodes) == 3
+
+
+def test_subgraph_with_max_nodes_one():
+    """max_nodes=1 returns just the core."""
+    g = _extract_subgraph("拓展思维----计数模块----加乘原理----乘法原理", max_nodes=1)
+    assert len(g.nodes) == 1
+    assert g.nodes[0].level == "core"
+
+
+def test_leaf_with_many_siblings_uses_full_budget(tmp_path):
+    """Leaf match + many siblings: sibling reservation should NOT block the last sibling slot."""
+    kc_loader._KC_SKILLS = None
+    kc_loader._LEAF_INDEX = None
+    kc_loader._TREE_CACHE = {}
+    sample = {
+        f"知识点----A----叶{i}": {
+            "route": f"知识点----A----叶{i}",
+            "leaf": f"叶{i}",
+            "skill": {
+                "description": "d",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        }
+        for i in range(15)
+    }
+    p = tmp_path / "kc_skills.json"
+    p.write_text(json.dumps(sample, ensure_ascii=False), encoding="utf-8")
+    kc_loader.load_kc_skills(p)
+    g = _extract_subgraph("知识点----A----叶0", max_nodes=10)
+    # Core (1) + ancestor "A" (1) + 8 siblings = 10. No reserved descendant slot since r* is a leaf.
+    assert len(g.nodes) == 10
+
+
+def test_edges_order_is_deterministic():
+    """Edge order must be stable across runs for snapshot/serialization stability."""
+    g1 = _extract_subgraph("拓展思维----计数模块----加乘原理----乘法原理", max_nodes=10)
+    g2 = _extract_subgraph("拓展思维----计数模块----加乘原理----乘法原理", max_nodes=10)
+    assert [(e.source, e.target) for e in g1.edges] == [
+        (e.source, e.target) for e in g2.edges
+    ]
