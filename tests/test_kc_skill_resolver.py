@@ -23,7 +23,10 @@ def _skill(mark: str = "重点") -> KCSkill:
 
 
 def _graph(names: list[str]) -> KnowledgeGraph:
-    nodes = [KnowledgeNode(id=str(i), name=n, description="", level="core") for i, n in enumerate(names)]
+    nodes = [
+        KnowledgeNode(id=str(i), name=n, description="", level="core")
+        for i, n in enumerate(names)
+    ]
     return KnowledgeGraph(topic="t", nodes=nodes, edges=[])
 
 
@@ -133,3 +136,68 @@ def test_resolver_skips_llm_when_leaf_index_empty():
 
     mock_llm.assert_not_called()
     assert patch_dict == {"kc_skills": {}}
+
+
+def test_resolver_id_fast_path_for_route_id():
+    """Route-id node hits _KC_SKILLS directly; resolve_by_leaf is NOT called."""
+    from src.agent.nodes.kc_skill_resolver import kc_skill_resolver_node
+
+    kc_loader._KC_SKILLS = {"知识点----乘法原理": _skill("A")}
+    kc_loader._LEAF_INDEX = {kc_loader.normalize("乘法原理"): ["知识点----乘法原理"]}
+
+    nodes = [
+        KnowledgeNode(
+            id="知识点----乘法原理", name="乘法原理", description="d", level="core"
+        )
+    ]
+    graph = KnowledgeGraph(topic="t", nodes=nodes, edges=[])
+    state = {"use_kc_skills": True, "knowledge_graph": graph}
+
+    with patch("src.agent.nodes.kc_skill_resolver.resolve_by_leaf") as mock_leaf:
+        result = kc_skill_resolver_node(state)
+        mock_leaf.assert_not_called()
+
+    assert "乘法原理" in result["kc_skills"]
+    assert result["kc_skills"]["乘法原理"]["考察重点"] == "A-重点"
+
+
+def test_resolver_skips_synthetic_prefix_silently():
+    """Synthetic-prefix node (id has '----' but isn't in _KC_SKILLS) → skipped, no leaf fallback."""
+    from src.agent.nodes.kc_skill_resolver import kc_skill_resolver_node
+
+    # Real route lives at a different leaf path; synthetic-prefix node has the same tail name but no entry
+    kc_loader._KC_SKILLS = {"知识点----乘法原理": _skill("A")}
+    kc_loader._LEAF_INDEX = {kc_loader.normalize("乘法原理"): ["知识点----乘法原理"]}
+
+    nodes = [
+        KnowledgeNode(
+            id="知识点----加乘原理----乘法原理",
+            name="乘法原理",
+            description="d",
+            level="core",
+        )
+    ]
+    graph = KnowledgeGraph(topic="t", nodes=nodes, edges=[])
+    state = {"use_kc_skills": True, "knowledge_graph": graph}
+
+    with patch("src.agent.nodes.kc_skill_resolver.resolve_by_leaf") as mock_leaf:
+        result = kc_skill_resolver_node(state)
+        mock_leaf.assert_not_called()
+
+    # No false positive — the synthetic node is silently skipped.
+    assert result.get("kc_skills", {}) == {}
+
+
+def test_resolver_legacy_path_for_non_route_ids():
+    """Node id without '----' falls through to existing leaf-name resolver."""
+    from src.agent.nodes.kc_skill_resolver import kc_skill_resolver_node
+
+    kc_loader._KC_SKILLS = {"root----乘法原理": _skill("A")}
+    kc_loader._LEAF_INDEX = {kc_loader.normalize("乘法原理"): ["root----乘法原理"]}
+
+    nodes = [KnowledgeNode(id="n1", name="乘法原理", description="d", level="core")]
+    graph = KnowledgeGraph(topic="t", nodes=nodes, edges=[])
+    state = {"use_kc_skills": True, "knowledge_graph": graph}
+
+    result = kc_skill_resolver_node(state)
+    assert "乘法原理" in result["kc_skills"]

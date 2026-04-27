@@ -18,7 +18,9 @@ from src.skills.kc_loader import get_kc_skills, leaf_index, resolve_by_leaf
 logger = logging.getLogger(__name__)
 
 
-def _llm_resolve(unresolved: list[str], candidate_leaves: list[str]) -> dict[str, str | None]:
+def _llm_resolve(
+    unresolved: list[str], candidate_leaves: list[str]
+) -> dict[str, str | None]:
     """Ask the LLM to map each unresolved node name to a route (or null).
 
     `candidate_leaves` is accepted for symmetry with the caller but the prompt
@@ -51,14 +53,27 @@ def kc_skill_resolver_node(state: LearningState) -> dict:
         return {}
 
     nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
+    kc_skills_map = get_kc_skills()  # full-bank flat cache
 
     resolved: dict[str, dict] = {}
     unresolved: list[str] = []
 
     for node in nodes:
         name = node.name if hasattr(node, "name") else node["name"]
+        nid = node.id if hasattr(node, "id") else node["id"]
         if not name:
             continue
+
+        # Fast-path: id is a registered route → direct hit
+        if nid in kc_skills_map:
+            resolved[name] = kc_skills_map[nid].model_dump()
+            continue
+
+        # id looks like a route (has '----') but isn't registered → synthetic prefix, skip silently
+        if "----" in nid:
+            continue
+
+        # Legacy path: LLM-fallback graphs whose ids aren't routes
         hit = resolve_by_leaf(name)
         if hit is not None:
             resolved[name] = hit.model_dump()
@@ -68,11 +83,13 @@ def kc_skill_resolver_node(state: LearningState) -> dict:
     if unresolved and leaf_index():
         try:
             mapping = _llm_resolve(unresolved, list(leaf_index().keys()))
-            kc = get_kc_skills()
             for name, route in mapping.items():
-                if route and route in kc:
-                    resolved[name] = kc[route].model_dump()
+                if route and route in kc_skills_map:
+                    resolved[name] = kc_skills_map[route].model_dump()
         except Exception:
-            logger.warning("KC skill LLM resolver failed; keeping rule-matched results only", exc_info=True)
+            logger.warning(
+                "KC skill LLM resolver failed; keeping rule-matched results only",
+                exc_info=True,
+            )
 
     return {"kc_skills": resolved}
