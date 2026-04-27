@@ -5,7 +5,7 @@ import json
 import pytest
 
 from src.skills import kc_loader
-from src.skills.kc_graph import _extract_subgraph, _rule_match_route
+from src.skills.kc_graph import _extract_subgraph, _rule_match_route, resolve_kc_graph
 
 
 @pytest.fixture(autouse=True)
@@ -313,3 +313,25 @@ def test_edges_order_is_deterministic():
     assert [(e.source, e.target) for e in g1.edges] == [
         (e.source, e.target) for e in g2.edges
     ]
+
+
+def test_resolve_returns_graph_on_match():
+    g = resolve_kc_graph("乘法原理", max_nodes=10)
+    assert g is not None
+    assert g.topic == "乘法原理"
+    cores = [n for n in g.nodes if n.level == "core"]
+    assert cores[0].name == "乘法原理"
+
+
+def test_resolve_returns_none_on_miss():
+    assert resolve_kc_graph("完全无关的话题") is None
+
+
+def test_resolve_llm_mode_raises_not_implemented():
+    with pytest.raises(NotImplementedError):
+        resolve_kc_graph("乘法原理", mode="llm")
+
+
+def test_resolve_unknown_mode_raises_value_error():
+    with pytest.raises(ValueError):
+        resolve_kc_graph("乘法原理", mode="garbage")  # type: ignore[arg-type]

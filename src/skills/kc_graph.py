@@ -168,3 +168,44 @@ def _extract_subgraph(
     return KnowledgeGraph(
         topic=topic or route.split("----")[-1], nodes=nodes, edges=edges
     )
+
+
+def _llm_match_route(
+    topic: str,
+    allowed_roots: frozenset[str] | None = None,
+) -> str | None:
+    raise NotImplementedError(
+        "LLM-driven route matching is not yet implemented. Future upgrade — see spec §6."
+    )
+
+
+def _match_route(
+    topic: str,
+    *,
+    mode: ResolverMode,
+    allowed_roots: frozenset[str] | None,
+) -> str | None:
+    if mode == "rule":
+        return _rule_match_route(topic, allowed_roots)
+    if mode == "llm":
+        return _llm_match_route(topic, allowed_roots)
+    if mode == "rule_then_llm":
+        return _rule_match_route(topic, allowed_roots) or _llm_match_route(
+            topic, allowed_roots
+        )
+    raise ValueError(f"Unknown ResolverMode: {mode!r}")
+
+
+def resolve_kc_graph(
+    topic: str,
+    *,
+    max_nodes: int = 10,
+    mode: ResolverMode = "rule",
+    allowed_roots: frozenset[str] | None = None,
+) -> KnowledgeGraph | None:
+    route = _match_route(topic, mode=mode, allowed_roots=allowed_roots)
+    if route is None:
+        return None
+    return _extract_subgraph(
+        route, max_nodes=max_nodes, topic=topic, allowed_roots=allowed_roots
+    )
