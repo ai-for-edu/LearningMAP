@@ -17,6 +17,7 @@ MAX_NODES = 10
 
 
 def _llm_generate_graph(topic: str, state: LearningState) -> KnowledgeGraph | None:
+    """Render the knowledge_graph prompt and call the LLM; return None on failure."""
     skill_instructions = get_skill_section(state, "knowledge_graph")
     prompt = render_prompt(
         "knowledge_graph",

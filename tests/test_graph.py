@@ -33,7 +33,7 @@ def _fake_llm_graph() -> KnowledgeGraph:
     )
 
 
-def test_knowledge_graph_node_uses_kc_when_topic_matches(monkeypatch):
+def test_knowledge_graph_node_uses_kc_when_topic_matches():
     """Topic matches kc bank → resolve_kc_graph returns a graph; LLM is NOT called."""
     from src.agent.nodes import knowledge_graph as node_mod
 
@@ -87,3 +87,18 @@ def test_knowledge_graph_node_skips_kc_when_flag_off():
         node_mod.knowledge_graph_node(state)
         mock_resolve.assert_not_called()
         mock_llm.assert_called_once()
+
+
+def test_knowledge_graph_node_returns_failure_when_both_paths_miss():
+    """When both kc lookup and LLM generation return None, return the failure dict."""
+    from src.agent.nodes import knowledge_graph as node_mod
+
+    state = {"topic": "x", "use_kc_skills": True}
+    with (
+        patch.object(node_mod, "resolve_kc_graph", return_value=None),
+        patch.object(node_mod, "_llm_generate_graph", return_value=None),
+    ):
+        result = node_mod.knowledge_graph_node(state)
+
+    assert result["mode"] == "chat"
+    assert "知识图谱生成失败" in result["messages"][0].content
