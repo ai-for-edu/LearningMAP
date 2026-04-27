@@ -11,12 +11,13 @@ from src.skills import kc_loader
 
 @pytest.fixture(autouse=True)
 def reset_kc_loader_state():
-    """Reset module-level caches before each test."""
     kc_loader._KC_SKILLS = None
     kc_loader._LEAF_INDEX = None
+    kc_loader._TREE_CACHE = {}
     yield
     kc_loader._KC_SKILLS = None
     kc_loader._LEAF_INDEX = None
+    kc_loader._TREE_CACHE = {}
 
 
 def _sample_json(tmp_path: Path) -> Path:
@@ -104,16 +105,22 @@ def test_resolve_by_leaf_prefers_longer_route_on_containment(tmp_path: Path):
             "route": "根----乘法原理",
             "leaf": "乘法原理",
             "skill": {
-                "description": "d", "考察重点": "短 route",
-                "考察形式": "f", "易错点": "e", "难度提示": "l",
+                "description": "d",
+                "考察重点": "短 route",
+                "考察形式": "f",
+                "易错点": "e",
+                "难度提示": "l",
             },
         },
         "根----分支----乘法原理": {
             "route": "根----分支----乘法原理",
             "leaf": "乘法原理",
             "skill": {
-                "description": "d", "考察重点": "长 route",
-                "考察形式": "f", "易错点": "e", "难度提示": "l",
+                "description": "d",
+                "考察重点": "长 route",
+                "考察形式": "f",
+                "易错点": "e",
+                "难度提示": "l",
             },
         },
     }
@@ -135,3 +142,178 @@ def test_normalize_strips_whitespace_and_punctuation():
     assert kc_loader.normalize("  乘法 原理 ") == kc_loader.normalize("乘法原理")
     assert kc_loader.normalize("ABC") == "abc"
     assert kc_loader.normalize("A,B.C!") == "abc"
+
+
+def test_flat_caches_are_full_bank(tmp_path):
+    """allowed_roots must NOT filter the flat caches."""
+    sample = {
+        "知识点----A": {
+            "route": "知识点----A",
+            "leaf": "A",
+            "skill": {
+                "description": "d",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+        "课内题型----B": {
+            "route": "课内题型----B",
+            "leaf": "B",
+            "skill": {
+                "description": "d",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+    }
+    p = tmp_path / "kc_skills.json"
+    p.write_text(json.dumps(sample, ensure_ascii=False), encoding="utf-8")
+    kc_loader.load_kc_skills(p)
+    # Even though 课内题型 is excluded from the default tree, flat caches contain everything.
+    assert "知识点----A" in kc_loader.get_kc_skills()
+    assert "课内题型----B" in kc_loader.get_kc_skills()
+    assert kc_loader.normalize("A") in kc_loader.leaf_index()
+    assert kc_loader.normalize("B") in kc_loader.leaf_index()
+
+
+def test_default_tree_built_for_allowed_roots(tmp_path):
+    sample = {
+        "知识点----A----X": {
+            "route": "知识点----A----X",
+            "leaf": "X",
+            "skill": {
+                "description": "dx",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+        "课内题型----B": {
+            "route": "课内题型----B",
+            "leaf": "B",
+            "skill": {
+                "description": "db",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+    }
+    p = tmp_path / "kc_skills.json"
+    p.write_text(json.dumps(sample, ensure_ascii=False), encoding="utf-8")
+    kc_loader.load_kc_skills(p)
+    tree = kc_loader._get_tree()  # default allowed_roots
+    # 课内题型 root excluded
+    assert "课内题型----B" not in tree.parent_of
+    # 知识点 leaf and synthetic prefix present
+    assert "知识点----A----X" in tree.parent_of
+    assert "知识点----A" in tree.parent_of  # synthetic
+    assert "知识点" in tree.parent_of  # root
+    assert tree.parent_of["知识点"] is None
+    assert tree.parent_of["知识点----A"] == "知识点"
+    assert tree.parent_of["知识点----A----X"] == "知识点----A"
+
+
+def test_synthetic_prefix_node_desc_falls_back_to_leaf_segment(tmp_path):
+    sample = {
+        "知识点----A----X": {
+            "route": "知识点----A----X",
+            "leaf": "X",
+            "skill": {
+                "description": "dx",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+    }
+    p = tmp_path / "kc_skills.json"
+    p.write_text(json.dumps(sample, ensure_ascii=False), encoding="utf-8")
+    kc_loader.load_kc_skills(p)
+    tree = kc_loader._get_tree()
+    assert tree.node_desc["知识点----A----X"] == "dx"  # registered
+    assert tree.node_desc["知识点----A"] == "A"  # synthetic, last segment
+    assert tree.node_desc["知识点"] == "知识点"  # synthetic root
+
+
+def test_tree_cache_keyed_by_allowed_roots(tmp_path):
+    sample = {
+        "知识点----A": {
+            "route": "知识点----A",
+            "leaf": "A",
+            "skill": {
+                "description": "d",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+        "拓展思维----C": {
+            "route": "拓展思维----C",
+            "leaf": "C",
+            "skill": {
+                "description": "d",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+    }
+    p = tmp_path / "kc_skills.json"
+    p.write_text(json.dumps(sample, ensure_ascii=False), encoding="utf-8")
+    kc_loader.load_kc_skills(p)
+    only_kp = kc_loader._get_tree(frozenset({"知识点"}))
+    default = kc_loader._get_tree()
+    assert "拓展思维----C" not in only_kp.parent_of
+    assert "拓展思维----C" in default.parent_of
+    # Same scope returns same instance (cached)
+    again = kc_loader._get_tree(frozenset({"知识点"}))
+    assert again is only_kp
+
+
+def test_parent_child_invariants(tmp_path):
+    sample = {
+        "知识点----A----X": {
+            "route": "知识点----A----X",
+            "leaf": "X",
+            "skill": {
+                "description": "dx",
+                "考察重点": "x",
+                "考察形式": "x",
+                "易错点": "x",
+                "难度提示": "x",
+            },
+        },
+        "知识点----A----Y": {
+            "route": "知识点----A----Y",
+            "leaf": "Y",
+            "skill": {
+                "description": "dy",
+                "考察重点": "y",
+                "考察形式": "y",
+                "易错点": "y",
+                "难度提示": "y",
+            },
+        },
+    }
+    p = tmp_path / "kc_skills.json"
+    p.write_text(json.dumps(sample, ensure_ascii=False), encoding="utf-8")
+    kc_loader.load_kc_skills(p)
+    tree = kc_loader._get_tree()
+    # children_of[知识点----A] contains both X and Y
+    assert set(tree.children_of["知识点----A"]) == {
+        "知识点----A----X",
+        "知识点----A----Y",
+    }
+    # Each child has 知识点----A as parent
+    assert tree.parent_of["知识点----A----X"] == "知识点----A"
+    assert tree.parent_of["知识点----A----Y"] == "知识点----A"

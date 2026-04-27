@@ -10,19 +10,38 @@ from __future__ import annotations
 import json
 import logging
 import string
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from src.llm.schemas import KCSkill
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PATH = Path(__file__).resolve().parent.parent.parent / "XES3G5M" / "metadata" / "kc_skills.json"
+DEFAULT_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "XES3G5M"
+    / "metadata"
+    / "kc_skills.json"
+)
+
+DEFAULT_ALLOWED_ROOTS: frozenset[str] = frozenset({"知识点", "课内知识点", "拓展思维"})
+
+
+@dataclass
+class KCTree:
+    parent_of: dict[str, str | None] = field(default_factory=dict)
+    children_of: dict[str, list[str]] = field(default_factory=dict)
+    node_desc: dict[str, str] = field(default_factory=dict)
+
 
 _KC_SKILLS: dict[str, KCSkill] | None = None  # route -> KCSkill
 _LEAF_INDEX: dict[str, list[str]] | None = None  # normalized leaf -> [routes]
+_TREE_CACHE: dict[frozenset[str], KCTree] = {}
 
 # ASCII punctuation + whitespace + common CJK punctuation, as a set for O(1) membership
-_STRIP_CHARS = frozenset(string.punctuation + string.whitespace + "，。；：、！？「」『』（）【】《》·．")
+_STRIP_CHARS = frozenset(
+    string.punctuation + string.whitespace + "，。；：、！？「」『』（）【】《》·．"
+)
 
 
 def normalize(s: str) -> str:
@@ -47,7 +66,11 @@ def load_kc_skills(path: Path = DEFAULT_PATH) -> dict[str, KCSkill]:
         _LEAF_INDEX = {}
         return _KC_SKILLS
     except Exception:
-        logger.warning("Failed to parse kc_skills.json at %s; KC skills disabled", path, exc_info=True)
+        logger.warning(
+            "Failed to parse kc_skills.json at %s; KC skills disabled",
+            path,
+            exc_info=True,
+        )
         _KC_SKILLS = {}
         _LEAF_INDEX = {}
         return _KC_SKILLS
@@ -127,3 +150,41 @@ def resolve_by_leaf(name: str) -> KCSkill | None:
     # Most specific route wins; lexicographic tie-break
     best = sorted(candidates, key=lambda r: (-_route_depth(r), r))[0]
     return skills.get(best)
+
+
+def _build_tree(allowed_roots: frozenset[str]) -> KCTree:
+    skills = get_kc_skills()
+    tree = KCTree()
+
+    for route, skill in skills.items():
+        parts = route.split("----")
+        if parts[0] not in allowed_roots:
+            continue
+        # Walk every prefix so synthetic ancestors get registered too.
+        for i in range(1, len(parts) + 1):
+            prefix = "----".join(parts[:i])
+            if prefix in tree.parent_of:
+                # Existing entry — only ensure description is registered version if we now know it.
+                if i == len(parts) and skill.description:
+                    tree.node_desc[prefix] = skill.description
+                continue
+            parent = "----".join(parts[: i - 1]) if i > 1 else None
+            tree.parent_of[prefix] = parent
+            tree.children_of.setdefault(prefix, [])
+            if parent is not None:
+                tree.children_of.setdefault(parent, []).append(prefix)
+            # Description: registered route gets skill description; synthetic prefix gets last segment.
+            if i == len(parts) and skill.description:
+                tree.node_desc[prefix] = skill.description
+            else:
+                tree.node_desc[prefix] = parts[i - 1]
+
+    return tree
+
+
+def _get_tree(allowed_roots: frozenset[str] | None = None) -> KCTree:
+    """Return the tree scoped to allowed_roots, building+caching on first request."""
+    key = allowed_roots if allowed_roots is not None else DEFAULT_ALLOWED_ROOTS
+    if key not in _TREE_CACHE:
+        _TREE_CACHE[key] = _build_tree(key)
+    return _TREE_CACHE[key]
