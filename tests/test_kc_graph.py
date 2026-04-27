@@ -318,9 +318,21 @@ def test_edges_order_is_deterministic():
 def test_resolve_returns_graph_on_match():
     g = resolve_kc_graph("乘法原理", max_nodes=10)
     assert g is not None
-    assert g.topic == "乘法原理"
     cores = [n for n in g.nodes if n.level == "core"]
     assert cores[0].name == "乘法原理"
+
+
+def test_resolve_preserves_user_topic_string():
+    """KnowledgeGraph.topic is the raw user input, not the matched route's last segment."""
+    g = resolve_kc_graph("我想学乘法原理", max_nodes=10)
+    assert g is not None
+    assert (
+        g.topic == "我想学乘法原理"
+    )  # passthrough — fails if topic=topic is dropped from _extract_subgraph call
+    cores = [n for n in g.nodes if n.level == "core"]
+    assert (
+        cores[0].name == "乘法原理"
+    )  # core still resolved correctly via segment match
 
 
 def test_resolve_returns_none_on_miss():

@@ -10,7 +10,7 @@ from typing import Literal
 
 from src.llm.schemas import KnowledgeEdge, KnowledgeGraph, KnowledgeNode
 from src.skills.kc_loader import (
-    DEFAULT_ALLOWED_ROOTS,  # noqa: F401  # re-exported for Tasks 3-4
+    DEFAULT_ALLOWED_ROOTS,
     _get_tree,
     normalize,
 )
@@ -174,6 +174,11 @@ def _llm_match_route(
     topic: str,
     allowed_roots: frozenset[str] | None = None,
 ) -> str | None:
+    """LLM-driven route matching. Reserved seam — raises NotImplementedError today.
+
+    See spec §6 (Future-LLM seam). Will be implemented when an LLM-based topic-to-route
+    picker is added; for now this stub guards against accidental ``mode="llm"`` use.
+    """
     raise NotImplementedError(
         "LLM-driven route matching is not yet implemented. Future upgrade — see spec §6."
     )
@@ -185,6 +190,13 @@ def _match_route(
     mode: ResolverMode,
     allowed_roots: frozenset[str] | None,
 ) -> str | None:
+    """Dispatch topic→route matching to the configured mode.
+
+    ``"rule"`` runs the deterministic segment-level matcher. ``"llm"`` raises
+    NotImplementedError today. ``"rule_then_llm"`` falls through to the LLM only
+    when rule matching misses (and therefore also raises today). Unknown modes raise
+    ValueError.
+    """
     if mode == "rule":
         return _rule_match_route(topic, allowed_roots)
     if mode == "llm":
@@ -203,6 +215,16 @@ def resolve_kc_graph(
     mode: ResolverMode = "rule",
     allowed_roots: frozenset[str] | None = None,
 ) -> KnowledgeGraph | None:
+    """Resolve a free-text topic against the kc_skills route taxonomy.
+
+    Returns a ``KnowledgeGraph`` whose ``core`` node is the matched route and whose
+    ``prerequisite``/``extension`` nodes are drawn from ancestors, siblings, and
+    descendants (capped at ``max_nodes``). Returns ``None`` when no route matches —
+    callers should fall back to LLM generation.
+
+    The user's raw ``topic`` string is preserved on ``KnowledgeGraph.topic`` rather
+    than being replaced with the matched route's last segment.
+    """
     route = _match_route(topic, mode=mode, allowed_roots=allowed_roots)
     if route is None:
         return None
