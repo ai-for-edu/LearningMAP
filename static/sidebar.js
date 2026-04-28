@@ -73,10 +73,8 @@
         '</span>';
 
       item.addEventListener('click', function () {
-        if (!isActive) {
-          setCurrentId(session.id);
-          window.location.href = '/?session_id=' + session.id;
-        }
+        setCurrentId(session.id);
+        window.location.href = '/?session_id=' + session.id;
       });
 
       // Three-dot menu button
