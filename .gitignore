@@ -4,3 +4,9 @@ __pycache__/
 .ruff_cache/
 openail.egg-info/
 student_memory/data/
+# .claude
+.pytest_cache
+.venv
+XES3G5M
+.superpowers
+.env

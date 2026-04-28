@@ -629,6 +629,9 @@ async def get_state(session_id: str) -> dict:
     if state.get("knowledge_skills"):
         result["knowledge_skills"] = state["knowledge_skills"]
     result["use_knowledge_skills"] = state.get("use_knowledge_skills", True)
+    if state.get("kc_skills"):
+        result["kc_skills"] = state["kc_skills"]
+    result["use_kc_skills"] = state.get("use_kc_skills", _USE_KC_SKILLS_DEFAULT)
     if state.get("pending_topic"):
         result["pending_topic"] = state["pending_topic"]
 
@@ -726,6 +729,23 @@ async def toggle_knowledge_skills(
     state["use_knowledge_skills"] = req.enabled
     _save(session_id, state)
     return {"session_id": session_id, "use_knowledge_skills": req.enabled}
+
+
+class ToggleKCSkillsRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/chat/{session_id}/toggle-kc-skills")
+async def toggle_kc_skills(
+    session_id: str, req: ToggleKCSkillsRequest
+) -> dict:
+    """Toggle KC skill resolver + prompt injection on/off for a session."""
+    state = _get_session(session_id)
+    if not state:
+        state = dict(_DEFAULT_STATE)
+    state["use_kc_skills"] = req.enabled
+    _save(session_id, state)
+    return {"session_id": session_id, "use_kc_skills": req.enabled}
 
 
 # ------------------------------------------------------------------

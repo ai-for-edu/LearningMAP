@@ -144,7 +144,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 .ks-card summary::marker, .ks-card summary::-webkit-details-marker { display: none; }
 .ks-card-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
 .ks-card-body { padding: 0 10px 10px; font-size: 11px; color: var(--text-3); line-height: 1.5; }
-#lessonGraph { min-height: 140px; background: #FAFAF9; border-radius: 8px; border: 1px solid var(--border); }
+#lessonGraph { height: 220px; background: #FAFAF9; border-radius: 8px; border: 1px solid var(--border); }
 .graph-legend-row { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
 .graph-legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-4); }
 .graph-legend-dot { width: 7px; height: 7px; border-radius: 50%; }
@@ -745,10 +745,12 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
       smooth: { type: 'continuous' },
     })));
 
-    new vis.Network(graphContainer, { nodes: visNodes, edges: visEdges }, {
+    const network = new vis.Network(graphContainer, { nodes: visNodes, edges: visEdges }, {
       physics: { barnesHut: { gravitationalConstant: -1500, springLength: 100 }, stabilization: { iterations: 80 } },
-      interaction: { hover: true, tooltipDelay: 200, zoomView: true, dragView: true, zoomSpeed: 0.3, minZoom: 0.4, maxZoom: 2.5 },
+      interaction: { hover: true, tooltipDelay: 200, zoomView: true, dragView: true, zoomSpeed: 0.3, minZoom: 0.3, maxZoom: 2.5 },
+      layout: { improvedLayout: true },
     });
+    network.on('stabilizationIterationsDone', function() { network.fit(); });
   }
 })();
 
