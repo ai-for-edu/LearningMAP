@@ -201,3 +201,42 @@ def test_resolver_legacy_path_for_non_route_ids():
 
     result = kc_skill_resolver_node(state)
     assert "乘法原理" in result["kc_skills"]
+
+
+def test_resolver_defaults_to_enabled_when_flag_missing():
+    """Missing use_kc_skills field defaults to True (matches knowledge_graph_node)."""
+    from src.agent.nodes.kc_skill_resolver import kc_skill_resolver_node
+
+    kc_loader._KC_SKILLS = {"知识点----乘法原理": _skill("A")}
+    kc_loader._LEAF_INDEX = {kc_loader.normalize("乘法原理"): ["知识点----乘法原理"]}
+
+    nodes = [
+        KnowledgeNode(
+            id="知识点----乘法原理", name="乘法原理", description="d", level="core"
+        )
+    ]
+    graph = KnowledgeGraph(topic="t", nodes=nodes, edges=[])
+    state = {"knowledge_graph": graph}  # no use_kc_skills key
+
+    result = kc_skill_resolver_node(state)
+    assert "乘法原理" in result["kc_skills"]
+
+
+def test_resolver_skips_bare_root_segment_silently():
+    """Topic-matched root segment (id with no '----') is a synthetic tree node and
+    must not fall through to leaf-name search — same invariant as '----'-prefix nodes."""
+    from src.agent.nodes.kc_skill_resolver import kc_skill_resolver_node
+
+    # Set up a leaf index where "知识点" *would* false-match if leaf search ran.
+    kc_loader._KC_SKILLS = {"some----route----知识点": _skill("X")}
+    kc_loader._LEAF_INDEX = {kc_loader.normalize("知识点"): ["some----route----知识点"]}
+
+    nodes = [KnowledgeNode(id="知识点", name="知识点", description="d", level="core")]
+    graph = KnowledgeGraph(topic="知识点", nodes=nodes, edges=[])
+    state = {"use_kc_skills": True, "knowledge_graph": graph}
+
+    with patch("src.agent.nodes.kc_skill_resolver.resolve_by_leaf") as mock_leaf:
+        result = kc_skill_resolver_node(state)
+        mock_leaf.assert_not_called()
+
+    assert result.get("kc_skills", {}) == {}

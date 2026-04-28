@@ -13,7 +13,12 @@ from src.agent.state import LearningState
 from src.llm.client import get_llm_client, get_model_name
 from src.llm.schemas import ResolverMapping
 from src.prompts.loader import render_prompt
-from src.skills.kc_loader import get_kc_skills, leaf_index, resolve_by_leaf
+from src.skills.kc_loader import (
+    DEFAULT_ALLOWED_ROOTS,
+    get_kc_skills,
+    leaf_index,
+    resolve_by_leaf,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +51,7 @@ def _llm_resolve(
 
 
 def kc_skill_resolver_node(state: LearningState) -> dict:
-    if not state.get("use_kc_skills"):
+    if not state.get("use_kc_skills", True):
         return {}
     graph = state.get("knowledge_graph")
     if not graph:
@@ -69,8 +74,10 @@ def kc_skill_resolver_node(state: LearningState) -> dict:
             resolved[name] = kc_skills_map[nid].model_dump()
             continue
 
-        # id looks like a route (has '----') but isn't registered → synthetic prefix, skip silently
-        if "----" in nid:
+        # Synthetic tree node — either a route prefix ('----'-bearing, not registered)
+        # or a bare allowed-root segment from a root-level topic match. Skip silently
+        # to avoid false-positive leaf-name lookups on a non-registered tree node.
+        if "----" in nid or nid in DEFAULT_ALLOWED_ROOTS:
             continue
 
         # Legacy path: LLM-fallback graphs whose ids aren't routes
