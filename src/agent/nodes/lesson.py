@@ -242,6 +242,7 @@ def _build_lesson_prompt(state: dict) -> str | None:
     node_map = {(n.name if hasattr(n, "name") else n["name"]): n for n in nodes}
 
     skill_instructions = get_skill_section(state, "lesson")
+    focus_directive = (state.get("review_result") or {}).get("focus_directive", "")
 
     if not weak_items:
         all_points = [
@@ -275,6 +276,7 @@ def _build_lesson_prompt(state: dict) -> str | None:
         topic=topic,
         weak_points=weak_points,
         skill_instructions=skill_instructions,
+        focus_directive=focus_directive,
     )
 
 

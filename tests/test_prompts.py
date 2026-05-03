@@ -135,3 +135,34 @@ def test_slide_outline_renders_kc_skill_block():
     )
     assert "KC 课件块" in result
     assert "slide 测试" in result
+
+
+def test_knowledge_graph_prompt_omits_section_when_no_directive() -> None:
+    from src.prompts.loader import render_prompt
+    out = render_prompt("knowledge_graph", topic="X", max_nodes=8,
+                       skill_instructions="", focus_directive="")
+    assert "Focus Directive" not in out
+
+
+def test_knowledge_graph_prompt_includes_directive_when_provided() -> None:
+    from src.prompts.loader import render_prompt
+    out = render_prompt("knowledge_graph", topic="X", max_nodes=8,
+                       skill_instructions="",
+                       focus_directive="学生在 分配律 上仍薄弱.")
+    assert "Focus Directive" in out
+    assert "分配律" in out
+
+
+def test_lesson_plan_prompt_omits_section_when_no_directive() -> None:
+    from src.prompts.loader import render_prompt
+    out = render_prompt("lesson_plan", topic="X", weak_points=[],
+                       skill_instructions="", focus_directive="")
+    assert "Focus Directive" not in out
+
+
+def test_lesson_plan_prompt_includes_directive_when_provided() -> None:
+    from src.prompts.loader import render_prompt
+    out = render_prompt("lesson_plan", topic="X", weak_points=[],
+                       skill_instructions="",
+                       focus_directive="A 已掌握, B 仍薄弱.")
+    assert "B 仍薄弱" in out

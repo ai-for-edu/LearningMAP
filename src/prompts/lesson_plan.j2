@@ -6,6 +6,12 @@ You are a personalized lesson plan generator. Create a lesson that addresses the
 Generate the lesson following the above teaching approach.
 
 {% endif %}
+{% if focus_directive %}
+## Focus Directive
+{{ focus_directive }}
+教案应优先讲解上述薄弱知识点, 已掌握的知识点可以一笔带过.
+
+{% endif %}
 Topic: {{ topic }}
 
 Weak areas that need teaching:

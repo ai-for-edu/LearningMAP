@@ -19,11 +19,13 @@ MAX_NODES = 10
 def _llm_generate_graph(topic: str, state: LearningState) -> KnowledgeGraph | None:
     """Render the knowledge_graph prompt and call the LLM; return None on failure."""
     skill_instructions = get_skill_section(state, "knowledge_graph")
+    focus_directive = (state.get("review_result") or {}).get("focus_directive", "")
     prompt = render_prompt(
         "knowledge_graph",
         topic=topic,
         max_nodes=MAX_NODES,
         skill_instructions=skill_instructions,
+        focus_directive=focus_directive,
     )
     try:
         client = get_llm_client()
