@@ -64,6 +64,44 @@ def retrieve_memory(user_id: str, query: str, top_k: int = 5) -> str:
 
 
 # ------------------------------------------------------------------
+# Mastery (review-flow)
+# ------------------------------------------------------------------
+
+def fetch_mastery(
+    user_id: str,
+    topic: str | None = None,
+    since_days: int | None = None,
+) -> list[dict[str, Any]]:
+    """GET /mastery/{user_id} → list of subtopic-level mastery rows.
+
+    Returns empty list on any failure so the caller can proceed without
+    historical context (graceful degradation, same style as retrieve_memory).
+    """
+    params: dict[str, Any] = {}
+    if topic is not None:
+        params["topic"] = topic
+    if since_days is not None:
+        params["since_days"] = since_days
+
+    try:
+        resp = _get_client().get(f"/mastery/{user_id}", params=params)
+        resp.raise_for_status()
+        body = resp.json()
+        items = body.get("items")
+        if not isinstance(items, list):
+            return []
+        return items
+    except httpx.HTTPError:
+        logger.warning(
+            "Memory service /mastery HTTP error, skipping", exc_info=True
+        )
+        return []
+    except Exception:
+        logger.error("Unexpected error in fetch_mastery", exc_info=True)
+        return []
+
+
+# ------------------------------------------------------------------
 # Ingest
 # ------------------------------------------------------------------
 

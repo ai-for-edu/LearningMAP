@@ -298,3 +298,92 @@ class TestIngestSession:
 
         # Should NOT call the HTTP client at all
         mock_get_client.return_value.post.assert_not_called()
+
+
+# ------------------------------------------------------------------
+# fetch_mastery
+# ------------------------------------------------------------------
+
+class TestFetchMastery:
+
+    @patch("src.memory_client._get_client")
+    def test_happy_path(self, mock_get_client: MagicMock) -> None:
+        from src.memory_client import fetch_mastery
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {
+            "user_id": "u1",
+            "items": [
+                {
+                    "subtopic": "判别式", "topic": "二次方程",
+                    "last_seen_at": "2026-04-15T10:00:00Z",
+                    "session_count": 2, "total_questions": 4,
+                    "total_correct": 2, "last_accuracy": 0.5,
+                }
+            ],
+        }
+        mock_get_client.return_value.get.return_value = mock_resp
+
+        items = fetch_mastery("u1")
+        assert len(items) == 1
+        assert items[0]["subtopic"] == "判别式"
+
+        mock_get_client.return_value.get.assert_called_once_with(
+            "/mastery/u1", params={}
+        )
+
+    @patch("src.memory_client._get_client")
+    def test_passes_topic_and_since_days_as_params(
+        self, mock_get_client: MagicMock
+    ) -> None:
+        from src.memory_client import fetch_mastery
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {"user_id": "u1", "items": []}
+        mock_get_client.return_value.get.return_value = mock_resp
+
+        fetch_mastery("u1", topic="代数", since_days=14)
+
+        mock_get_client.return_value.get.assert_called_once_with(
+            "/mastery/u1", params={"topic": "代数", "since_days": 14}
+        )
+
+    @patch("src.memory_client._get_client")
+    def test_http_error_returns_empty(self, mock_get_client: MagicMock) -> None:
+        from src.memory_client import fetch_mastery
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "503", request=MagicMock(), response=MagicMock()
+        )
+        mock_get_client.return_value.get.return_value = mock_resp
+
+        assert fetch_mastery("u1") == []
+
+    @patch("src.memory_client._get_client")
+    def test_connection_error_returns_empty(
+        self, mock_get_client: MagicMock
+    ) -> None:
+        from src.memory_client import fetch_mastery
+
+        mock_get_client.return_value.get.side_effect = httpx.ConnectError(
+            "refused"
+        )
+
+        assert fetch_mastery("u1") == []
+
+    @patch("src.memory_client._get_client")
+    def test_malformed_response_returns_empty(
+        self, mock_get_client: MagicMock
+    ) -> None:
+        from src.memory_client import fetch_mastery
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {"unexpected": "shape"}
+        mock_get_client.return_value.get.return_value = mock_resp
+
+        # Missing "items" key — should degrade to []
+        assert fetch_mastery("u1") == []
