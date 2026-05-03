@@ -93,3 +93,70 @@ class TestSelectCandidateKps:
         ]
         names = [c["subtopic"] for c in select_candidate_kps(items)]
         assert names == ["First", "Second"]
+
+
+class TestRenderDirective:
+
+    def test_only_weak_kps(self) -> None:
+        from src.agent.nodes.review import _render_directive
+        out = _render_directive(weak_kps=["分配律", "交换律"], strong_kps=[])
+        assert "分配律" in out and "交换律" in out
+        assert "薄弱" in out or "巩固" in out
+
+    def test_only_strong_kps(self) -> None:
+        from src.agent.nodes.review import _render_directive
+        out = _render_directive(weak_kps=[], strong_kps=["求根公式"])
+        assert "求根公式" in out
+        assert "已掌握" in out or "略" in out
+
+    def test_both_present(self) -> None:
+        from src.agent.nodes.review import _render_directive
+        out = _render_directive(weak_kps=["A"], strong_kps=["B"])
+        assert "A" in out and "B" in out
+
+    def test_empty_returns_empty_string(self) -> None:
+        from src.agent.nodes.review import _render_directive
+        assert _render_directive(weak_kps=[], strong_kps=[]) == ""
+
+
+class TestGradeReview:
+
+    def _make_q(self, qid: str, kp: str, answer_idx: int):
+        from src.llm.schemas import QuizQuestion
+        return QuizQuestion(
+            id=qid, knowledge_point=kp,
+            question="Q?", options=["a", "b", "c", "d"], answer=answer_idx,
+        )
+
+    def test_all_correct(self) -> None:
+        from src.agent.nodes.review import grade_review
+        qs = [self._make_q("q1", "A", 0), self._make_q("q2", "B", 1)]
+        result = grade_review(qs, [0, 1])
+        assert result.weak_kps == []
+        assert set(result.strong_kps) == {"A", "B"}
+        assert result.score == 1.0
+
+    def test_all_wrong(self) -> None:
+        from src.agent.nodes.review import grade_review
+        qs = [self._make_q("q1", "A", 0), self._make_q("q2", "B", 1)]
+        result = grade_review(qs, [1, 0])
+        assert set(result.weak_kps) == {"A", "B"}
+        assert result.strong_kps == []
+        assert result.score == 0.0
+
+    def test_mixed(self) -> None:
+        from src.agent.nodes.review import grade_review
+        qs = [self._make_q("q1", "A", 0), self._make_q("q2", "B", 1), self._make_q("q3", "C", 2)]
+        result = grade_review(qs, [0, 0, 2])  # A correct, B wrong, C correct
+        assert result.weak_kps == ["B"]
+        assert set(result.strong_kps) == {"A", "C"}
+        assert abs(result.score - 2/3) < 1e-9
+        assert "B" in result.focus_directive
+
+    def test_unanswered_treated_as_wrong(self) -> None:
+        from src.agent.nodes.review import grade_review
+        qs = [self._make_q("q1", "A", 0), self._make_q("q2", "B", 1)]
+        # Only one answer provided
+        result = grade_review(qs, [0])
+        assert "B" in result.weak_kps
+        assert "A" in result.strong_kps

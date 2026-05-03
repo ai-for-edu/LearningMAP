@@ -81,3 +81,57 @@ def select_candidate_kps(
     else:
         cap = 5
     return [item for _, _, item in scored[:cap]]
+
+
+# ---------------------------------------------------------------------------
+# Directive rendering + grading
+# ---------------------------------------------------------------------------
+
+def _render_directive(*, weak_kps: list[str], strong_kps: list[str]) -> str:
+    """Render the focus directive that downstream prompts will see."""
+    if not weak_kps and not strong_kps:
+        return ""
+    parts = []
+    if weak_kps:
+        parts.append(
+            f"学生在 {'、'.join(weak_kps)} 上仍薄弱，本次教案应优先衔接这些点。"
+        )
+    if strong_kps:
+        parts.append(
+            f"{'、'.join(strong_kps)} 已掌握，可以略过基础部分。"
+        )
+    return " ".join(parts)
+
+
+def grade_review(
+    questions: list,
+    answers: list[int],
+) -> "ReviewResult":  # forward ref, imported lazily  # noqa: F821
+    """Pure-Python grading. Unanswered questions count as wrong.
+
+    Returns a ReviewResult ready to write into state['review_result'].
+    """
+    from src.llm.schemas import ReviewResult
+
+    weak: list[str] = []
+    strong: list[str] = []
+    correct = 0
+    for i, q in enumerate(questions):
+        kp = q.knowledge_point if hasattr(q, "knowledge_point") else q["knowledge_point"]
+        expected = q.answer if hasattr(q, "answer") else q["answer"]
+        student = answers[i] if i < len(answers) else -1
+        if student == expected:
+            correct += 1
+            if kp not in strong:
+                strong.append(kp)
+        else:
+            if kp not in weak:
+                weak.append(kp)
+
+    total = len(questions) or 1
+    return ReviewResult(
+        weak_kps=weak,
+        strong_kps=strong,
+        score=correct / total,
+        focus_directive=_render_directive(weak_kps=weak, strong_kps=strong),
+    )
