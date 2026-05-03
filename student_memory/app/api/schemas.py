@@ -75,6 +75,24 @@ class RetrieveResponse(BaseModel):
 
 
 # ----------------------------------------------------------------------
+# /mastery
+# ----------------------------------------------------------------------
+class MasteryItem(BaseModel):
+    subtopic: str
+    topic: str | None = None
+    last_seen_at: str
+    session_count: int
+    total_questions: int
+    total_correct: int
+    last_accuracy: float | None = None
+
+
+class MasteryResponse(BaseModel):
+    user_id: str
+    items: list[MasteryItem]
+
+
+# ----------------------------------------------------------------------
 # error envelope
 # ----------------------------------------------------------------------
 class ErrorResponse(BaseModel):
