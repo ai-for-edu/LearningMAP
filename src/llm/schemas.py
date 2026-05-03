@@ -76,3 +76,17 @@ class ResolverMapping(BaseModel):
         ...,
         description="{node_name: full_route | null} — one entry per unresolved node.",
     )
+
+
+class ReviewResult(BaseModel):
+    """Output of submit-review: which KPs need reinforcement vs were retained.
+
+    focus_directive is the rendered Chinese sentence injected into
+    knowledge_graph and lesson prompts so the next-round content is biased
+    toward the weak KPs.
+    """
+
+    weak_kps: list[str]
+    strong_kps: list[str]
+    score: float = Field(..., ge=0.0, le=1.0)
+    focus_directive: str

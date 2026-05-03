@@ -51,3 +51,26 @@ def test_kc_skill_schema():
     assert skill.考察重点.startswith("理解")
     assert "填空" in skill.考察形式
     assert "使用" in skill.description or "skill" in skill.description.lower()
+
+
+def test_review_result_round_trip() -> None:
+    from src.llm.schemas import ReviewResult
+
+    r = ReviewResult(
+        weak_kps=["分配律"],
+        strong_kps=["结合律", "交换律"],
+        score=0.67,
+        focus_directive="学生在 分配律 上仍薄弱，本次教案应优先衔接此点。",
+    )
+    dumped = r.model_dump()
+    restored = ReviewResult(**dumped)
+    assert restored == r
+
+
+def test_review_result_score_bounds() -> None:
+    import pytest
+    from pydantic import ValidationError
+    from src.llm.schemas import ReviewResult
+
+    with pytest.raises(ValidationError):
+        ReviewResult(weak_kps=[], strong_kps=[], score=1.5, focus_directive="x")
