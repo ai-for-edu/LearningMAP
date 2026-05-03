@@ -141,3 +141,28 @@ def test_no_history_returns_404(mock_fetch, client_gate_on, session_id_gate_on):
     r = client_gate_on.post(f"/api/chat/{session_id_gate_on}/start-review")
     assert r.status_code == 404
     assert r.json()["detail"] == "No history to review"
+
+
+# ---------------------------------------------------------------------------
+# Input validation: answer index range
+# ---------------------------------------------------------------------------
+
+
+def test_submit_review_rejects_out_of_range_answer(
+    client_gate_on, session_id_gate_on
+):
+    """answer index outside [0,3] returns 422 from Pydantic."""
+    # Pre-populate state with valid review_questions to bypass the empty check
+    from src.llm.schemas import QuizQuestion
+    state = chat_module._sessions[session_id_gate_on]
+    state["review_questions"] = [
+        QuizQuestion(id="rq_0", knowledge_point="A",
+                     question="q", options=["a", "b", "c", "d"], answer=0),
+    ]
+    chat_module._save(session_id_gate_on, state)
+
+    r = client_gate_on.post(
+        f"/api/chat/{session_id_gate_on}/submit-review",
+        json={"answers": [99]},
+    )
+    assert r.status_code == 422

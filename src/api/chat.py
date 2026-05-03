@@ -437,6 +437,13 @@ class SubmitQuizRequest(BaseModel):
 class SubmitReviewRequest(BaseModel):
     answers: list[int] = Field(..., min_length=1, max_length=5)
 
+    @field_validator("answers")
+    @classmethod
+    def validate_answer_range(cls, v: list[int]) -> list[int]:
+        if any(a < 0 or a > 3 for a in v):
+            raise ValueError("answer index must be in [0, 3]")
+        return v
+
 
 @router.post("/chat/{session_id}/submit-quiz")
 async def submit_quiz(session_id: str, req: SubmitQuizRequest) -> dict:
