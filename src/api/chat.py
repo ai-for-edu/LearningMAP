@@ -34,6 +34,21 @@ def _get_graph():
 
 _USE_KC_SKILLS_DEFAULT = os.environ.get("USE_KC_SKILLS", "true").lower() == "true"
 
+_REVIEW_FLOW_ENABLED = os.environ.get("ENABLE_REVIEW_FLOW", "false").lower() == "true"
+
+
+def _has_history(user_id: str) -> bool:
+    """True if the user has any prior subtopic in L1.
+
+    Returns False unconditionally when ENABLE_REVIEW_FLOW is off, so the
+    front-end "复习" button is hidden in that case.
+    """
+    if not _REVIEW_FLOW_ENABLED:
+        return False
+    from src.memory_client import fetch_mastery
+    return bool(fetch_mastery(user_id))
+
+
 _DEFAULT_STATE = {
     "messages": [],
     "mode": "chat",
@@ -404,6 +419,10 @@ class SubmitQuizRequest(BaseModel):
         return v
 
 
+class SubmitReviewRequest(BaseModel):
+    answers: list[int] = Field(..., min_length=1, max_length=10)
+
+
 @router.post("/chat/{session_id}/submit-quiz")
 async def submit_quiz(session_id: str, req: SubmitQuizRequest) -> dict:
     """Submit all quiz answers, run diagnosis only (no lesson)."""
@@ -653,6 +672,8 @@ async def get_state(session_id: str) -> dict:
         if p:
             result[f"{t}_task_progress"] = p
 
+    result["has_history"] = _has_history(DEFAULT_USER_ID)
+
     return result
 
 
@@ -874,3 +895,62 @@ async def cancel_generation(session_id: str, task_type: str) -> dict:
         _save(session_id, state)
 
     return {"cancelled": cancelled}
+
+
+@router.post("/chat/{session_id}/start-review")
+async def start_review(session_id: str) -> dict:
+    if not _REVIEW_FLOW_ENABLED:
+        raise HTTPException(status_code=404, detail="Review flow disabled")
+
+    state = _get_session(session_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    from src.memory_client import fetch_mastery
+    from src.agent.nodes.review import (
+        select_candidate_kps, generate_review_questions,
+    )
+
+    snapshot = state.get("mastery_snapshot")
+    # Refresh snapshot if missing (cheap; small payload)
+    if not snapshot:
+        snapshot = await asyncio.to_thread(fetch_mastery, DEFAULT_USER_ID)
+        state["mastery_snapshot"] = snapshot
+
+    candidates = select_candidate_kps(snapshot)
+    if not candidates:
+        raise HTTPException(status_code=404, detail="No history to review")
+
+    questions = await asyncio.to_thread(generate_review_questions, candidates)
+    if not questions:
+        raise HTTPException(status_code=502, detail="Failed to generate review questions")
+
+    state["review_questions"] = questions
+    state["review_answers"] = []
+    state["review_result"] = None
+    _save(session_id, state)
+
+    return {"questions": [q.model_dump() for q in questions]}
+
+
+@router.post("/chat/{session_id}/submit-review")
+async def submit_review(session_id: str, req: SubmitReviewRequest) -> dict:
+    if not _REVIEW_FLOW_ENABLED:
+        raise HTTPException(status_code=404, detail="Review flow disabled")
+
+    state = _get_session(session_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    questions = state.get("review_questions") or []
+    if not questions:
+        raise HTTPException(status_code=400, detail="No review in progress")
+
+    from src.agent.nodes.review import grade_review
+    result = grade_review(questions, req.answers)
+
+    state["review_answers"] = req.answers
+    state["review_result"] = result.model_dump()
+    _save(session_id, state)
+
+    return {"review_result": result.model_dump()}
