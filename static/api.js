@@ -134,6 +134,31 @@ async function getSessionState(sessionId) {
   return resp.json();
 }
 
+// Review flow (PR-3)
+async function startReview(sessionId) {
+  const resp = await fetch(`${API_BASE}/chat/${sessionId}/start-review`, {
+    method: 'POST',
+  });
+  if (resp.status === 404) {
+    const body = await resp.json().catch(() => ({}));
+    return { ok: false, reason: body.detail || 'not-available' };
+  }
+  if (!resp.ok) throw new Error(`start-review failed: ${resp.status}`);
+  const data = await resp.json();
+  return { ok: true, questions: data.questions };
+}
+
+async function submitReview(sessionId, answers) {
+  const resp = await fetch(`${API_BASE}/chat/${sessionId}/submit-review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers }),
+  });
+  if (!resp.ok) throw new Error(`submit-review failed: ${resp.status}`);
+  const data = await resp.json();
+  return data.review_result;
+}
+
 // 导出会话
 async function exportSession(sessionId, format) {
   const state = await getSessionState(sessionId);
