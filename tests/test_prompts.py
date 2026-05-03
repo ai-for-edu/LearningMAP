@@ -166,3 +166,28 @@ def test_lesson_plan_prompt_includes_directive_when_provided() -> None:
                        skill_instructions="",
                        focus_directive="A 已掌握, B 仍薄弱.")
     assert "B 仍薄弱" in out
+
+
+def test_lesson_point_prompt_omits_directive_when_empty() -> None:
+    from src.prompts.loader import render_prompt
+    out = render_prompt(
+        "lesson_point",
+        topic="X", knowledge_point_name="A", knowledge_point_description="...",
+        pedagogy_instructions="x", knowledge_skill="无额外教学技能",
+        point_index=1, total_points=1, kc_skill_block="",
+        focus_directive="",
+    )
+    assert "复习反馈指令" not in out
+
+
+def test_lesson_point_prompt_includes_directive_when_provided() -> None:
+    from src.prompts.loader import render_prompt
+    out = render_prompt(
+        "lesson_point",
+        topic="X", knowledge_point_name="A", knowledge_point_description="...",
+        pedagogy_instructions="x", knowledge_skill="无额外教学技能",
+        point_index=1, total_points=1, kc_skill_block="",
+        focus_directive="学生在 分配律 上薄弱，已掌握 求根公式。",
+    )
+    assert "复习反馈指令" in out
+    assert "分配律" in out

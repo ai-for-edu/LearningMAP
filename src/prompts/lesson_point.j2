@@ -3,6 +3,12 @@
 ## 教学法要求
 {{ pedagogy_instructions }}
 
+{% if focus_directive %}
+## 复习反馈指令
+{{ focus_directive }}
+本次教学请优先讲解上述薄弱点；已掌握的部分可一笔带过。
+
+{% endif %}
 {% if knowledge_skill and knowledge_skill != "无额外教学技能" %}
 ## 知识点教学技能
 以下是针对该知识点的教学策略，请严格遵循：

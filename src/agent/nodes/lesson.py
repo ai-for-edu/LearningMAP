@@ -126,6 +126,7 @@ def generate_lesson_per_point(
     pedagogy_instructions: str,
     knowledge_skills: dict[str, str],
     kc_skills: dict | None = None,
+    focus_directive: str = "",        # NEW
 ) -> str:
     """Step 2: Generate lesson content per knowledge point, then concatenate."""
     client = get_raw_client()
@@ -144,6 +145,7 @@ def generate_lesson_per_point(
             point_index=i + 1,
             total_points=total,
             kc_skill_block=kc_skill_block,
+            focus_directive=focus_directive,    # NEW
         )
         response = client.chat.completions.create(
             model=get_model_name(),
@@ -205,9 +207,11 @@ def lesson_node(state: LearningState) -> dict:
         }
 
     # Step 2: Generate per-point content
+    focus_directive = (state.get("review_result") or {}).get("focus_directive", "")
     lesson_text = generate_lesson_per_point(
         topic, weak_points, pedagogy_instructions, knowledge_skills,
         kc_skills=state.get("kc_skills"),
+        focus_directive=focus_directive,
     )
 
     return {
@@ -292,6 +296,7 @@ def lesson_node_stream(state: dict):
     nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
 
     pedagogy_instructions, knowledge_skills, weak_points = retrieve_skills(state)
+    focus_directive = (state.get("review_result") or {}).get("focus_directive", "")
 
     if not weak_points:
         skill_instructions = get_skill_section(state, "lesson")
@@ -343,6 +348,7 @@ def lesson_node_stream(state: dict):
             point_index=i + 1,
             total_points=total,
             kc_skill_block=kc_skill_block,
+            focus_directive=focus_directive,    # NEW
         )
         stream = client.chat.completions.create(
             model=get_model_name(),
