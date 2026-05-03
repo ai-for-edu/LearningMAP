@@ -59,6 +59,10 @@ _DEFAULT_STATE = {
     "lesson_task_status": None,
     "slides_task_status": None,
     "slides_task_progress": None,
+    "mastery_snapshot": None,
+    "review_questions": [],
+    "review_answers": [],
+    "review_result": None,
 }
 
 

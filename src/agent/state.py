@@ -42,3 +42,9 @@ class LearningState(MessagesState):
 
     # Pending topic waiting for skill selection
     pending_topic: str | None
+
+    # Review (复习) — review-flow PR-2
+    mastery_snapshot: list[dict] | None  # cached at first start-review call, expires >24h
+    review_questions: list[QuizQuestion] | None
+    review_answers: list[int] | None
+    review_result: dict | None  # {weak_kps, strong_kps, score, focus_directive}
