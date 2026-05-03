@@ -265,6 +265,7 @@ body.sidebar-collapsed #bottomBar { left: 0; }
 <script src="api.js?v=6"></script>
 <main id="mainContent">
   <div id="chatArea">
+    <div id="reviewBanner" style="display:none;"></div>
     <div id="chatHistory"></div>
   </div>
 </main>
@@ -1030,6 +1031,11 @@ async function showLessonFormatChoice(sid) {
   // Use setTimeout to ensure DOM has fully updated after innerHTML operations
   // 500ms ensures all async state fetches and DOM updates are complete
   setTimeout(initAllGraphs, 500);
+
+  // Show review banner if backend reports has_history (review-flow PR-3)
+  if (state.has_history) {
+    maybeShowReviewBanner(state);
+  }
 })();
 </script>
 
@@ -1110,6 +1116,211 @@ function toggleSidebar() {
   body.classList.toggle('sidebar-collapsed');
   sidebar.classList.toggle('collapsed');
   icon.textContent = body.classList.contains('sidebar-collapsed') ? 'chevron_right' : 'chevron_left';
+}
+</script>
+<div id="reviewModalRoot"></div>
+<script>
+// ────────────────────────────────────────────────────────────────
+// Review flow (PR-3)
+// ────────────────────────────────────────────────────────────────
+let _reviewQuestions = [];
+let _reviewCurrentIdx = 0;
+let _reviewAnswers = [];
+let _reviewSelectedOption = -1;
+
+async function maybeShowReviewBanner(preloadedState) {
+  // Called after session state is loaded. Shows the banner only when
+  // backend reports has_history (which requires ENABLE_REVIEW_FLOW=true).
+  const sid = currentSessionId;
+  if (!sid) return;
+  let state;
+  try {
+    state = preloadedState || await getSessionState(sid);
+  } catch (e) {
+    return;
+  }
+  if (!state.has_history) return;
+
+  const banner = document.getElementById('reviewBanner');
+  if (!banner) return;
+  banner.innerHTML = `
+    <div style="margin:16px 0;padding:14px 18px;border:1px solid var(--accent);border-radius:12px;background:var(--bg-tinted);display:flex;align-items:center;gap:12px;">
+      <span class="material-symbols-outlined" style="color:var(--accent);font-size:20px;">history_edu</span>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);">${escapeHtml('您有过往的学习记录')}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px;">${escapeHtml('先做一次复习, 帮 AI 安排本次的学习重点')}</div>
+      </div>
+      <button id="startReviewBtn" style="padding:8px 16px;border-radius:99px;border:none;background:var(--accent);color:white;font-size:12px;font-weight:600;cursor:pointer;">
+        开始复习
+      </button>
+    </div>`;
+  banner.style.display = 'block';
+  document.getElementById('startReviewBtn').addEventListener('click', openReviewModal);
+}
+
+async function openReviewModal() {
+  const sid = currentSessionId;
+  if (!sid) return;
+  renderReviewModal(`
+    <div style="text-align:center;padding:40px;">
+      <svg class="animate-spin" style="width:32px;height:32px;color:var(--accent);margin:0 auto 16px;display:block;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity:0.25"></circle>
+        <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" style="opacity:0.75"></path>
+      </svg>
+      <div style="font-size:13px;color:var(--text-3);">正在生成复习题…</div>
+    </div>`);
+
+  let result;
+  try {
+    result = await startReview(sid);
+  } catch (e) {
+    renderReviewModal(`
+      <div style="padding:40px;text-align:center;">
+        <div style="font-size:13px;color:#dc2626;margin-bottom:16px;">${escapeHtml('复习生成失败, 请稍后再试')}</div>
+        <button onclick="closeReviewModal()" style="padding:8px 20px;border-radius:99px;border:1px solid var(--border);background:white;cursor:pointer;">关闭</button>
+      </div>`);
+    return;
+  }
+  if (!result.ok) {
+    renderReviewModal(`
+      <div style="padding:40px;text-align:center;">
+        <div style="font-size:13px;color:var(--text-3);margin-bottom:16px;">${escapeHtml(result.reason || '当前没有可复习的内容')}</div>
+        <button onclick="closeReviewModal()" style="padding:8px 20px;border-radius:99px;border:1px solid var(--border);background:white;cursor:pointer;">关闭</button>
+      </div>`);
+    return;
+  }
+
+  _reviewQuestions = result.questions;
+  _reviewCurrentIdx = 0;
+  _reviewAnswers = new Array(_reviewQuestions.length).fill(-1);
+  _reviewSelectedOption = -1;
+  renderReviewQuestion();
+}
+
+function renderReviewModal(innerHtml) {
+  const root = document.getElementById('reviewModalRoot');
+  root.innerHTML = `
+    <div class="review-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;">
+      <div style="background:white;border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">
+        ${innerHtml}
+      </div>
+    </div>`;
+  root.querySelector('.review-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeReviewModal();
+  });
+}
+
+function closeReviewModal() {
+  document.getElementById('reviewModalRoot').innerHTML = '';
+}
+
+function renderReviewQuestion() {
+  const q = _reviewQuestions[_reviewCurrentIdx];
+  const total = _reviewQuestions.length;
+  const isLast = _reviewCurrentIdx === total - 1;
+  const letters = ['A', 'B', 'C', 'D'];
+
+  const optionsHtml = q.options.map((opt, idx) => `
+    <button class="review-option-btn" data-idx="${idx}" style="display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;margin:8px 0;border-radius:10px;border:1px solid ${_reviewSelectedOption === idx ? 'var(--accent)' : 'var(--border)'};background:${_reviewSelectedOption === idx ? 'var(--bg-tinted)' : 'white'};cursor:pointer;text-align:left;">
+      <span style="font-weight:700;color:var(--accent);">${letters[idx]}</span>
+      <span style="font-size:13px;color:var(--text);">${escapeHtml(opt)}</span>
+    </button>
+  `).join('');
+
+  renderReviewModal(`
+    <div style="padding:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-size:11px;color:var(--text-3);">复习 · 第 ${_reviewCurrentIdx + 1} / ${total} 题</div>
+        <button onclick="closeReviewModal()" style="font-size:18px;color:var(--text-3);background:none;border:none;cursor:pointer;">✕</button>
+      </div>
+      <div style="font-size:11px;color:var(--accent);margin-bottom:8px;">${escapeHtml(q.knowledge_point)}</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:16px;">${escapeHtml(q.question)}</div>
+      ${optionsHtml}
+      <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+        <button id="reviewNextBtn" disabled style="padding:8px 20px;border-radius:99px;border:none;background:var(--accent);color:white;font-size:12px;font-weight:600;cursor:pointer;opacity:0.4;">
+          ${isLast ? '提交' : '下一题 →'}
+        </button>
+      </div>
+    </div>`);
+
+  document.querySelectorAll('.review-option-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      _reviewSelectedOption = parseInt(btn.dataset.idx, 10);
+      _reviewAnswers[_reviewCurrentIdx] = _reviewSelectedOption;
+      renderReviewQuestion();
+    });
+  });
+
+  if (_reviewSelectedOption !== -1) {
+    const nextBtn = document.getElementById('reviewNextBtn');
+    nextBtn.disabled = false;
+    nextBtn.style.opacity = '1';
+    nextBtn.addEventListener('click', () => {
+      if (isLast) {
+        submitReviewFlow();
+      } else {
+        _reviewCurrentIdx += 1;
+        _reviewSelectedOption = _reviewAnswers[_reviewCurrentIdx] ?? -1;
+        renderReviewQuestion();
+      }
+    });
+  }
+}
+
+async function submitReviewFlow() {
+  const sid = currentSessionId;
+  if (!sid) return;
+  renderReviewModal(`
+    <div style="text-align:center;padding:40px;">
+      <svg class="animate-spin" style="width:32px;height:32px;color:var(--accent);margin:0 auto 16px;display:block;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity:0.25"></circle>
+        <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" style="opacity:0.75"></path>
+      </svg>
+      <div style="font-size:13px;color:var(--text-3);">正在评分…</div>
+    </div>`);
+
+  let result;
+  try {
+    result = await submitReview(sid, _reviewAnswers);
+  } catch (e) {
+    renderReviewModal(`
+      <div style="padding:40px;text-align:center;">
+        <div style="font-size:13px;color:#dc2626;margin-bottom:16px;">${escapeHtml('提交失败, 请稍后再试')}</div>
+        <button onclick="closeReviewModal()" style="padding:8px 20px;border-radius:99px;border:1px solid var(--border);background:white;cursor:pointer;">关闭</button>
+      </div>`);
+    return;
+  }
+
+  const weakHtml = (result.weak_kps || []).map(k => `<li style="font-size:12px;color:#dc2626;">${escapeHtml(k)}</li>`).join('');
+  const strongHtml = (result.strong_kps || []).map(k => `<li style="font-size:12px;color:#059669;">${escapeHtml(k)}</li>`).join('');
+  const scorePct = Math.round((result.score || 0) * 100);
+
+  renderReviewModal(`
+    <div style="padding:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);">复习完成</div>
+        <button onclick="closeReviewModal()" style="font-size:18px;color:var(--text-3);background:none;border:none;cursor:pointer;">✕</button>
+      </div>
+      <div style="text-align:center;font-size:22px;font-weight:700;color:var(--accent);margin:8px 0 16px;">${scorePct}%</div>
+      <div style="display:flex;gap:16px;">
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:600;color:#dc2626;margin-bottom:6px;">仍需巩固</div>
+          <ul style="margin:0;padding-left:16px;">${weakHtml || '<li style="font-size:12px;color:var(--text-3);">无</li>'}</ul>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:600;color:#059669;margin-bottom:6px;">已掌握</div>
+          <ul style="margin:0;padding-left:16px;">${strongHtml || '<li style="font-size:12px;color:var(--text-3);">无</li>'}</ul>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding:12px;background:var(--bg-tinted);border-radius:8px;font-size:12px;color:var(--text-3);">
+        ${escapeHtml(result.focus_directive || '')}
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+        <button onclick="closeReviewModal(); document.getElementById('reviewBanner').style.display='none';" style="padding:8px 20px;border-radius:99px;border:none;background:var(--accent);color:white;font-size:12px;font-weight:600;cursor:pointer;">
+          继续学习
+        </button>
+      </div>
+    </div>`);
 }
 </script>
 </body></html>
