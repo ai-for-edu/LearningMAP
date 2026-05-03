@@ -174,9 +174,13 @@ def generate_review_questions(candidates: list[dict]) -> list:
             )
         except (KeyError, ValueError):
             days_ago = 0
-        enriched.append({**c, "days_ago": days_ago})
+        enriched.append({
+            **c,
+            "days_ago": days_ago,
+            "last_accuracy": c.get("last_accuracy") or 0.0,
+        })
 
-    system_prompt = render_prompt(
+    user_prompt = render_prompt(
         "review_generate_system", candidates=enriched
     )
 
@@ -184,9 +188,9 @@ def generate_review_questions(candidates: list[dict]) -> list:
         client = get_llm_client()
         result = client.chat.completions.create(
             model=get_reviewer_model_name(),
-            messages=[{"role": "system", "content": system_prompt}],
+            messages=[{"role": "user", "content": user_prompt}],
             response_model=list[QuizQuestion],
-            max_tokens=2048,
+            max_tokens=4096,
         )
         return list(result)
     except Exception:

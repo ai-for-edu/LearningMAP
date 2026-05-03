@@ -226,3 +226,43 @@ class TestGenerateReviewQuestions:
         )
         candidates = [_make_item("A", last_seen_days_ago=10, last_accuracy=0.5)]
         assert generate_review_questions(candidates) == []
+
+    @patch("src.agent.nodes.review.get_llm_client")
+    def test_uses_reviewer_model_env(self, mock_get_client) -> None:
+        """REVIEWER_MODEL env var must override LLM_MODEL for review calls."""
+        import os
+        from src.agent.nodes.review import generate_review_questions
+        from src.llm.schemas import QuizQuestion
+
+        mock_client = mock_get_client.return_value
+        mock_client.chat.completions.create.return_value = [
+            QuizQuestion(id="rq_0", knowledge_point="A",
+                         question="Q", options=["a", "b", "c", "d"], answer=0),
+        ]
+        candidates = [_make_item("A", last_seen_days_ago=10, last_accuracy=0.5)]
+
+        with patch.dict(os.environ, {"REVIEWER_MODEL": "test-cheap-model"}):
+            generate_review_questions(candidates)
+
+        call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        assert call_kwargs["model"] == "test-cheap-model"
+
+    @patch("src.agent.nodes.review.get_llm_client")
+    def test_none_last_accuracy_does_not_crash(self, mock_get_client) -> None:
+        """A candidate with last_accuracy=None must not crash the template."""
+        from src.agent.nodes.review import generate_review_questions
+        from src.llm.schemas import QuizQuestion
+
+        mock_client = mock_get_client.return_value
+        mock_client.chat.completions.create.return_value = [
+            QuizQuestion(id="rq_0", knowledge_point="A",
+                         question="Q", options=["a", "b", "c", "d"], answer=0),
+        ]
+        item = _make_item("A", last_seen_days_ago=10, last_accuracy=0.5)
+        item["last_accuracy"] = None  # override to None
+
+        questions = generate_review_questions([item])
+        assert len(questions) == 1
+        # Verify prompt rendered without crashing — must contain "0%"
+        rendered = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+        assert "0%" in rendered  # last_accuracy=None coerced to 0.0
