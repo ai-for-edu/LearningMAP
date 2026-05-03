@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from unittest.mock import patch
-
-import pytest
+from unittest.mock import patch  # noqa: F401  # used by Tasks 4/5 mock-LLM tests
 
 
 def _make_item(
@@ -84,3 +82,14 @@ class TestSelectCandidateKps:
         first = select_candidate_kps(items)
         second = select_candidate_kps(items)
         assert first == second
+
+    def test_equal_priority_preserves_input_order(self) -> None:
+        from src.agent.nodes.review import select_candidate_kps
+        # Two items with identical staleness and uncertainty → equal priority.
+        # Output order must match input order (stable tie-break).
+        items = [
+            _make_item("First", last_seen_days_ago=10, last_accuracy=0.5),
+            _make_item("Second", last_seen_days_ago=10, last_accuracy=0.5),
+        ]
+        names = [c["subtopic"] for c in select_candidate_kps(items)]
+        assert names == ["First", "Second"]
