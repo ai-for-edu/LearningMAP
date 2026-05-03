@@ -74,6 +74,15 @@ def _deserialize_state(data: str) -> dict[str, Any]:
         except Exception:
             logger.warning("Failed to deserialize questions", exc_info=True)
 
+    if raw.get("review_questions") and isinstance(raw["review_questions"], list):
+        try:
+            raw["review_questions"] = [
+                QuizQuestion(**q) if isinstance(q, dict) else q
+                for q in raw["review_questions"]
+            ]
+        except Exception:
+            logger.warning("Failed to deserialize review_questions", exc_info=True)
+
     if raw.get("diagnosis_result") and isinstance(raw["diagnosis_result"], dict):
         try:
             raw["diagnosis_result"] = DiagnosisResult(**raw["diagnosis_result"])
