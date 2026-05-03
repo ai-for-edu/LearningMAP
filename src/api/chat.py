@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 import uuid
 from typing import Any
 
@@ -36,17 +37,29 @@ _USE_KC_SKILLS_DEFAULT = os.environ.get("USE_KC_SKILLS", "true").lower() == "tru
 
 _REVIEW_FLOW_ENABLED = os.environ.get("ENABLE_REVIEW_FLOW", "false").lower() == "true"
 
+# Module-level cache for has_history (gate-on path); 60s TTL keyed by user_id.
+_has_history_cache: dict[str, tuple[float, bool]] = {}
+_HAS_HISTORY_TTL_S = 60.0
+
 
 def _has_history(user_id: str) -> bool:
     """True if the user has any prior subtopic in L1.
 
     Returns False unconditionally when ENABLE_REVIEW_FLOW is off, so the
     front-end "复习" button is hidden in that case.
+
+    Memoized for 60 s to avoid hammering the memory service on /state polls.
     """
     if not _REVIEW_FLOW_ENABLED:
         return False
+    now = time.monotonic()
+    cached = _has_history_cache.get(user_id)
+    if cached is not None and (now - cached[0]) < _HAS_HISTORY_TTL_S:
+        return cached[1]
     from src.memory_client import fetch_mastery
-    return bool(fetch_mastery(user_id))
+    result = bool(fetch_mastery(user_id))
+    _has_history_cache[user_id] = (now, result)
+    return result
 
 
 _DEFAULT_STATE = {
@@ -420,7 +433,7 @@ class SubmitQuizRequest(BaseModel):
 
 
 class SubmitReviewRequest(BaseModel):
-    answers: list[int] = Field(..., min_length=1, max_length=10)
+    answers: list[int] = Field(..., min_length=1, max_length=5)
 
 
 @router.post("/chat/{session_id}/submit-quiz")
@@ -945,6 +958,12 @@ async def submit_review(session_id: str, req: SubmitReviewRequest) -> dict:
     questions = state.get("review_questions") or []
     if not questions:
         raise HTTPException(status_code=400, detail="No review in progress")
+
+    if len(req.answers) != len(questions):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Expected {len(questions)} answers, got {len(req.answers)}",
+        )
 
     from src.agent.nodes.review import grade_review
     result = grade_review(questions, req.answers)
