@@ -46,3 +46,8 @@ def get_raw_client() -> openai.OpenAI:
 def get_model_name() -> str:
     """Get the LLM model name from env."""
     return os.environ.get("LLM_MODEL", "claude-sonnet-4-20250514")
+
+
+def get_reviewer_model_name() -> str:
+    """Reviewer (复习出题/评估) 用的便宜模型. 默认与主流程同 LLM_MODEL."""
+    return os.environ.get("REVIEWER_MODEL", get_model_name())

@@ -175,3 +175,54 @@ class TestGradeReview:
         # implementation choice: the malformed q still counts in `total` for the score
         # denominator, since len(questions) is 2.
         assert abs(result.score - 0.5) < 1e-9
+
+
+class TestGenerateReviewQuestions:
+
+    @patch("src.agent.nodes.review.get_llm_client")
+    def test_calls_llm_with_correct_count_and_returns_questions(
+        self, mock_get_client
+    ) -> None:
+        from src.agent.nodes.review import generate_review_questions
+        from src.llm.schemas import QuizQuestion
+
+        # Mock instructor client to return 2 fake questions
+        mock_client = mock_get_client.return_value
+        mock_client.chat.completions.create.return_value = [
+            QuizQuestion(id="rq_0", knowledge_point="A",
+                         question="Qa", options=["x", "y", "z", "w"], answer=0),
+            QuizQuestion(id="rq_1", knowledge_point="B",
+                         question="Qb", options=["x", "y", "z", "w"], answer=1),
+        ]
+
+        candidates = [
+            _make_item("A", last_seen_days_ago=10, last_accuracy=0.5),
+            _make_item("B", last_seen_days_ago=15, last_accuracy=0.8),
+        ]
+        questions = generate_review_questions(candidates)
+
+        assert len(questions) == 2
+        assert {q.knowledge_point for q in questions} == {"A", "B"}
+
+        # Verify the LLM was called with response_model + messages
+        call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        assert "response_model" in call_kwargs
+        assert "messages" in call_kwargs
+
+    @patch("src.agent.nodes.review.get_llm_client")
+    def test_empty_candidates_skips_llm_returns_empty(
+        self, mock_get_client
+    ) -> None:
+        from src.agent.nodes.review import generate_review_questions
+        result = generate_review_questions([])
+        assert result == []
+        mock_get_client.assert_not_called()
+
+    @patch("src.agent.nodes.review.get_llm_client")
+    def test_llm_failure_returns_empty(self, mock_get_client) -> None:
+        from src.agent.nodes.review import generate_review_questions
+        mock_get_client.return_value.chat.completions.create.side_effect = (
+            RuntimeError("boom")
+        )
+        candidates = [_make_item("A", last_seen_days_ago=10, last_accuracy=0.5)]
+        assert generate_review_questions(candidates) == []

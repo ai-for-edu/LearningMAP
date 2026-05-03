@@ -9,6 +9,8 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
+from src.llm.client import get_llm_client, get_reviewer_model_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -144,3 +146,49 @@ def grade_review(
         score=correct / total,
         focus_directive=_render_directive(weak_kps=weak, strong_kps=strong),
     )
+
+
+# ---------------------------------------------------------------------------
+# LLM-bearing question generation
+# ---------------------------------------------------------------------------
+
+def generate_review_questions(candidates: list[dict]) -> list:
+    """Call LLM with the review_generate prompt, return list[QuizQuestion].
+
+    Empty input → empty output, no LLM call. Failure → empty list (caller
+    sees an empty review and the front-end can skip silently).
+    """
+    if not candidates:
+        return []
+
+    from src.llm.schemas import QuizQuestion
+    from src.prompts.loader import render_prompt
+
+    # Enrich candidates with days_ago for the prompt
+    now = datetime.now(timezone.utc)
+    enriched = []
+    for c in candidates:
+        try:
+            days_ago = int(
+                (now - _parse_iso_z(c["last_seen_at"])).total_seconds() / 86400
+            )
+        except (KeyError, ValueError):
+            days_ago = 0
+        enriched.append({**c, "days_ago": days_ago})
+
+    system_prompt = render_prompt(
+        "review_generate_system", candidates=enriched
+    )
+
+    try:
+        client = get_llm_client()
+        result = client.chat.completions.create(
+            model=get_reviewer_model_name(),
+            messages=[{"role": "system", "content": system_prompt}],
+            response_model=list[QuizQuestion],
+            max_tokens=2048,
+        )
+        return list(result)
+    except Exception:
+        logger.exception("review question generation failed")
+        return []
