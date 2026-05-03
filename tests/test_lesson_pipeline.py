@@ -322,3 +322,35 @@ def test_lesson_node_all_mastered():
     assert result["mode"] == "lesson"
     assert result["knowledge_skills"] is None
     assert mock_client.chat.completions.create.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Wiring tests: focus_directive flows into live LLM prompt (I-1)
+# ---------------------------------------------------------------------------
+
+
+def test_generate_lesson_per_point_threads_focus_directive_into_prompt():
+    """Focus directive must appear in the rendered lesson_point prompt."""
+    from src.agent.nodes.lesson import generate_lesson_per_point
+
+    weak_points = [{"name": "分配律", "description": "..."}]
+    pedagogy_instructions = ""
+    knowledge_skills = {}
+    directive = "学生在 分配律 上仍薄弱，本次教案应优先衔接这些点。"
+
+    with patch("src.agent.nodes.lesson.get_raw_client") as mock_client:
+        mock_resp = MagicMock()
+        mock_resp.choices = [MagicMock()]
+        mock_resp.choices[0].message.content = "教案"
+        mock_client.return_value.chat.completions.create.return_value = mock_resp
+
+        generate_lesson_per_point(
+            "二次方程", weak_points, pedagogy_instructions, knowledge_skills,
+            focus_directive=directive,
+        )
+
+        # Inspect the prompt that was actually sent to the mock LLM.
+        call_kwargs = mock_client.return_value.chat.completions.create.call_args.kwargs
+        sent_prompt = call_kwargs["messages"][0]["content"]
+        assert directive in sent_prompt
+        assert "复习反馈指令" in sent_prompt

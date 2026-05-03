@@ -347,3 +347,38 @@ def test_resolve_llm_mode_raises_not_implemented():
 def test_resolve_unknown_mode_raises_value_error():
     with pytest.raises(ValueError):
         resolve_kc_graph("乘法原理", mode="garbage")  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# Wiring tests: focus_directive flows into live LLM prompt (I-1)
+# ---------------------------------------------------------------------------
+
+
+def test_llm_generate_graph_threads_focus_directive_into_prompt():
+    """Focus directive must appear in the rendered knowledge_graph prompt."""
+    from unittest.mock import patch, MagicMock
+    from src.agent.nodes.knowledge_graph import _llm_generate_graph
+    from src.llm.schemas import KnowledgeGraph
+
+    state = {
+        "use_kc_skills": False,
+        "review_result": {
+            "focus_directive": "学生在 分配律 上仍薄弱.",
+            "weak_kps": ["分配律"],
+            "strong_kps": [],
+            "score": 0.5,
+        },
+    }
+
+    with patch("src.agent.nodes.knowledge_graph.get_llm_client") as mock_client:
+        # Return a minimal valid KnowledgeGraph
+        mock_client.return_value.chat.completions.create.return_value = (
+            KnowledgeGraph(topic="二次方程", nodes=[], edges=[])
+        )
+
+        _llm_generate_graph("二次方程", state)
+
+        call_kwargs = mock_client.return_value.chat.completions.create.call_args.kwargs
+        sent_prompt = call_kwargs["messages"][0]["content"]
+        assert "分配律" in sent_prompt
+        assert "Focus Directive" in sent_prompt
