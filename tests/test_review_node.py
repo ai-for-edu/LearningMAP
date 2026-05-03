@@ -160,3 +160,18 @@ class TestGradeReview:
         result = grade_review(qs, [0])
         assert "B" in result.weak_kps
         assert "A" in result.strong_kps
+
+    def test_malformed_dict_question_skipped(self) -> None:
+        """A malformed dict (missing keys) should not crash; it's skipped + logged."""
+        from src.agent.nodes.review import grade_review
+        # First question is well-formed; second is missing 'knowledge_point' key
+        good = self._make_q("q1", "A", 0)
+        bad = {"id": "q2", "answer": 1}  # missing 'knowledge_point'
+        result = grade_review([good, bad], [0, 1])
+        # Only the well-formed question contributed
+        assert result.strong_kps == ["A"]
+        assert result.weak_kps == []
+        # score = 1 correct out of total 2 questions (the bad one wasn't graded)
+        # implementation choice: the malformed q still counts in `total` for the score
+        # denominator, since len(questions) is 2.
+        assert abs(result.score - 0.5) < 1e-9

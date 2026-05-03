@@ -109,6 +109,11 @@ def grade_review(
 ) -> "ReviewResult":  # forward ref, imported lazily  # noqa: F821
     """Pure-Python grading. Unanswered questions count as wrong.
 
+    Note: When the same KP appears in multiple questions, the **first**
+    occurrence's correctness wins; later answers for the same KP are
+    ignored. In normal use this never triggers because Task 5's prompt
+    enforces "1 question per KP".
+
     Returns a ReviewResult ready to write into state['review_result'].
     """
     from src.llm.schemas import ReviewResult
@@ -117,8 +122,12 @@ def grade_review(
     strong: list[str] = []
     correct = 0
     for i, q in enumerate(questions):
-        kp = q.knowledge_point if hasattr(q, "knowledge_point") else q["knowledge_point"]
-        expected = q.answer if hasattr(q, "answer") else q["answer"]
+        try:
+            kp = q.knowledge_point if hasattr(q, "knowledge_point") else q["knowledge_point"]
+            expected = q.answer if hasattr(q, "answer") else q["answer"]
+        except (KeyError, AttributeError):
+            logger.warning("malformed review question at index %d, skipping", i)
+            continue
         student = answers[i] if i < len(answers) else -1
         if student == expected:
             correct += 1
