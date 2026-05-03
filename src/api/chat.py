@@ -42,13 +42,15 @@ _has_history_cache: dict[str, tuple[float, bool]] = {}
 _HAS_HISTORY_TTL_S = 60.0
 
 
-def _has_history(user_id: str) -> bool:
+async def _has_history(user_id: str) -> bool:
     """True if the user has any prior subtopic in L1.
 
     Returns False unconditionally when ENABLE_REVIEW_FLOW is off, so the
     front-end "复习" button is hidden in that case.
 
     Memoized for 60 s to avoid hammering the memory service on /state polls.
+    Wraps the blocking httpx call in asyncio.to_thread to keep the event
+    loop responsive.
     """
     if not _REVIEW_FLOW_ENABLED:
         return False
@@ -57,7 +59,7 @@ def _has_history(user_id: str) -> bool:
     if cached is not None and (now - cached[0]) < _HAS_HISTORY_TTL_S:
         return cached[1]
     from src.memory_client import fetch_mastery
-    result = bool(fetch_mastery(user_id))
+    result = bool(await asyncio.to_thread(fetch_mastery, user_id))
     _has_history_cache[user_id] = (now, result)
     return result
 
@@ -685,7 +687,7 @@ async def get_state(session_id: str) -> dict:
         if p:
             result[f"{t}_task_progress"] = p
 
-    result["has_history"] = _has_history(DEFAULT_USER_ID)
+    result["has_history"] = await _has_history(DEFAULT_USER_ID)
 
     return result
 
