@@ -18,6 +18,8 @@ from app.api.schemas import (
     HealthResponse,
     IngestRequest,
     IngestResponse,
+    MasteryItem,
+    MasteryResponse,
     RetrievedMemory,
     RetrieveRequest,
     RetrieveResponse,
@@ -51,6 +53,10 @@ def get_ingestor(request: Request) -> Ingestor:
 
 def get_retriever(request: Request) -> Retriever:
     return request.app.state.retriever
+
+
+def get_repo(request: Request) -> SqliteRepo:
+    return request.app.state.repo
 
 
 # ----------------------------------------------------------------------
@@ -113,6 +119,33 @@ def retrieve(
             for r in resp.results
         ],
         context_text=resp.context_text,
+    )
+
+
+@router.get("/mastery/{user_id}", response_model=MasteryResponse)
+def mastery(
+    user_id: str,
+    topic: str | None = None,
+    since_days: int | None = None,
+    min_seen: int = 1,
+    repo: SqliteRepo = Depends(get_repo),
+) -> MasteryResponse:
+    if min_seen < 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="min_seen must be >= 1",
+        )
+    if since_days is not None and since_days < 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="since_days must be >= 1",
+        )
+    rows = repo.aggregate_mastery(
+        user_id, topic=topic, since_days=since_days, min_seen=min_seen,
+    )
+    return MasteryResponse(
+        user_id=user_id,
+        items=[MasteryItem(**r) for r in rows],
     )
 
 

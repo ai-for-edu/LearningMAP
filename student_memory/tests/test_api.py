@@ -125,3 +125,64 @@ def test_health_via_router_module() -> None:
     assert "/health" in paths
     assert "/ingest" in paths
     assert "/retrieve" in paths
+
+
+def test_mastery_empty_returns_empty_items(settings_override: Settings) -> None:
+    with _client(settings_override) as client:
+        resp = client.get("/mastery/u_unknown")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == {"user_id": "u_unknown", "items": []}
+
+
+def test_mastery_returns_aggregated_subtopics(
+    settings_override: Settings, sample_session_payload: dict
+) -> None:
+    with _client(settings_override) as client:
+        ingest_resp = client.post("/ingest", json=sample_session_payload)
+        assert ingest_resp.status_code == 200
+
+        resp = client.get("/mastery/u_001")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["user_id"] == "u_001"
+    subtopics = {it["subtopic"] for it in body["items"]}
+    assert subtopics == {"Discriminant", "Factoring"}
+
+    disc = next(it for it in body["items"] if it["subtopic"] == "Discriminant")
+    assert disc["topic"] == "Quadratic Equations"
+    assert disc["session_count"] == 1
+    assert disc["total_questions"] == 2
+    assert disc["total_correct"] == 1   # 1 of 2 correct in fixture
+    assert disc["last_accuracy"] == 0.5
+
+
+def test_mastery_topic_query_param(
+    settings_override: Settings, sample_session_payload: dict
+) -> None:
+    with _client(settings_override) as client:
+        client.post("/ingest", json=sample_session_payload)
+        resp = client.get("/mastery/u_001?topic=Quadratic%20Equations")
+        assert resp.status_code == 200
+        assert len(resp.json()["items"]) == 2
+
+        resp_other = client.get("/mastery/u_001?topic=Calculus")
+        assert resp_other.status_code == 200
+        assert resp_other.json()["items"] == []
+
+
+def test_mastery_min_seen_query_param(
+    settings_override: Settings, sample_session_payload: dict
+) -> None:
+    with _client(settings_override) as client:
+        client.post("/ingest", json=sample_session_payload)
+        # Each subtopic seen once → min_seen=2 should filter all out
+        resp = client.get("/mastery/u_001?min_seen=2")
+    assert resp.status_code == 200
+    assert resp.json()["items"] == []
+
+
+def test_mastery_invalid_min_seen_returns_422(settings_override: Settings) -> None:
+    with _client(settings_override) as client:
+        resp = client.get("/mastery/u_001?min_seen=0")
+    assert resp.status_code == 422
