@@ -126,7 +126,7 @@ def generate_lesson_per_point(
     pedagogy_instructions: str,
     knowledge_skills: dict[str, str],
     kc_skills: dict | None = None,
-    focus_directive: str = "",        # NEW
+    focus_directive: str = "",
 ) -> str:
     """Step 2: Generate lesson content per knowledge point, then concatenate."""
     client = get_raw_client()
@@ -145,7 +145,7 @@ def generate_lesson_per_point(
             point_index=i + 1,
             total_points=total,
             kc_skill_block=kc_skill_block,
-            focus_directive=focus_directive,    # NEW
+            focus_directive=focus_directive,
         )
         response = client.chat.completions.create(
             model=get_model_name(),
@@ -348,7 +348,7 @@ def lesson_node_stream(state: dict):
             point_index=i + 1,
             total_points=total,
             kc_skill_block=kc_skill_block,
-            focus_directive=focus_directive,    # NEW
+            focus_directive=focus_directive,
         )
         stream = client.chat.completions.create(
             model=get_model_name(),

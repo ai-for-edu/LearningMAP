@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -224,6 +224,7 @@ async def run_lesson_generation(
             )
         else:
             # Step 2: Generate per-point content (with progress updates)
+            focus_directive = (state_snapshot.get("review_result") or {}).get("focus_directive", "")
             client = get_raw_client()
             sections = []
             total = len(weak_points)
@@ -242,6 +243,7 @@ async def run_lesson_generation(
                     knowledge_skill=knowledge_skills.get(wp["name"], "无额外教学技能"),
                     point_index=i + 1,
                     total_points=total,
+                    focus_directive=focus_directive,
                 )
                 response = await asyncio.to_thread(
                     lambda p=prompt: client.chat.completions.create(
