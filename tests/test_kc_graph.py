@@ -356,7 +356,7 @@ def test_resolve_unknown_mode_raises_value_error():
 
 def test_llm_generate_graph_threads_focus_directive_into_prompt():
     """Focus directive must appear in the rendered knowledge_graph prompt."""
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import patch
     from src.agent.nodes.knowledge_graph import _llm_generate_graph
     from src.llm.schemas import KnowledgeGraph
 
