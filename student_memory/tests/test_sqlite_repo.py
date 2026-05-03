@@ -146,3 +146,103 @@ def test_delete_memory_cascades_to_labels(repo: SqliteRepo) -> None:
     repo.delete_memory("m_a")
     assert repo.get_memory("m_a") is None
     assert repo.get_label("m_a") is None
+
+
+class TestAggregateMastery:
+    """Aggregation queries for review-flow."""
+
+    def test_empty_db_returns_empty_list(self, repo: SqliteRepo) -> None:
+        assert repo.aggregate_mastery("u_001") == []
+
+    def test_groups_by_subtopic_with_session_count(self, repo: SqliteRepo) -> None:
+        # Two sessions on Discriminant, one on Factoring
+        repo.insert_memories(
+            [
+                _make_record("m1", session_id="s1", subtopic="Discriminant",
+                             timestamp="2026-04-01T10:00:00Z"),
+                _make_record("m2", session_id="s2", subtopic="Discriminant",
+                             timestamp="2026-04-15T10:00:00Z"),
+                _make_record("m3", session_id="s3", subtopic="Factoring",
+                             timestamp="2026-04-10T10:00:00Z"),
+            ]
+        )
+        items = repo.aggregate_mastery("u_001")
+
+        # Sorted by last_seen_at desc → Discriminant (Apr 15) first
+        assert [i["subtopic"] for i in items] == ["Discriminant", "Factoring"]
+
+        disc = items[0]
+        assert disc["session_count"] == 2
+        assert disc["last_seen_at"] == "2026-04-15T10:00:00Z"
+        assert disc["total_questions"] == 4   # 2 questions per record
+        assert disc["total_correct"] == 2
+        assert disc["last_accuracy"] == 0.5   # from _make_record default
+
+    def test_filters_other_users(self, repo: SqliteRepo) -> None:
+        repo.insert_memories([
+            _make_record("m1", user_id="u_001", subtopic="A"),
+            _make_record("m2", user_id="u_002", subtopic="A"),
+        ])
+        items = repo.aggregate_mastery("u_001")
+        assert len(items) == 1
+
+    def test_excludes_null_subtopic_rows(self, repo: SqliteRepo) -> None:
+        repo.insert_memories([
+            _make_record("m1", subtopic="A"),
+            _make_record("m2", subtopic=None),  # goal-level row, must skip
+        ])
+        items = repo.aggregate_mastery("u_001")
+        assert {i["subtopic"] for i in items} == {"A"}
+
+    def test_topic_filter(self, repo: SqliteRepo) -> None:
+        repo.insert_memories([
+            _make_record("m1", topic="Algebra", subtopic="A"),
+            _make_record("m2", topic="Geometry", subtopic="B"),
+        ])
+        items = repo.aggregate_mastery("u_001", topic="Algebra")
+        assert {i["subtopic"] for i in items} == {"A"}
+
+    def test_min_seen_filter(self, repo: SqliteRepo) -> None:
+        # Subtopic A: 1 session; B: 2 sessions
+        repo.insert_memories([
+            _make_record("m1", session_id="s1", subtopic="A"),
+            _make_record("m2", session_id="s1", subtopic="B"),
+            _make_record("m3", session_id="s2", subtopic="B"),
+        ])
+        items = repo.aggregate_mastery("u_001", min_seen=2)
+        assert {i["subtopic"] for i in items} == {"B"}
+
+    def test_since_days_filter(self, repo: SqliteRepo) -> None:
+        # 100 days old → excluded; 1 day old → included
+        from datetime import timedelta
+        from app.utils.time import format_timestamp, utcnow
+        old_ts = format_timestamp(utcnow() - timedelta(days=100))
+        new_ts = format_timestamp(utcnow() - timedelta(days=1))
+        repo.insert_memories([
+            _make_record("m1", subtopic="Old", timestamp=old_ts),
+            _make_record("m2", subtopic="New", timestamp=new_ts),
+        ])
+        items = repo.aggregate_mastery("u_001", since_days=30)
+        assert {i["subtopic"] for i in items} == {"New"}
+
+    def test_last_accuracy_uses_most_recent_session(self, repo: SqliteRepo) -> None:
+        # Insert two records same subtopic; later one should win
+        rec_old = MemoryRecord(
+            memory_id="m1", user_id="u_001", session_id="s1",
+            memory_type="subtopic", topic="T", subtopic="A",
+            timestamp="2026-04-01T10:00:00Z",
+            retrieval_text="x", raw_json="{}",
+            question_count=2, correct_count=1, accuracy=0.5,
+            error_types=None,
+        )
+        rec_new = MemoryRecord(
+            memory_id="m2", user_id="u_001", session_id="s2",
+            memory_type="subtopic", topic="T", subtopic="A",
+            timestamp="2026-04-20T10:00:00Z",
+            retrieval_text="y", raw_json="{}",
+            question_count=2, correct_count=2, accuracy=1.0,
+            error_types=None,
+        )
+        repo.insert_memories([rec_old, rec_new])
+        items = repo.aggregate_mastery("u_001")
+        assert items[0]["last_accuracy"] == 1.0

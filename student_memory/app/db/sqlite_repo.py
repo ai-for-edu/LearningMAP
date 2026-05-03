@@ -267,6 +267,77 @@ class SqliteRepo:
         cur = self._conn.execute(sql, params)
         return [_row_to_record(r) for r in cur.fetchall()]
 
+    def aggregate_mastery(
+        self,
+        user_id: str,
+        *,
+        topic: str | None = None,
+        since_days: int | None = None,
+        min_seen: int = 1,
+    ) -> list[dict]:
+        """Aggregate mastery per subtopic for review-flow.
+
+        Returns one row per (subtopic, topic) with:
+          - last_seen_at: max timestamp
+          - session_count: distinct sessions touched
+          - total_questions / total_correct: across all sessions
+          - last_accuracy: accuracy of the most recent session
+
+        Sorted by last_seen_at DESC. Rows with NULL subtopic are excluded.
+        Fails closed: returns [] for unknown user_id (no exception).
+        """
+        from datetime import timedelta
+
+        from app.utils.time import format_timestamp, utcnow
+
+        sql_parts = [
+            """
+            SELECT
+                subtopic, topic,
+                MAX(timestamp) AS last_seen_at,
+                COUNT(DISTINCT session_id) AS session_count,
+                COALESCE(SUM(question_count), 0) AS total_questions,
+                COALESCE(SUM(correct_count), 0) AS total_correct,
+                (SELECT accuracy FROM memories m2
+                   WHERE m2.user_id = m.user_id
+                     AND m2.subtopic = m.subtopic
+                   ORDER BY timestamp DESC LIMIT 1) AS last_accuracy
+            FROM memories m
+            WHERE user_id = ?
+              AND subtopic IS NOT NULL
+            """
+        ]
+        params: list = [user_id]
+
+        if topic is not None:
+            sql_parts.append("AND topic = ?")
+            params.append(topic)
+
+        if since_days is not None:
+            cutoff_iso = format_timestamp(utcnow() - timedelta(days=since_days))
+            sql_parts.append("AND timestamp >= ?")
+            params.append(cutoff_iso)
+
+        sql_parts.append("GROUP BY subtopic, topic")
+        sql_parts.append("HAVING session_count >= ?")
+        params.append(min_seen)
+        sql_parts.append("ORDER BY last_seen_at DESC")
+
+        sql = "\n".join(sql_parts)
+        rows = self._conn.execute(sql, params).fetchall()
+        return [
+            {
+                "subtopic": row["subtopic"],
+                "topic": row["topic"],
+                "last_seen_at": row["last_seen_at"],
+                "session_count": row["session_count"],
+                "total_questions": row["total_questions"],
+                "total_correct": row["total_correct"],
+                "last_accuracy": row["last_accuracy"],
+            }
+            for row in rows
+        ]
+
     def iter_all(self) -> Iterator[MemoryRecord]:
         cur = self._conn.execute("SELECT * FROM memories ORDER BY rowid")
         for row in cur:
