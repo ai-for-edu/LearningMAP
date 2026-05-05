@@ -460,6 +460,7 @@ async def submit_quiz(session_id: str, req: SubmitQuizRequest) -> dict:
     diag_result = await asyncio.to_thread(diagnosis_node, state)
     state.update(diag_result)
     _save(session_id, state)
+    _has_history_cache.pop(DEFAULT_USER_ID, None)
 
     # Persist to student_memory service (background, non-blocking)
     asyncio.get_event_loop().run_in_executor(
@@ -980,5 +981,6 @@ async def submit_review(session_id: str, req: SubmitReviewRequest) -> dict:
     state["review_answers"] = req.answers
     state["review_result"] = result.model_dump()
     _save(session_id, state)
+    _has_history_cache.pop(DEFAULT_USER_ID, None)
 
     return {"review_result": result.model_dump()}
