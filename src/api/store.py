@@ -16,14 +16,6 @@ logger = logging.getLogger(__name__)
 _DB_PATH = Path(__file__).resolve().parent.parent.parent / "sessions.db"
 
 
-def _get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(_DB_PATH))
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, data TEXT)"
-    )
-    return conn
-
-
 def _serialize_state(state: dict[str, Any]) -> str:
     """Convert session state to JSON string."""
     out: dict[str, Any] = {}
@@ -98,6 +90,9 @@ def save_session(session_id: str, state: dict[str, Any]) -> None:
         data = _serialize_state(state)
         with sqlite3.connect(str(_DB_PATH)) as db:
             db.execute(
+                "CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, data TEXT)"
+            )
+            db.execute(
                 "INSERT OR REPLACE INTO sessions (id, data) VALUES (?, ?)",
                 (session_id, data),
             )
@@ -109,6 +104,9 @@ def load_session(session_id: str) -> dict[str, Any] | None:
     """Load session state from SQLite."""
     try:
         with sqlite3.connect(str(_DB_PATH)) as db:
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, data TEXT)"
+            )
             row = db.execute(
                 "SELECT data FROM sessions WHERE id = ?", (session_id,)
             ).fetchone()
