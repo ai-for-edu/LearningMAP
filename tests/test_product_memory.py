@@ -10,6 +10,7 @@ Run: uv run python -m pytest tests/test_product_memory.py -v
 
 from __future__ import annotations
 
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -54,7 +55,7 @@ def memory_service(tmp_path_factory: pytest.TempPathFactory):
         [str(venv_python), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(SERVICE_PORT)],
         cwd=str(STUDENT_MEMORY_DIR),
         env={
-            "PATH": str(venv_python.parent),
+            **os.environ,
             "SM_USE_FAKE_EMBEDDER": "1",
             "SM_DATA_DIR": str(tmp_dir),
             "SM_SQLITE_PATH": str(tmp_dir / "memory.db"),

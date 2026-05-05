@@ -16,6 +16,7 @@ This test proves that:
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import time
@@ -59,7 +60,7 @@ def memory_service(tmp_path_factory: pytest.TempPathFactory):
         ],
         cwd=str(STUDENT_MEMORY_DIR),
         env={
-            "PATH": str(venv_python.parent),
+            **os.environ,
             "SM_USE_FAKE_EMBEDDER": "1",
             "SM_DATA_DIR": str(tmp_dir),
             "SM_SQLITE_PATH": str(tmp_dir / "memory.db"),
