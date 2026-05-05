@@ -66,9 +66,9 @@ env={**os.environ, "SM_USE_FAKE_EMBEDDER": "1", ...}
 
 理由：保留 `HOME`/`PATH`/`LANG`/`uv` 缓存路径等。fixture 仍仅覆盖 `SM_*` 与 `SERVICE_PORT`，行为不变，但子进程启动稳定。
 
-## 验证策略（一次性回归测试，验完即删）
+## 验证策略（一次性回归测试，不进 git）
 
-新建两个测试文件，跑过所有断言后用 `git rm` 单独提交移除（不进 main 分支测试集合）。Fixture 修复属于既有测试代码，**不删**。
+新建两个测试文件用于本地验证，**全程不 `git add`**：写文件 → `uv run pytest` 跑通 → 验证手动 curl 路径 → `rm` 文件。Fixture 修复属于既有测试代码，**保留并提交**。
 
 ### `tests/test_session_persistence.py`（验完即删）
 
@@ -115,7 +115,9 @@ env={**os.environ, "SM_USE_FAKE_EMBEDDER": "1", ...}
 1. `fix(store): create sessions table on connect, drop dead _get_db`
 2. `fix(api): invalidate has_history cache after submit-quiz/submit-review`
 3. `test(fixture): preserve os.environ when starting student_memory subprocess`
-4. `test: add transient regression tests for store/has_history`（含两个 test 文件）
-5. `test: remove transient regression tests`（`git rm` 上一步两个文件）
 
-第 4 / 5 合起来满足"测完即删"的指令，并在 git 历史里留下"曾验证过"的痕迹。
+新增的两个一次性测试文件（`tests/test_session_persistence.py`、`tests/test_has_history_invalidation.py`）**不进 git**：在工作区里跑通后直接 `rm`。git 历史只保留 1–3 三个提交。
+
+## 后续
+
+KG 节点 3 态掌握（mastered/fuzzy/unmastered）+ 复习迭代收敛是独立产品特性，不在本 spec 范围。等以上 3 个 bugfix 落地后单独 brainstorming。
