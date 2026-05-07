@@ -239,3 +239,41 @@ class TestAnnotateGraphWithMastery:
         assert n1.mastery.status == "unseen"
         assert n1.mastery.retention == 0.0
         assert n1.mastery.last_accuracy is None
+
+    def test_legacy_polluted_subtopic_matches_by_prefix(
+        self, graph: KnowledgeGraph, now: datetime
+    ) -> None:
+        """Legacy memory rows shaped 'node: long description' should still
+        match a clean KG node name. This recovers data from before
+        quiz_node started pinning knowledge_point to the KG node name."""
+        rows = [{
+            "subtopic": "判别式: 讲解二次方程根的判别式 b²-4ac，区分根的情况",
+            "topic": "二次方程",
+            "last_accuracy": 0.8,
+            "last_seen_at": (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "session_count": 1,
+        }]
+        out = annotate_graph_with_mastery(
+            graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
+        )
+        n1 = next(n for n in out.nodes if n.name == "判别式")
+        assert n1.mastery is not None
+        assert n1.mastery.last_accuracy == 0.8
+
+    def test_legacy_chinese_colon_also_matches(
+        self, graph: KnowledgeGraph, now: datetime
+    ) -> None:
+        """Both ASCII colon ': ' and full-width '：' separators recover."""
+        rows = [{
+            "subtopic": "求根公式：完整推导加用例",
+            "topic": "二次方程",
+            "last_accuracy": 0.9,
+            "last_seen_at": (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "session_count": 1,
+        }]
+        out = annotate_graph_with_mastery(
+            graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
+        )
+        n2 = next(n for n in out.nodes if n.name == "求根公式")
+        assert n2.mastery is not None
+        assert n2.mastery.last_accuracy == 0.9

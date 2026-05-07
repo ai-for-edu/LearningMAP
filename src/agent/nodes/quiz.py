@@ -132,6 +132,12 @@ def quiz_node(state: LearningState) -> dict:
                 messages=[{"role": "user", "content": prompt}],
                 response_model=list[QuizQuestion],
             )
+            # Pin knowledge_point to the KG node name. The LLM has been
+            # observed to paraphrase or append the description into this
+            # field (e.g. "乘法原理: 讲解分步计数..."), which then becomes
+            # the subtopic key in memory and breaks cross-session matching.
+            for q in batch:
+                q.knowledge_point = node.name
             all_generated.extend(batch)
 
         return {
@@ -198,6 +204,10 @@ def quiz_generate_progressive(state: dict):
                 messages=[{"role": "user", "content": prompt}],
                 response_model=list[QuizQuestion],
             )
+            # Pin knowledge_point to the KG node name — same reason as in
+            # quiz_node: stop LLM-paraphrase pollution from breaking memory match.
+            for q in batch:
+                q.knowledge_point = node.name
             yield batch
         except Exception:
             logger.exception(

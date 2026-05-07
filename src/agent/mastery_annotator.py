@@ -1,9 +1,13 @@
 """Annotate a KnowledgeGraph with per-node mastery metadata.
 
-Two-stage match between KG nodes and memory mastery rows:
+Three-stage match between KG nodes and memory mastery rows:
 1. exact name match (case- and whitespace-sensitive)
 2. normalized name match — strip whitespace, lowercase ASCII, drop
    common punctuation. Catches LLM drift like "判别式 (Δ)" vs "判别式".
+3. prefix-before-colon match — recovers legacy memory rows where the
+   subtopic was stored as "节点名: 完整描述" because an older quiz LLM
+   appended the description into QuizQuestion.knowledge_point. Modern
+   quiz_node pins this field to the KG node name, but old data stays.
 
 Anything still unmatched stays as `mastery=None`, which the frontend
 renders as "unseen". Malformed rows are skipped (graceful degradation).
@@ -75,6 +79,22 @@ def _parse_ts(s: str) -> datetime | None:
 # ---- main ----------------------------------------------------------
 
 
+def _split_prefix(name: str) -> str | None:
+    """Return the part of `name` before the first ':' / '：' separator.
+
+    Used to recover legacy memory rows where the subtopic was stored as
+    "node: long description" — match the prefix to today's KG node.
+    Returns None if no separator is present (avoids matching everything).
+    """
+    if not isinstance(name, str):
+        return None
+    for sep in (": ", "：", ":"):
+        if sep in name:
+            head = name.split(sep, 1)[0].strip()
+            return head or None
+    return None
+
+
 def annotate_graph_with_mastery(
     graph: KnowledgeGraph,
     *,
@@ -85,16 +105,25 @@ def annotate_graph_with_mastery(
     """Return a new KnowledgeGraph with mastery attached to matching nodes."""
     by_exact: dict[str, dict[str, Any]] = {}
     by_norm: dict[str, dict[str, Any]] = {}
+    by_prefix_norm: dict[str, dict[str, Any]] = {}
     for row in mastery_rows:
         sub = row.get("subtopic")
         if not isinstance(sub, str) or not sub:
             continue
         by_exact.setdefault(sub, row)
         by_norm.setdefault(_normalize_name(sub), row)
+        prefix = _split_prefix(sub)
+        if prefix:
+            by_prefix_norm.setdefault(_normalize_name(prefix), row)
 
     new_nodes: list[KnowledgeNode] = []
     for node in graph.nodes:
-        row = by_exact.get(node.name) or by_norm.get(_normalize_name(node.name))
+        node_norm = _normalize_name(node.name)
+        row = (
+            by_exact.get(node.name)
+            or by_norm.get(node_norm)
+            or by_prefix_norm.get(node_norm)
+        )
         meta: MasteryMeta | None = None
         if row is not None:
             meta = _row_to_meta(row, model=model, now=now)

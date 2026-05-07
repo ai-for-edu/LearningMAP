@@ -121,3 +121,58 @@ class TestCoerceNode:
         out = _coerce_node(d)
         assert out.mastery is not None
         assert out.mastery.status == "weak"
+
+
+class TestQuizNodePinsKnowledgePoint:
+    """quiz_node and quiz_generate_progressive must overwrite the LLM's
+    knowledge_point field with the KG node name, so memory ingest groups
+    by stable identifiers across sessions."""
+
+    def test_quiz_node_pins_kp_to_node_name(self) -> None:
+        from unittest.mock import MagicMock, patch
+        from src.agent.nodes.quiz import quiz_node
+        from src.llm.schemas import KnowledgeEdge, KnowledgeGraph, QuizQuestion
+
+        graph = KnowledgeGraph(
+            topic="二次方程",
+            nodes=[KnowledgeNode(id="n1", name="判别式", description="d", level="core")],
+            edges=[],
+        )
+        # Simulate LLM returning a polluted knowledge_point string
+        polluted = QuizQuestion(
+            id="q1",
+            knowledge_point="判别式: 这道题考察判别式的计算与根的判断",
+            question="b²-4ac < 0 时？",
+            options=["两实根", "一实根", "无实根", "无法判断"],
+            answer=2,
+        )
+        with patch("src.agent.nodes.quiz.get_llm_client") as mock_client:
+            mock_client.return_value.chat.completions.create.return_value = [polluted]
+            out = quiz_node({"knowledge_graph": graph, "questions": []})
+
+        # After the pin, the question's knowledge_point must equal the KG node name
+        assert out["questions"][0].knowledge_point == "判别式"
+
+    def test_progressive_pins_kp_to_node_name(self) -> None:
+        from unittest.mock import MagicMock, patch
+        from src.agent.nodes.quiz import quiz_generate_progressive
+        from src.llm.schemas import KnowledgeEdge, KnowledgeGraph, QuizQuestion
+
+        graph = KnowledgeGraph(
+            topic="二次方程",
+            nodes=[KnowledgeNode(id="n1", name="求根公式", description="d", level="core")],
+            edges=[],
+        )
+        polluted = QuizQuestion(
+            id="q1",
+            knowledge_point="求根公式：完整推导",
+            question="x = ?",
+            options=["a", "b", "c", "d"],
+            answer=0,
+        )
+        with patch("src.agent.nodes.quiz.get_llm_client") as mock_client:
+            mock_client.return_value.chat.completions.create.return_value = [polluted]
+            batches = list(quiz_generate_progressive({"knowledge_graph": graph}))
+
+        assert len(batches) == 1
+        assert batches[0][0].knowledge_point == "求根公式"
