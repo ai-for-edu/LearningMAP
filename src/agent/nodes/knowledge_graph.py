@@ -42,6 +42,9 @@ def _build_prompt_mastery(
 
 
 def _coarse_status_for_prompt(acc: Any) -> str:
+    # Thresholds mirror mastery_annotator._MASTERED_MIN / _PARTIAL_MIN.
+    # These apply to raw last_accuracy; the annotator applies the same
+    # thresholds to forgetting-adjusted retention. Keep in sync manually.
     if acc is None:
         return "unseen"
     try:
@@ -101,7 +104,17 @@ def knowledge_graph_node(state: LearningState) -> dict:
     """
     topic = state.get("topic", "")
 
-    mastery_rows = fetch_mastery(DEFAULT_USER_ID, topic=topic) if topic else []
+    if topic:
+        try:
+            mastery_rows = fetch_mastery(DEFAULT_USER_ID, topic=topic)
+        except Exception:
+            logger.warning(
+                "fetch_mastery raised unexpectedly; degrading to no-mastery",
+                exc_info=True,
+            )
+            mastery_rows = []
+    else:
+        mastery_rows = []
 
     graph: KnowledgeGraph | None = None
     if state.get("use_kc_skills", True):

@@ -34,7 +34,13 @@ def _fake_graph() -> KnowledgeGraph:
 def test_kc_path_still_annotated(
     mock_resolve: MagicMock, mock_fetch: MagicMock,
 ) -> None:
-    """When kc_skills resolver hits, the result must still be annotated."""
+    """When kc_skills resolver hits, the result must still be annotated.
+
+    We assert the annotation contract (mastery is attached, status is
+    not unseen-because-unmatched) rather than a specific status bucket,
+    since retention computation depends on wall-clock now and would
+    drift if the forgetting curve is recalibrated.
+    """
     mock_resolve.return_value = _fake_graph()
     now = datetime(2026, 5, 7, 12, tzinfo=UTC)
     mock_fetch.return_value = [{
@@ -50,8 +56,14 @@ def test_kc_path_still_annotated(
 
     graph = out["knowledge_graph"]
     n1 = next(n for n in graph.nodes if n.name == "判别式")
+    # Matched row → mastery attached, status is not the unmatched-sentinel.
+    # Specific retention bucket is covered by mastery_annotator unit tests.
     assert n1.mastery is not None
-    assert n1.mastery.status in {"mastered", "partial"}
+    assert n1.mastery.status != "unseen"
+    assert n1.mastery.forgetting_model == "ebbinghaus_v1"
+    # Unmatched node remains None (not over-annotated).
+    n2 = next(n for n in graph.nodes if n.name == "求根公式")
+    assert n2.mastery is None
 
 
 @patch("src.agent.nodes.knowledge_graph.fetch_mastery")
@@ -101,11 +113,19 @@ def test_no_mastery_means_unseen_nodes(
 def test_fetch_mastery_failure_does_not_break_graph(
     mock_resolve: MagicMock, mock_fetch: MagicMock,
 ) -> None:
-    """fetch_mastery already returns [] on error; verify node still works."""
-    mock_resolve.return_value = _fake_graph()
-    mock_fetch.return_value = []  # graceful-degradation contract
-    state = {"topic": "二次方程", "use_kc_skills": True}
-    out = knowledge_graph_node(state)
+    """The node must produce a graph even if fetch_mastery itself blows up.
 
+    fetch_mastery already swallows HTTP errors and returns []; this test
+    covers the defense-in-depth case where the call somehow raises anyway.
+    """
+    mock_resolve.return_value = _fake_graph()
+    mock_fetch.side_effect = RuntimeError("synthetic memory service crash")
+    state = {"topic": "二次方程", "use_kc_skills": True}
+
+    # Should not raise. Should still produce a graph (with no mastery).
+    out = knowledge_graph_node(state)
     assert "knowledge_graph" in out
-    assert len(out["knowledge_graph"].nodes) == 2
+    graph = out["knowledge_graph"]
+    assert len(graph.nodes) == 2
+    for node in graph.nodes:
+        assert node.mastery is None
