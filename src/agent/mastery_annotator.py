@@ -44,7 +44,7 @@ def _compute_status(retention: float) -> str:
 # Keep only CJK unified ideographs and ASCII alphanumeric [a-z0-9].
 # All whitespace, punctuation, symbols, and non-ASCII letters (e.g.
 # Greek Δ/δ) are dropped so that "判别式（Δ）" matches "判别式".
-_KEEP_RE = re.compile(r"[^一-鿿㐀-䶿a-z0-9豈-﫿]")
+_KEEP_RE = re.compile(r"[^一-鿿㐀-䶿a-z0-9豈-﫿]")
 
 
 def _normalize_name(name: str) -> str:
