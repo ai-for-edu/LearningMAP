@@ -1,16 +1,82 @@
 from __future__ import annotations
 
 import logging
+from typing import Sequence
+
+from langchain_core.messages import AIMessage
+
 from src.agent.state import LearningState
 from src.llm.client import get_llm_client, get_model_name
-from src.llm.schemas import QuizQuestion
-from src.prompts.loader import render_prompt, render_kc_skill_block
+from src.llm.schemas import KnowledgeNode, QuizQuestion
+from src.prompts.loader import render_kc_skill_block, render_prompt
 from src.skills.loader import get_skill_section
-from langchain_core.messages import AIMessage
 
 logger = logging.getLogger(__name__)
 
 QUESTIONS_PER_POINT = 2
+UNSEEN_PRIORITY = 0.7  # treat unseen nodes as moderately needing attention
+MIN_PER_NODE = 1
+
+
+def _priority(node: KnowledgeNode) -> float:
+    """Higher priority → more questions. Mastery-aware when possible."""
+    if node.mastery is None:
+        return UNSEEN_PRIORITY
+    return max(0.0, 1.0 - float(node.mastery.retention))
+
+
+def _allocate_questions_per_node(
+    nodes: Sequence[KnowledgeNode],
+    *,
+    base_per_node: int = QUESTIONS_PER_POINT,
+) -> dict[str, int]:
+    """Distribute base_per_node × N questions across nodes by priority.
+
+    Every node gets at least MIN_PER_NODE. Remaining budget is split in
+    proportion to priority. Total is preserved (modulo rounding ±len(nodes)).
+    """
+    n = len(nodes)
+    if n == 0:
+        return {}
+
+    # If no mastery info anywhere → uniform (preserves legacy behavior)
+    if all(node.mastery is None for node in nodes):
+        return {node.name: base_per_node for node in nodes}
+
+    total_budget = base_per_node * n
+    weights = [_priority(node) for node in nodes]
+    total_w = sum(weights)
+    if total_w <= 0:
+        return {node.name: base_per_node for node in nodes}
+
+    # Step 1: floor of weighted share, with a min of MIN_PER_NODE
+    raw = [max(MIN_PER_NODE, int((w / total_w) * total_budget)) for w in weights]
+    # Step 2: distribute leftover by largest fractional remainder
+    used = sum(raw)
+    leftover = total_budget - used
+    if leftover > 0:
+        # Give extras to nodes with highest priority first
+        order = sorted(range(n), key=lambda i: -weights[i])
+        for i in order[:leftover]:
+            raw[i] += 1
+    elif leftover < 0:
+        # Trim from lowest-priority nodes (but never below MIN_PER_NODE)
+        order = sorted(range(n), key=lambda i: weights[i])
+        for i in order:
+            if leftover == 0:
+                break
+            if raw[i] > MIN_PER_NODE:
+                raw[i] -= 1
+                leftover += 1
+
+    return {node.name: raw[i] for i, node in enumerate(nodes)}
+
+
+def _coerce_node(item) -> KnowledgeNode:
+    """Accept either a KnowledgeNode or a dict (after JSON round-trip)."""
+    if isinstance(item, KnowledgeNode):
+        return item
+    return KnowledgeNode.model_validate(item)
 
 
 def quiz_node(state: LearningState) -> dict:
@@ -18,49 +84,50 @@ def quiz_node(state: LearningState) -> dict:
     questions = state.get("questions", [])
     current_idx = state.get("current_question_index", 0)
 
-    # If no questions generated yet, generate them
     if not questions:
         graph = state.get("knowledge_graph")
         if not graph:
             return {"mode": "chat", "messages": [AIMessage(content="请先选择一个学习主题。")]}
 
-        nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
-        points = [{"name": n.name if hasattr(n, "name") else n["name"],
-                    "description": n.description if hasattr(n, "description") else n["description"]}
-                   for n in nodes]
+        raw_nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
+        nodes = [_coerce_node(n) for n in raw_nodes]
+        per_node = _allocate_questions_per_node(nodes)
 
         skill_instructions = get_skill_section(state, "quiz")
         kc_skills_state = state.get("kc_skills") or {}
-        blocks = []
-        for p in points:
-            b = render_kc_skill_block(kc_skills_state.get(p["name"]))
-            if b:
-                blocks.append(b)
-        kc_skill_block = "\n\n".join(blocks)
-        prompt = render_prompt(
-            "quiz_generate",
-            knowledge_points=points,
-            questions_per_point=QUESTIONS_PER_POINT,
-            skill_instructions=skill_instructions,
-            kc_skill_block=kc_skill_block,
-        )
+
+        all_generated: list[QuizQuestion] = []
         client = get_llm_client()
-        generated = client.chat.completions.create(
-            model=get_model_name(),
-            max_tokens=4096,
-            messages=[{"role": "user", "content": prompt}],
-            response_model=list[QuizQuestion],
-        )
+        for node in nodes:
+            count = per_node.get(node.name, QUESTIONS_PER_POINT)
+            if count <= 0:
+                continue
+            point = {"name": node.name, "description": node.description}
+            block = render_kc_skill_block(kc_skills_state.get(node.name))
+            kc_skill_block = block or ""
+            prompt = render_prompt(
+                "quiz_generate",
+                knowledge_points=[point],
+                questions_per_point=count,
+                skill_instructions=skill_instructions,
+                kc_skill_block=kc_skill_block,
+            )
+            batch = client.chat.completions.create(
+                model=get_model_name(),
+                max_tokens=4096,
+                messages=[{"role": "user", "content": prompt}],
+                response_model=list[QuizQuestion],
+            )
+            all_generated.extend(batch)
 
         return {
-            "questions": generated,
+            "questions": all_generated,
             "current_question_index": 0,
             "answers": [],
             "mode": "quiz",
-            "messages": [AIMessage(content=f"共 {len(generated)} 道题，开始作答！")],
+            "messages": [AIMessage(content=f"共 {len(all_generated)} 道题，开始作答！")],
         }
 
-    # Serve current question
     if current_idx < len(questions):
         q = questions[current_idx]
         q_name = q.knowledge_point if hasattr(q, "knowledge_point") else q["knowledge_point"]
@@ -70,38 +137,38 @@ def quiz_node(state: LearningState) -> dict:
         reply = f"[{q_name}] 第 {current_idx+1}/{len(questions)} 题\n\n{q_text}\n\n{options_text}"
         return {"mode": "quiz", "messages": [AIMessage(content=reply)]}
 
-    # All done
     return {"mode": "result"}
 
 
 def quiz_generate_progressive(state: dict):
-    """Generate quiz questions one knowledge point at a time.
+    """Generate quiz questions one knowledge point at a time, weighted by mastery.
 
-    Yields list[QuizQuestion] batches (one batch per knowledge point).
-    Used by the SSE endpoint for progressive quiz loading.
+    Yields list[QuizQuestion] batches.
     """
     graph = state.get("knowledge_graph")
     if not graph:
         return
 
-    nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
+    raw_nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
+    nodes = [_coerce_node(n) for n in raw_nodes]
+    per_node = _allocate_questions_per_node(nodes)
+
     skill_instructions = get_skill_section(state, "quiz")
     client = get_llm_client()
 
     for node in nodes:
-        name = node.name if hasattr(node, "name") else node["name"]
-        desc = node.description if hasattr(node, "description") else node.get("description", "")
-        point = {"name": name, "description": desc}
-        kc_skill_block = render_kc_skill_block((state.get("kc_skills") or {}).get(name))
-
+        count = per_node.get(node.name, QUESTIONS_PER_POINT)
+        if count <= 0:
+            continue
+        point = {"name": node.name, "description": node.description}
+        kc_skill_block = render_kc_skill_block((state.get("kc_skills") or {}).get(node.name))
         prompt = render_prompt(
             "quiz_generate",
             knowledge_points=[point],
-            questions_per_point=QUESTIONS_PER_POINT,
+            questions_per_point=count,
             skill_instructions=skill_instructions,
             kc_skill_block=kc_skill_block,
         )
-
         try:
             batch = client.chat.completions.create(
                 model=get_model_name(),
@@ -111,4 +178,4 @@ def quiz_generate_progressive(state: dict):
             )
             yield batch
         except Exception:
-            logger.exception("Failed to generate quiz for knowledge point: %s", name)
+            logger.exception("Failed to generate quiz for knowledge point: %s", node.name)
