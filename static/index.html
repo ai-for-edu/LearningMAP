@@ -757,20 +757,39 @@ function initGraph(containerId, graphNodes, graphEdges, levelStyles) {
     if (!container || typeof vis === 'undefined') return;
     container.innerHTML = ''; // Clear any stale content before re-init
 
+    // Mastery status → border color (status comes from MasteryMeta on each node).
+    // Background is owned by `level`; border carries the mastery overlay.
+    const masteryBorderByStatus = {
+      mastered:  '#16A34A',  // 深绿
+      partial:   '#84CC16',  // 黄绿
+      weak:      '#F59E0B',  // 琥珀
+      forgotten: '#DC2626',  // 红
+      unseen:    null,       // matched-but-untested → fall back to level border
+    };
+    function _masteryTooltip(m) {
+      if (!m) return '';
+      const acc = (m.last_accuracy == null) ? '未测试' : `${Math.round(m.last_accuracy * 100)}%`;
+      return `\n上次正确率 ${acc} · ${m.last_seen_at || ''} · 状态 ${m.status}`;
+    }
+
     const visNodes = new vis.DataSet(graphNodes.map(n => {
       const style = levelStyles[n.level] || levelStyles.prerequisite;
       const isCore = n.level === 'core';
+      const m = n.mastery || null;
+      const masteryBorder = m ? masteryBorderByStatus[m.status] : null;
+      const baseBorder = masteryBorder || style.border;
+      const borderWidth = m ? (isCore ? 4 : 3) : (isCore ? 3 : 2);
       return {
         id: n.id,
         label: n.name,
-        title: n.description || n.name,
+        title: (n.description || n.name) + _masteryTooltip(m),
         size: style.size,
         shape: 'dot',
         color: {
           background: style.bg,
-          border: style.border,
-          highlight: { background: '#CF6833', border: '#9E4A2A' },
-          hover: { background: '#CF6833', border: '#9E4A2A' },
+          border: baseBorder,
+          highlight: { background: '#CF6833', border: masteryBorder || '#9E4A2A' },
+          hover: { background: '#CF6833', border: masteryBorder || '#9E4A2A' },
         },
         font: {
           color: '#1a1a1a',
@@ -778,7 +797,7 @@ function initGraph(containerId, graphNodes, graphEdges, levelStyles) {
           face: 'Inter, sans-serif',
           bold: { color: '#1a1a1a', size: 14, face: 'Inter, sans-serif' },
         },
-        borderWidth: isCore ? 3 : 2,
+        borderWidth,
         shadow: { enabled: true, size: 8, color: 'rgba(0,0,0,0.1)' },
       };
     }));

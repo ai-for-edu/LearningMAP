@@ -732,21 +732,41 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
     const allEdges = state.graph.edges || [];
     const weakSet = new Set(weakPoints);
 
+    // Mastery status → border color overlay. Background is owned by
+    // (weak ? weak-red : level), so review-weak and historical-mastery
+    // can co-exist visually: bg shows current-session weakness, border
+    // shows historical retention.
+    const masteryBorderByStatus = {
+      mastered:  '#16A34A',
+      partial:   '#84CC16',
+      weak:      '#F59E0B',
+      forgotten: '#DC2626',
+      unseen:    null,
+    };
+    function _masteryTooltip(m) {
+      if (!m) return '';
+      const acc = (m.last_accuracy == null) ? '未测试' : `${Math.round(m.last_accuracy * 100)}%`;
+      return `\n上次正确率 ${acc} · ${m.last_seen_at || ''} · 状态 ${m.status}`;
+    }
+
     const visNodes = new vis.DataSet(allNodes.map(n => {
       const isWeak = weakSet.has(n.name);
       const isCore = n.level === 'core';
+      const m = n.mastery || null;
+      const masteryBorder = m ? masteryBorderByStatus[m.status] : null;
+      const fallbackBorder = isWeak ? '#DC2626' : (isCore ? '#9E4A2A' : '#CF6833');
       return {
         id: n.id,
         label: n.name,
-        title: n.description || n.name,
+        title: (n.description || n.name) + _masteryTooltip(m),
         size: isCore ? 22 : 16,
         shape: 'dot',
         color: {
           background: isWeak ? '#FECACA' : (isCore ? '#CF6833' : '#F5D5BF'),
-          border: isWeak ? '#DC2626' : (isCore ? '#9E4A2A' : '#CF6833'),
+          border: masteryBorder || fallbackBorder,
         },
         font: { color: '#1a1a1a', size: 11, face: 'Inter, sans-serif' },
-        borderWidth: isWeak ? 3 : 2,
+        borderWidth: m ? 3 : (isWeak ? 3 : 2),
       };
     }));
 
