@@ -712,13 +712,14 @@ const _LEVEL_STYLES = {
   prerequisite: { size: 20 },
   extension:    { size: 18 },
 };
-// mastery.status → {bg, border}. Used as the primary visual signal so a
-// returning user can see their learning history at a glance.
+// mastery.status → {bg, border}. Light backgrounds (Tailwind 200/300)
+// so the dark node label stays legible at WCAG-AA contrast on every
+// status. Borders use a saturated 600-shade for visual punch.
 const _MASTERY_STYLE_BY_STATUS = {
-  mastered:  { bg: '#16A34A', border: '#15803D' },  // 绿
-  weak:      { bg: '#F59E0B', border: '#B45309' },  // 琥珀
-  forgotten: { bg: '#DC2626', border: '#991B1B' },  // 红
-  unseen:    { bg: '#9CA3AF', border: '#6B7280' },  // 灰
+  mastered:  { bg: '#86EFAC', border: '#16A34A' },  // 浅绿 + 深绿描边
+  weak:      { bg: '#FCD34D', border: '#D97706' },  // 浅琥珀 + 深琥珀
+  forgotten: { bg: '#FCA5A5', border: '#DC2626' },  // 浅红 + 深红
+  unseen:    { bg: '#E5E7EB', border: '#9CA3AF' },  // 浅灰 + 中灰
 };
 const _NO_MASTERY_STYLE = _MASTERY_STYLE_BY_STATUS.unseen;
 
@@ -747,10 +748,10 @@ function renderKnowledgeGraph(data) {
           <div id="${containerId}" style="height:280px;background:#FAFAF9;"></div>
           <div class="kg-footer">
             <div class="kg-legend">
-              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#16A34A;"></div>已掌握</div>
-              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#F59E0B;"></div>待复习</div>
-              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#DC2626;"></div>已遗忘</div>
-              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#9CA3AF;"></div>未学</div>
+              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#86EFAC;border:1px solid #16A34A;"></div>已掌握</div>
+              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#FCD34D;border:1px solid #D97706;"></div>待复习</div>
+              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#FCA5A5;border:1px solid #DC2626;"></div>已遗忘</div>
+              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#E5E7EB;border:1px solid #9CA3AF;"></div>未学</div>
             </div>
             <button class="kg-start-btn" onclick="startDiagnosis('${currentSessionId}')">开始诊断 →</button>
           </div>
@@ -781,9 +782,7 @@ function initGraph(containerId, graphNodes, graphEdges, levelStyles) {
       const isCore = n.level === 'core';
       const m = n.mastery || null;
       const cs = (m && _MASTERY_STYLE_BY_STATUS[m.status]) || _NO_MASTERY_STYLE;
-      // Choose label color for contrast against the colored background.
-      const labelColor = (m && (m.status === 'mastered' || m.status === 'forgotten'))
-        ? '#FFFFFF' : '#1a1a1a';
+      // All four palettes use light backgrounds → uniform dark label.
       return {
         id: n.id,
         label: n.name,
@@ -797,10 +796,10 @@ function initGraph(containerId, graphNodes, graphEdges, levelStyles) {
           hover: { background: cs.bg, border: cs.border },
         },
         font: {
-          color: labelColor,
+          color: '#1a1a1a',
           size: isCore ? 14 : 12,
           face: 'Inter, sans-serif',
-          bold: { color: labelColor, size: 14, face: 'Inter, sans-serif' },
+          bold: { color: '#1a1a1a', size: 14, face: 'Inter, sans-serif' },
         },
         borderWidth: isCore ? 3 : 2,
         shadow: { enabled: true, size: 8, color: 'rgba(0,0,0,0.1)' },

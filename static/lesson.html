@@ -736,11 +736,14 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
     // learning state). Current-session review weak (weakSet) is layered
     // on as a thicker red ring so users see "things you just got wrong"
     // distinct from "things historically forgotten".
+    // Light backgrounds (Tailwind 200/300) keep the dark node label
+    // legible at WCAG-AA contrast on every status. Borders use a
+    // saturated 600-shade for visual punch.
     const masteryStyleByStatus = {
-      mastered:  { bg: '#16A34A', border: '#15803D' },  // 绿
-      weak:      { bg: '#F59E0B', border: '#B45309' },  // 琥珀
-      forgotten: { bg: '#DC2626', border: '#991B1B' },  // 红
-      unseen:    { bg: '#9CA3AF', border: '#6B7280' },  // 灰
+      mastered:  { bg: '#86EFAC', border: '#16A34A' },
+      weak:      { bg: '#FCD34D', border: '#D97706' },
+      forgotten: { bg: '#FCA5A5', border: '#DC2626' },
+      unseen:    { bg: '#E5E7EB', border: '#9CA3AF' },
     };
     const NO_MASTERY_STYLE = masteryStyleByStatus.unseen;
 
@@ -755,8 +758,6 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
       const isCore = n.level === 'core';
       const m = n.mastery || null;
       const cs = (m && masteryStyleByStatus[m.status]) || NO_MASTERY_STYLE;
-      const labelColor = (m && (m.status === 'mastered' || m.status === 'forgotten'))
-        ? '#FFFFFF' : '#1a1a1a';
       return {
         id: n.id,
         label: n.name,
@@ -769,7 +770,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
           // historical mastery status.
           border: isWeak ? '#DC2626' : cs.border,
         },
-        font: { color: labelColor, size: 11, face: 'Inter, sans-serif' },
+        font: { color: '#1a1a1a', size: 11, face: 'Inter, sans-serif' },
         borderWidth: isWeak ? 4 : (isCore ? 3 : 2),
       };
     }));

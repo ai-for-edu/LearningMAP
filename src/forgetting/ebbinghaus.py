@@ -1,8 +1,18 @@
 """Default Ebbinghaus retention curve.
 
-R = exp(-t / S)   where t is days since last_seen and S is "stability"
-in days. Stability grows with last_accuracy (you remember mastered
-material longer) and with session_count (spaced repetition compounds).
+R = last_accuracy * exp(-t / S)
+
+  t = days since last_seen
+  S = stability in days; grows with session_count (spaced repetition)
+
+The multiplicative form is intentional. The traditional Ebbinghaus
+exp(-t/S) describes "fraction retained of what was learned". On its own
+it returns ~1.0 right after a session even if the student got every
+question wrong, which is mathematically correct but not what we want
+to display: a student who just answered 0% should see RED, not GREEN.
+Multiplying by last_accuracy gives a single number that means "how
+well does the student know this NOW", combining both how much they
+ever learned and how much has decayed since.
 """
 
 from __future__ import annotations
@@ -17,12 +27,13 @@ class EbbinghausV1:
     def __init__(
         self,
         *,
-        base_stability_days: float = 1.0,
-        accuracy_boost: float = 4.0,
-        repetition_boost: float = 1.0,
+        base_stability_days: float = 7.0,
+        repetition_boost: float = 7.0,
     ) -> None:
+        # Defaults give a one-week half-life for first-time learners and
+        # double that per additional session (spaced repetition). Tune
+        # these without changing the formula shape.
         self.S0 = base_stability_days
-        self.alpha = accuracy_boost
         self.beta = repetition_boost
 
     def retention(
@@ -35,20 +46,20 @@ class EbbinghausV1:
     ) -> float:
         """Return retention probability in [0, 1].
 
-        session_count is the total completed study sessions on this item:
-        1 = first study (baseline stability, no spaced-repetition boost yet),
-        2+ = each additional session adds beta to stability.
+        last_accuracy is multiplied in directly: 0% accuracy → 0 retention
+        regardless of recency. None means "never tested" → 0.
 
-        A future last_seen (clock skew) is treated as t=0, which yields
-        retention=1.0. Callers should validate timestamps if that's wrong.
+        session_count is the total completed study sessions on this item:
+        1 = first study (baseline stability), 2+ = each additional session
+        adds beta to stability.
+
+        A future last_seen (clock skew) is treated as t=0.
         """
         if last_accuracy is None:
             return 0.0
         days = max((now - last_seen).total_seconds() / 86400.0, 0.0)
-        stability = (
-            self.S0 + self.alpha * last_accuracy + self.beta * max(session_count - 1, 0)
-        )
+        stability = self.S0 + self.beta * max(session_count - 1, 0)
         if stability <= 0:
             return 0.0
-        r = math.exp(-days / stability)
+        r = float(last_accuracy) * math.exp(-days / stability)
         return max(0.0, min(1.0, r))

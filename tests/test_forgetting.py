@@ -94,15 +94,33 @@ class TestEbbinghausV1:
         # Pin one concrete value so a refactor that changes the formula
         # is caught immediately.
         # accuracy=0.5, session_count=1, days=2:
-        #   S = 1.0 + 4.0*0.5 + 1.0*(1-1) = 3.0
-        #   R = exp(-2/3) ≈ 0.5134
+        #   S = 7.0 + 7.0*(1-1) = 7.0
+        #   R = 0.5 * exp(-2/7) ≈ 0.5 * 0.7515 ≈ 0.3757
         r = self.model.retention(
             last_seen=self.now - timedelta(days=2),
             last_accuracy=0.5,
             session_count=1,
             now=self.now,
         )
-        assert math.isclose(r, math.exp(-2.0 / 3.0), rel_tol=1e-6)
+        assert math.isclose(r, 0.5 * math.exp(-2.0 / 7.0), rel_tol=1e-6)
+
+    def test_zero_accuracy_yields_zero_regardless_of_recency(self) -> None:
+        # The whole point of the multiplicative model: a student who just
+        # answered 0% should not look "mastered" because they were just-seen.
+        r_now = self.model.retention(
+            last_seen=self.now - timedelta(seconds=1),
+            last_accuracy=0.0,
+            session_count=1,
+            now=self.now,
+        )
+        r_old = self.model.retention(
+            last_seen=self.now - timedelta(days=30),
+            last_accuracy=0.0,
+            session_count=1,
+            now=self.now,
+        )
+        assert r_now == 0.0
+        assert r_old == 0.0
 
 
 class TestRegistry:
