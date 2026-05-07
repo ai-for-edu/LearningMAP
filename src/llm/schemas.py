@@ -1,4 +1,20 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+MasteryStatus = Literal["mastered", "partial", "weak", "forgotten", "unseen"]
+
+
+class MasteryMeta(BaseModel):
+    """Per-node mastery snapshot — what the student knows about this node."""
+
+    last_accuracy: float | None = None
+    last_seen_at: str
+    session_count: int
+    retention: float  # output of the active ForgettingModel, in [0, 1]
+    status: MasteryStatus
+    forgetting_model: str  # e.g. "ebbinghaus_v1" — for future A/B tracking
 
 
 class KnowledgeNode(BaseModel):
@@ -6,6 +22,7 @@ class KnowledgeNode(BaseModel):
     name: str
     description: str
     level: str  # "prerequisite" | "core" | "extension"
+    mastery: MasteryMeta | None = None
 
 
 class KnowledgeEdge(BaseModel):

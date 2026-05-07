@@ -1,4 +1,4 @@
-from src.llm.schemas import KnowledgeNode, KnowledgeEdge, KnowledgeGraph, QuizQuestion, DiagnosisBreakdown, DiagnosisResult, KCSkill
+from src.llm.schemas import KnowledgeNode, KnowledgeEdge, KnowledgeGraph, QuizQuestion, DiagnosisBreakdown, DiagnosisResult, KCSkill, MasteryMeta
 
 
 def test_knowledge_graph_schema():
@@ -74,3 +74,63 @@ def test_review_result_score_bounds() -> None:
 
     with pytest.raises(ValidationError):
         ReviewResult(weak_kps=[], strong_kps=[], score=1.5, focus_directive="x")
+
+
+# ---- MasteryMeta + KnowledgeNode.mastery ----
+
+
+class TestMasteryMeta:
+    def test_required_fields(self) -> None:
+        m = MasteryMeta(
+            last_accuracy=0.8,
+            last_seen_at="2026-04-30T10:00:00Z",
+            session_count=2,
+            retention=0.62,
+            status="partial",
+            forgetting_model="ebbinghaus_v1",
+        )
+        assert m.status == "partial"
+        assert m.retention == 0.62
+
+    def test_last_accuracy_optional(self) -> None:
+        # accuracy can be None for never-tested rows
+        m = MasteryMeta(
+            last_accuracy=None,
+            last_seen_at="2026-04-30T10:00:00Z",
+            session_count=1,
+            retention=0.0,
+            status="unseen",
+            forgetting_model="ebbinghaus_v1",
+        )
+        assert m.last_accuracy is None
+
+
+class TestKnowledgeNodeMastery:
+    def test_default_mastery_none(self) -> None:
+        n = KnowledgeNode(id="n1", name="判别式", description="...", level="core")
+        assert n.mastery is None
+
+    def test_with_mastery(self) -> None:
+        n = KnowledgeNode(
+            id="n1", name="判别式", description="...", level="core",
+            mastery=MasteryMeta(
+                last_accuracy=0.5, last_seen_at="2026-04-30T10:00:00Z",
+                session_count=1, retention=0.4, status="weak",
+                forgetting_model="ebbinghaus_v1",
+            ),
+        )
+        assert n.mastery.status == "weak"
+
+    def test_round_trip_dict(self) -> None:
+        n = KnowledgeNode(
+            id="n1", name="x", description="d", level="core",
+            mastery=MasteryMeta(
+                last_accuracy=0.9, last_seen_at="2026-04-30T10:00:00Z",
+                session_count=2, retention=0.88, status="mastered",
+                forgetting_model="ebbinghaus_v1",
+            ),
+        )
+        dumped = n.model_dump()
+        assert dumped["mastery"]["status"] == "mastered"
+        rebuilt = KnowledgeNode.model_validate(dumped)
+        assert rebuilt.mastery.status == "mastered"
