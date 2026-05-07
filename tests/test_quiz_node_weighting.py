@@ -58,3 +58,56 @@ class TestAllocateQuestionsPerNode:
         ]
         alloc = _allocate_questions_per_node(nodes, base_per_node=2)
         assert alloc["unseen"] >= alloc["mastered_one"]
+
+    def test_dominant_node_does_not_overflow_budget(self) -> None:
+        # 4 mastered + 1 forgotten: raw allocation gives the forgotten
+        # node ~all the budget, but other nodes are pinned at MIN_PER_NODE.
+        # Total must still equal base_per_node × N.
+        nodes = [
+            _node(f"m{i}", retention=1.0, status="mastered") for i in range(4)
+        ] + [
+            _node("f1", retention=0.05, status="forgotten"),
+        ]
+        alloc = _allocate_questions_per_node(nodes, base_per_node=2)
+        # 5 nodes × base 2 = 10 total
+        assert sum(alloc.values()) == 10
+        # All mastered nodes get at least MIN
+        for i in range(4):
+            assert alloc[f"m{i}"] >= 1
+        # Forgotten node gets the bulk
+        assert alloc["f1"] >= 6
+
+
+class TestCoerceNode:
+    def test_accepts_knowledge_node(self) -> None:
+        from src.agent.nodes.quiz import _coerce_node
+
+        n = KnowledgeNode(id="x", name="x", description="d", level="core")
+        assert _coerce_node(n) is n  # passthrough
+
+    def test_accepts_dict(self) -> None:
+        from src.agent.nodes.quiz import _coerce_node
+
+        d = {"id": "x", "name": "x", "description": "d", "level": "core"}
+        out = _coerce_node(d)
+        assert isinstance(out, KnowledgeNode)
+        assert out.name == "x"
+        assert out.mastery is None
+
+    def test_accepts_dict_with_mastery(self) -> None:
+        from src.agent.nodes.quiz import _coerce_node
+
+        d = {
+            "id": "x", "name": "x", "description": "d", "level": "core",
+            "mastery": {
+                "last_accuracy": 0.5,
+                "last_seen_at": "2026-05-01T10:00:00Z",
+                "session_count": 1,
+                "retention": 0.4,
+                "status": "weak",
+                "forgetting_model": "ebbinghaus_v1",
+            },
+        }
+        out = _coerce_node(d)
+        assert out.mastery is not None
+        assert out.mastery.status == "weak"

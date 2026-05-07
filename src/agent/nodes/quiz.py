@@ -51,23 +51,29 @@ def _allocate_questions_per_node(
 
     # Step 1: floor of weighted share, with a min of MIN_PER_NODE
     raw = [max(MIN_PER_NODE, int((w / total_w) * total_budget)) for w in weights]
-    # Step 2: distribute leftover by largest fractional remainder
+    # Step 2: distribute leftover by priority (highest weight gets extras)
     used = sum(raw)
     leftover = total_budget - used
     if leftover > 0:
-        # Give extras to nodes with highest priority first
         order = sorted(range(n), key=lambda i: -weights[i])
         for i in order[:leftover]:
             raw[i] += 1
     elif leftover < 0:
-        # Trim from lowest-priority nodes (but never below MIN_PER_NODE)
-        order = sorted(range(n), key=lambda i: weights[i])
-        for i in order:
-            if leftover == 0:
-                break
-            if raw[i] > MIN_PER_NODE:
-                raw[i] -= 1
-                leftover += 1
+        # Trim greedily from the highest-raw node above MIN until budget
+        # is satisfied. Single-pass trimming wasn't enough when one node
+        # dominated the raw allocation (e.g., one forgotten kp + many
+        # mastered kps pinned at MIN).
+        while leftover < 0:
+            best = -1
+            best_raw = MIN_PER_NODE
+            for i in range(n):
+                if raw[i] > best_raw:
+                    best = i
+                    best_raw = raw[i]
+            if best < 0:
+                break  # everyone at MIN; give up
+            raw[best] -= 1
+            leftover += 1
 
     return {node.name: raw[i] for i, node in enumerate(nodes)}
 
