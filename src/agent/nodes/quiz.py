@@ -14,7 +14,12 @@ from src.skills.loader import get_skill_section
 logger = logging.getLogger(__name__)
 
 QUESTIONS_PER_POINT = 2
-UNSEEN_PRIORITY = 0.7  # treat unseen nodes as moderately needing attention
+# UNSEEN_PRIORITY = priority for nodes with NO memory record at all
+# (mastery is None). Set below 1.0 because we deliberately rank these
+# below "matched-but-forgotten" nodes (mastery exists, retention low →
+# priority ~1.0). Rationale: a student we've never seen on a topic gets
+# fewer questions than one we've seen but who has clearly forgotten.
+UNSEEN_PRIORITY = 0.7
 MIN_PER_NODE = 1
 
 

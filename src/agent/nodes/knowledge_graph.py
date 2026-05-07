@@ -44,9 +44,9 @@ def _build_prompt_mastery(
 
 
 def _coarse_status_for_prompt(acc: Any) -> str:
-    # Thresholds mirror mastery_annotator._MASTERED_MIN / _PARTIAL_MIN.
-    # These apply to raw last_accuracy; the annotator applies the same
-    # thresholds to forgetting-adjusted retention. Keep in sync manually.
+    # Thresholds mirror mastery_annotator._MASTERED_MIN / _PARTIAL_MIN /
+    # _WEAK_MIN. These apply to raw last_accuracy; the annotator applies
+    # the same thresholds to forgetting-adjusted retention. Keep in sync.
     if acc is None:
         return "unseen"
     try:
@@ -57,7 +57,9 @@ def _coarse_status_for_prompt(acc: Any) -> str:
         return "mastered"
     if a >= 0.6:
         return "partial"
-    return "weak"
+    if a >= 0.3:
+        return "weak"
+    return "forgotten"
 
 
 def _llm_generate_graph(

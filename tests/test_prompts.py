@@ -281,3 +281,48 @@ class TestKnowledgeGraphMasteryBlock:
         assert "求根公式" in text
         # The block must instruct the LLM to reuse subtopic names as node names
         assert "复用" in text or "reuse" in text.lower()
+
+    def test_mastery_block_handles_null_accuracy(self) -> None:
+        text = render_prompt(
+            "knowledge_graph",
+            topic="二次方程",
+            max_nodes=10,
+            skill_instructions="",
+            focus_directive="",
+            review_weak_kps=[],
+            review_strong_kps=[],
+            existing_mastery=[
+                {
+                    "subtopic": "极坐标",
+                    "last_accuracy": None,  # never tested
+                    "last_seen_at": "2026-04-30T10:00:00Z",
+                    "status": "unseen",
+                },
+            ],
+        )
+        # Must not leak Python repr "None" into the prompt
+        assert "None" not in text
+        # Should present a human-readable fallback
+        assert "未测试" in text
+
+    def test_mastery_block_formats_accuracy_as_percent(self) -> None:
+        text = render_prompt(
+            "knowledge_graph",
+            topic="二次方程",
+            max_nodes=10,
+            skill_instructions="",
+            focus_directive="",
+            review_weak_kps=[],
+            review_strong_kps=[],
+            existing_mastery=[
+                {
+                    "subtopic": "判别式",
+                    "last_accuracy": 0.8,
+                    "last_seen_at": "2026-04-30T10:00:00Z",
+                    "status": "partial",
+                },
+            ],
+        )
+        assert "80%" in text
+        # Should NOT contain the raw 0.8 float
+        assert "0.8，" not in text
