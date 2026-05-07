@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-MasteryStatus = Literal["mastered", "partial", "weak", "forgotten", "unseen"]
+MasteryStatus = Literal["mastered", "weak", "forgotten", "unseen"]
 
 
 class MasteryMeta(BaseModel):

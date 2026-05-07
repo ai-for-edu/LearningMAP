@@ -712,12 +712,21 @@ function renderKnowledgeGraph(data) {
   const graphEdges = graph.edges || [];
   const containerId = 'kg-container-' + (++_graphCounter);
 
-  // Color palette by level — all labels dark for readability
+  // Level controls SIZE only. Background color is owned by mastery.status.
   const levelStyles = {
-    core:         { bg: '#CF6833', border: '#9E4A2A', size: 28 },
-    prerequisite: { bg: '#F5D5BF', border: '#E8B897', size: 20 },
-    extension:    { bg: '#EDE9E3', border: '#D4CFC8', size: 18 },
+    core:         { size: 28 },
+    prerequisite: { size: 20 },
+    extension:    { size: 18 },
   };
+  // mastery.status → background color. Used as the primary visual signal
+  // so a returning user can see their learning history at a glance.
+  const masteryStyleByStatus = {
+    mastered:  { bg: '#16A34A', border: '#15803D' },  // 绿
+    weak:      { bg: '#F59E0B', border: '#B45309' },  // 琥珀
+    forgotten: { bg: '#DC2626', border: '#991B1B' },  // 红
+    unseen:    { bg: '#9CA3AF', border: '#6B7280' },  // 灰
+  };
+  const NO_MASTERY_STYLE = masteryStyleByStatus.unseen;
 
   const nodeCount = graphNodes.length;
   chatHistory.innerHTML += `
@@ -735,9 +744,10 @@ function renderKnowledgeGraph(data) {
           <div id="${containerId}" style="height:280px;background:#FAFAF9;"></div>
           <div class="kg-footer">
             <div class="kg-legend">
-              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:var(--accent);"></div>核心</div>
-              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:var(--accent-border);"></div>前置</div>
-              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:var(--user-bubble);"></div>拓展</div>
+              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#16A34A;"></div>已掌握</div>
+              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#F59E0B;"></div>待复习</div>
+              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#DC2626;"></div>已遗忘</div>
+              <div class="kg-legend-item"><div class="kg-legend-dot" style="background:#9CA3AF;"></div>未学</div>
             </div>
             <button class="kg-start-btn" onclick="startDiagnosis('${currentSessionId}')">开始诊断 →</button>
           </div>
@@ -757,15 +767,6 @@ function initGraph(containerId, graphNodes, graphEdges, levelStyles) {
     if (!container || typeof vis === 'undefined') return;
     container.innerHTML = ''; // Clear any stale content before re-init
 
-    // Mastery status → border color (status comes from MasteryMeta on each node).
-    // Background is owned by `level`; border carries the mastery overlay.
-    const masteryBorderByStatus = {
-      mastered:  '#16A34A',  // 深绿
-      partial:   '#84CC16',  // 黄绿
-      weak:      '#F59E0B',  // 琥珀
-      forgotten: '#DC2626',  // 红
-      unseen:    null,       // matched-but-untested → fall back to level border
-    };
     function _masteryTooltip(m) {
       if (!m) return '';
       const acc = (m.last_accuracy == null) ? '未测试' : `${Math.round(m.last_accuracy * 100)}%`;
@@ -773,31 +774,32 @@ function initGraph(containerId, graphNodes, graphEdges, levelStyles) {
     }
 
     const visNodes = new vis.DataSet(graphNodes.map(n => {
-      const style = levelStyles[n.level] || levelStyles.prerequisite;
+      const sizeStyle = levelStyles[n.level] || levelStyles.prerequisite;
       const isCore = n.level === 'core';
       const m = n.mastery || null;
-      const masteryBorder = m ? masteryBorderByStatus[m.status] : null;
-      const baseBorder = masteryBorder || style.border;
-      const borderWidth = m ? (isCore ? 4 : 3) : (isCore ? 3 : 2);
+      const cs = (m && masteryStyleByStatus[m.status]) || NO_MASTERY_STYLE;
+      // Choose label color for contrast against the colored background.
+      const labelColor = (m && (m.status === 'mastered' || m.status === 'forgotten'))
+        ? '#FFFFFF' : '#1a1a1a';
       return {
         id: n.id,
         label: n.name,
         title: (n.description || n.name) + _masteryTooltip(m),
-        size: style.size,
+        size: sizeStyle.size,
         shape: 'dot',
         color: {
-          background: style.bg,
-          border: baseBorder,
-          highlight: { background: '#CF6833', border: masteryBorder || '#9E4A2A' },
-          hover: { background: '#CF6833', border: masteryBorder || '#9E4A2A' },
+          background: cs.bg,
+          border: cs.border,
+          highlight: { background: cs.bg, border: cs.border },
+          hover: { background: cs.bg, border: cs.border },
         },
         font: {
-          color: '#1a1a1a',
+          color: labelColor,
           size: isCore ? 14 : 12,
           face: 'Inter, sans-serif',
-          bold: { color: '#1a1a1a', size: 14, face: 'Inter, sans-serif' },
+          bold: { color: labelColor, size: 14, face: 'Inter, sans-serif' },
         },
-        borderWidth,
+        borderWidth: isCore ? 3 : 2,
         shadow: { enabled: true, size: 8, color: 'rgba(0,0,0,0.1)' },
       };
     }));

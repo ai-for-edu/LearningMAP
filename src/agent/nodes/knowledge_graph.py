@@ -44,20 +44,18 @@ def _build_prompt_mastery(
 
 
 def _coarse_status_for_prompt(acc: Any) -> str:
-    # Thresholds mirror mastery_annotator._MASTERED_MIN / _PARTIAL_MIN /
-    # _WEAK_MIN. These apply to raw last_accuracy; the annotator applies
-    # the same thresholds to forgetting-adjusted retention. Keep in sync.
+    # Thresholds mirror mastery_annotator._MASTERED_MIN / _WEAK_MIN.
+    # These apply to raw last_accuracy; the annotator applies the same
+    # thresholds to forgetting-adjusted retention. Keep in sync.
     if acc is None:
         return "unseen"
     try:
         a = float(acc)
     except (TypeError, ValueError):
         return "unseen"
-    if a >= 0.85:
+    if a >= 0.70:
         return "mastered"
-    if a >= 0.6:
-        return "partial"
-    if a >= 0.3:
+    if a >= 0.30:
         return "weak"
     return "forgotten"
 

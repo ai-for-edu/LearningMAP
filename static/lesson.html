@@ -732,17 +732,18 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
     const allEdges = state.graph.edges || [];
     const weakSet = new Set(weakPoints);
 
-    // Mastery status → border color overlay. Background is owned by
-    // (weak ? weak-red : level), so review-weak and historical-mastery
-    // can co-exist visually: bg shows current-session weakness, border
-    // shows historical retention.
-    const masteryBorderByStatus = {
-      mastered:  '#16A34A',
-      partial:   '#84CC16',
-      weak:      '#F59E0B',
-      forgotten: '#DC2626',
-      unseen:    null,
+    // Mastery status → background color (primary signal of historical
+    // learning state). Current-session review weak (weakSet) is layered
+    // on as a thicker red ring so users see "things you just got wrong"
+    // distinct from "things historically forgotten".
+    const masteryStyleByStatus = {
+      mastered:  { bg: '#16A34A', border: '#15803D' },  // 绿
+      weak:      { bg: '#F59E0B', border: '#B45309' },  // 琥珀
+      forgotten: { bg: '#DC2626', border: '#991B1B' },  // 红
+      unseen:    { bg: '#9CA3AF', border: '#6B7280' },  // 灰
     };
+    const NO_MASTERY_STYLE = masteryStyleByStatus.unseen;
+
     function _masteryTooltip(m) {
       if (!m) return '';
       const acc = (m.last_accuracy == null) ? '未测试' : `${Math.round(m.last_accuracy * 100)}%`;
@@ -753,8 +754,9 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
       const isWeak = weakSet.has(n.name);
       const isCore = n.level === 'core';
       const m = n.mastery || null;
-      const masteryBorder = m ? masteryBorderByStatus[m.status] : null;
-      const fallbackBorder = isWeak ? '#DC2626' : (isCore ? '#9E4A2A' : '#CF6833');
+      const cs = (m && masteryStyleByStatus[m.status]) || NO_MASTERY_STYLE;
+      const labelColor = (m && (m.status === 'mastered' || m.status === 'forgotten'))
+        ? '#FFFFFF' : '#1a1a1a';
       return {
         id: n.id,
         label: n.name,
@@ -762,11 +764,13 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
         size: isCore ? 22 : 16,
         shape: 'dot',
         color: {
-          background: isWeak ? '#FECACA' : (isCore ? '#CF6833' : '#F5D5BF'),
-          border: masteryBorder || fallbackBorder,
+          background: cs.bg,
+          // Current-session weakness: outline in pure red regardless of
+          // historical mastery status.
+          border: isWeak ? '#DC2626' : cs.border,
         },
-        font: { color: '#1a1a1a', size: 11, face: 'Inter, sans-serif' },
-        borderWidth: m ? 3 : (isWeak ? 3 : 2),
+        font: { color: labelColor, size: 11, face: 'Inter, sans-serif' },
+        borderWidth: isWeak ? 4 : (isCore ? 3 : 2),
       };
     }));
 

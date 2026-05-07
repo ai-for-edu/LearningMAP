@@ -61,12 +61,9 @@ class TestComputeStatus:
         [
             (1.00, "mastered"),
             (0.90, "mastered"),
-            (0.85, "mastered"),  # boundary
-            (0.84999, "partial"),
-            (0.70, "partial"),
-            (0.60, "partial"),  # boundary
-            (0.59999, "weak"),
-            (0.45, "weak"),
+            (0.70, "mastered"),  # boundary
+            (0.69999, "weak"),
+            (0.50, "weak"),
             (0.30, "weak"),  # boundary
             (0.29999, "forgotten"),
             (0.10, "forgotten"),

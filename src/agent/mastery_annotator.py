@@ -25,16 +25,13 @@ logger = logging.getLogger(__name__)
 
 # ---- thresholds (tunable; pinned by tests) ------------------------
 
-_MASTERED_MIN = 0.85
-_PARTIAL_MIN = 0.60
+_MASTERED_MIN = 0.70
 _WEAK_MIN = 0.30
 
 
 def _compute_status(retention: float) -> str:
     if retention >= _MASTERED_MIN:
         return "mastered"
-    if retention >= _PARTIAL_MIN:
-        return "partial"
     if retention >= _WEAK_MIN:
         return "weak"
     return "forgotten"
