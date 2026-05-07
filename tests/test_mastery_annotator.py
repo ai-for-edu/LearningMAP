@@ -176,3 +176,25 @@ class TestAnnotateGraphWithMastery:
         assert original_n1.mastery is None  # original unchanged
         out_n1 = next(n for n in out.nodes if n.name == "判别式")
         assert out_n1.mastery is not None
+
+    def test_matched_row_with_null_accuracy_yields_unseen_status(
+        self, graph: KnowledgeGraph, now: datetime
+    ) -> None:
+        """A mastery row with last_accuracy=None still attaches MasteryMeta,
+        but with status='unseen' and retention=0. Distinct from mastery=None
+        (truly unmatched)."""
+        rows = [{
+            "subtopic": "判别式",
+            "topic": "二次方程",
+            "last_accuracy": None,
+            "last_seen_at": (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "session_count": 1,
+        }]
+        out = annotate_graph_with_mastery(
+            graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
+        )
+        n1 = next(n for n in out.nodes if n.name == "判别式")
+        assert n1.mastery is not None  # matched, not unseen-by-absence
+        assert n1.mastery.status == "unseen"
+        assert n1.mastery.retention == 0.0
+        assert n1.mastery.last_accuracy is None

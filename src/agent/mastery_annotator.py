@@ -44,7 +44,7 @@ def _compute_status(retention: float) -> str:
 # Keep only CJK unified ideographs and ASCII alphanumeric [a-z0-9].
 # All whitespace, punctuation, symbols, and non-ASCII letters (e.g.
 # Greek Δ/δ) are dropped so that "判别式（Δ）" matches "判别式".
-_KEEP_RE = re.compile(r"[^一-鿿㐀-䶿豈-﫿a-z0-9]")
+_KEEP_RE = re.compile(r"[^一-鿿㐀-䶿a-z0-9豈-﫿]")
 
 
 def _normalize_name(name: str) -> str:
@@ -110,12 +110,17 @@ def _row_to_meta(
     try:
         session_count = int(row.get("session_count") or 0)
     except (TypeError, ValueError):
+        logger.warning("dropping mastery row with bad session_count: %r", row)
         return None
     last_accuracy = row.get("last_accuracy")
     if last_accuracy is not None:
         try:
             last_accuracy = float(last_accuracy)
         except (TypeError, ValueError):
+            logger.warning(
+                "non-numeric last_accuracy in mastery row, treating as unseen: %r",
+                row,
+            )
             last_accuracy = None
 
     retention = model.retention(
