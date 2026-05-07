@@ -34,6 +34,10 @@ def _get_client() -> httpx.Client:
             _client = httpx.Client(
                 base_url=MEMORY_SERVICE_URL,
                 timeout=httpx.Timeout(10.0, connect=2.0),
+                # Memory service is always local; ignore HTTP(S)_PROXY env
+                # vars which would otherwise route 127.0.0.1 traffic through
+                # the user's outbound proxy and time out.
+                trust_env=False,
             )
     return _client
 
