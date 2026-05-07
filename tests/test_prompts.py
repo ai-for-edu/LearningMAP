@@ -319,7 +319,7 @@ class TestKnowledgeGraphMasteryBlock:
                     "subtopic": "判别式",
                     "last_accuracy": 0.8,
                     "last_seen_at": "2026-04-30T10:00:00Z",
-                    "status": "partial",
+                    "status": "mastered",
                 },
             ],
         )

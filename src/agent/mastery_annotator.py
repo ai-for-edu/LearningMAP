@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 # ---- thresholds (tunable; pinned by tests) ------------------------
+#
+# 4-bucket scheme: any retention above _MASTERED_MIN counts as mastered
+# (loose by design — see brainstorming notes; users need to see green to
+# feel progress). Below _WEAK_MIN, the material is effectively forgotten.
 
 _MASTERED_MIN = 0.70
 _WEAK_MIN = 0.30

@@ -58,10 +58,10 @@ def test_full_pipeline_kc_path(
     graph = out["knowledge_graph"]
 
     by_name = {n.name: n for n in graph.nodes}
-    # Recently-mastered: status mastered or partial
+    # Recently studied with perfect accuracy → mastered
     assert by_name["判别式"].mastery is not None
-    assert by_name["判别式"].mastery.status in {"mastered", "partial"}
-    # Long-ago weak: status forgotten or weak
+    assert by_name["判别式"].mastery.status == "mastered"
+    # 60-day-old session with 50% accuracy → forgotten
     assert by_name["求根公式"].mastery is not None
     assert by_name["求根公式"].mastery.status in {"weak", "forgotten"}
     # Never seen: mastery is None

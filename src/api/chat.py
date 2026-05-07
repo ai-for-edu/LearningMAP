@@ -9,13 +9,22 @@ from typing import Any
 
 import json
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from langchain_core.messages import HumanMessage, AIMessage
 from src.agent.graph import build_graph
+from src.agent.mastery_annotator import annotate_graph_with_mastery
 from src.api.store import load_session, save_session
-from src.memory_client import ingest_session, DEFAULT_USER_ID
+from src.forgetting import get_forgetting_model
+from src.llm.schemas import KnowledgeGraph
+from src.memory_client import (
+    DEFAULT_USER_ID,
+    fetch_mastery,
+    ingest_session,
+)
 from src.skills.loader import get_skill, list_skills
 
 logger = logging.getLogger(__name__)
@@ -621,10 +630,38 @@ async def get_state(session_id: str) -> dict:
         "has_lesson": state.get("lesson_content") is not None,
     }
 
-    # Include full data when available
+    # Include full data when available. Re-annotate the KG with the freshest
+    # mastery rows so the frontend sees node colors update in the same session
+    # as soon as new memory is ingested (post-quiz, post-lesson). The on-disk
+    # state retains the generation-time snapshot — this refresh is per-response.
     kg = state.get("knowledge_graph")
     if kg:
-        result["graph"] = kg.model_dump() if hasattr(kg, "model_dump") else kg
+        kg_obj = (
+            kg
+            if hasattr(kg, "model_dump")
+            else KnowledgeGraph.model_validate(kg)
+        )
+        topic = state.get("topic") or ""
+        if topic:
+            try:
+                mastery_rows = await asyncio.to_thread(
+                    fetch_mastery, DEFAULT_USER_ID, topic
+                )
+            except Exception:
+                logger.warning(
+                    "fetch_mastery raised in get_state; degrading to no-mastery",
+                    exc_info=True,
+                )
+                mastery_rows = []
+        else:
+            mastery_rows = []
+        kg_obj = annotate_graph_with_mastery(
+            kg_obj,
+            mastery_rows=mastery_rows,
+            model=get_forgetting_model(),
+            now=datetime.now(timezone.utc),
+        )
+        result["graph"] = kg_obj.model_dump()
 
     dr = state.get("diagnosis_result")
     if dr:

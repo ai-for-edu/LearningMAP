@@ -101,15 +101,15 @@ def test_review_result_score_bounds() -> None:
 class TestMasteryMeta:
     def test_required_fields(self) -> None:
         m = MasteryMeta(
-            last_accuracy=0.5,
+            last_accuracy=0.8,
             last_seen_at="2026-04-30T10:00:00Z",
             session_count=2,
-            retention=0.45,
+            retention=0.62,
             status="weak",
             forgetting_model="ebbinghaus_v1",
         )
         assert m.status == "weak"
-        assert m.retention == 0.45
+        assert m.retention == 0.62
 
     def test_last_accuracy_optional(self) -> None:
         # accuracy can be None for never-tested rows
