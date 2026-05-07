@@ -705,6 +705,23 @@ async function handleSend(text) {
 
 let _graphCounter = 0;
 
+// Module-scope so both renderKnowledgeGraph and initGraph can reference them.
+// Level controls SIZE only. Background color is owned by mastery.status.
+const _LEVEL_STYLES = {
+  core:         { size: 28 },
+  prerequisite: { size: 20 },
+  extension:    { size: 18 },
+};
+// mastery.status → {bg, border}. Used as the primary visual signal so a
+// returning user can see their learning history at a glance.
+const _MASTERY_STYLE_BY_STATUS = {
+  mastered:  { bg: '#16A34A', border: '#15803D' },  // 绿
+  weak:      { bg: '#F59E0B', border: '#B45309' },  // 琥珀
+  forgotten: { bg: '#DC2626', border: '#991B1B' },  // 红
+  unseen:    { bg: '#9CA3AF', border: '#6B7280' },  // 灰
+};
+const _NO_MASTERY_STYLE = _MASTERY_STYLE_BY_STATUS.unseen;
+
 function renderKnowledgeGraph(data) {
   const graph = data.data.graph;
   const chatHistory = document.getElementById('chatHistory');
@@ -712,21 +729,7 @@ function renderKnowledgeGraph(data) {
   const graphEdges = graph.edges || [];
   const containerId = 'kg-container-' + (++_graphCounter);
 
-  // Level controls SIZE only. Background color is owned by mastery.status.
-  const levelStyles = {
-    core:         { size: 28 },
-    prerequisite: { size: 20 },
-    extension:    { size: 18 },
-  };
-  // mastery.status → background color. Used as the primary visual signal
-  // so a returning user can see their learning history at a glance.
-  const masteryStyleByStatus = {
-    mastered:  { bg: '#16A34A', border: '#15803D' },  // 绿
-    weak:      { bg: '#F59E0B', border: '#B45309' },  // 琥珀
-    forgotten: { bg: '#DC2626', border: '#991B1B' },  // 红
-    unseen:    { bg: '#9CA3AF', border: '#6B7280' },  // 灰
-  };
-  const NO_MASTERY_STYLE = masteryStyleByStatus.unseen;
+  const levelStyles = _LEVEL_STYLES;
 
   const nodeCount = graphNodes.length;
   chatHistory.innerHTML += `
@@ -777,7 +780,7 @@ function initGraph(containerId, graphNodes, graphEdges, levelStyles) {
       const sizeStyle = levelStyles[n.level] || levelStyles.prerequisite;
       const isCore = n.level === 'core';
       const m = n.mastery || null;
-      const cs = (m && masteryStyleByStatus[m.status]) || NO_MASTERY_STYLE;
+      const cs = (m && _MASTERY_STYLE_BY_STATUS[m.status]) || _NO_MASTERY_STYLE;
       // Choose label color for contrast against the colored background.
       const labelColor = (m && (m.status === 'mastered' || m.status === 'forgotten'))
         ? '#FFFFFF' : '#1a1a1a';
