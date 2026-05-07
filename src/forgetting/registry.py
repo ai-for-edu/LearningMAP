@@ -4,7 +4,7 @@ from __future__ import annotations
 from src.forgetting.base import ForgettingModel
 from src.forgetting.ebbinghaus import EbbinghausV1
 
-_REGISTRY: dict[str, type] = {
+_REGISTRY: dict[str, type[ForgettingModel]] = {
     "ebbinghaus_v1": EbbinghausV1,
 }
 

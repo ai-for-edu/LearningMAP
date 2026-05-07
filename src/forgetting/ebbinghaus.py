@@ -32,6 +32,15 @@ class EbbinghausV1:
         session_count: int,
         now: datetime,
     ) -> float:
+        """Return retention probability in [0, 1].
+
+        session_count is the total completed study sessions on this item:
+        1 = first study (baseline stability, no spaced-repetition boost yet),
+        2+ = each additional session adds beta to stability.
+
+        A future last_seen (clock skew) is treated as t=0, which yields
+        retention=1.0. Callers should validate timestamps if that's wrong.
+        """
         if last_accuracy is None:
             return 0.0
         days = max((now - last_seen).total_seconds() / 86400.0, 0.0)

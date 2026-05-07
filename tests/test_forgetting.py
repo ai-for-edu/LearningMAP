@@ -68,13 +68,14 @@ class TestEbbinghausV1:
         r_many = self.model.retention(session_count=5, **kw)
         assert r_many > r_once
 
-    def test_retention_clamped_to_unit_interval(self) -> None:
-        # Future last_seen (clock skew) — must not produce >1
+    def test_future_last_seen_treated_as_zero_age(self) -> None:
+        # Clock-skew / stale-timestamp safety: future last_seen yields
+        # retention=1.0 (treated as just-seen), not a >1 overflow.
         r = self.model.retention(
             last_seen=self.now + timedelta(days=1),
             last_accuracy=1.0, session_count=1, now=self.now,
         )
-        assert 0.0 <= r <= 1.0
+        assert r == 1.0
 
     def test_name_attribute(self) -> None:
         assert self.model.name == "ebbinghaus_v1"
@@ -108,6 +109,8 @@ class TestRegistry:
 
 class TestProtocolConformance:
     def test_ebbinghaus_satisfies_protocol(self) -> None:
-        m: ForgettingModel = EbbinghausV1()  # static type check by assignment
-        assert hasattr(m, "name")
-        assert callable(m.retention)
+        # @runtime_checkable on ForgettingModel makes this a structural check.
+        assert isinstance(EbbinghausV1(), ForgettingModel)
+
+    def test_factory_returns_protocol_instance(self) -> None:
+        assert isinstance(get_forgetting_model(), ForgettingModel)
