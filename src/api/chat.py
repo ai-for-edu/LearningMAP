@@ -953,7 +953,13 @@ async def start_review(session_id: str) -> dict:
     state["review_result"] = None
     _save(session_id, state)
 
-    return {"questions": [q.model_dump() for q in questions]}
+    topic_by_kp = {c["subtopic"]: c.get("topic", "") for c in candidates}
+    return {
+        "questions": [
+            {**q.model_dump(), "topic": topic_by_kp.get(q.knowledge_point, "")}
+            for q in questions
+        ]
+    }
 
 
 @router.post("/chat/{session_id}/submit-review")

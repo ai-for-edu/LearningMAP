@@ -1233,7 +1233,9 @@ function renderReviewQuestion() {
         <div style="font-size:11px;color:var(--text-3);">复习 · 第 ${_reviewCurrentIdx + 1} / ${total} 题</div>
         <button onclick="closeReviewModal()" style="font-size:18px;color:var(--text-3);background:none;border:none;cursor:pointer;">✕</button>
       </div>
-      <div style="font-size:11px;color:var(--accent);margin-bottom:8px;">${escapeHtml(q.knowledge_point)}</div>
+      <div style="font-size:11px;color:var(--accent);margin-bottom:8px;">
+        ${q.topic ? `<span style="color:var(--text-3);font-weight:500;">来自《${escapeHtml(q.topic)}》 · </span>` : ''}${escapeHtml(q.knowledge_point)}
+      </div>
       <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:16px;">${escapeHtml(q.question)}</div>
       ${optionsHtml}
       <div style="display:flex;justify-content:flex-end;margin-top:16px;">

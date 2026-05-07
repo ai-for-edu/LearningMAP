@@ -131,6 +131,49 @@ def test_full_review_round_trip(
 
 
 # ---------------------------------------------------------------------------
+# Cross-topic: each returned question must carry its source topic
+# ---------------------------------------------------------------------------
+
+
+@patch("src.agent.nodes.review.get_llm_client")
+@patch("src.memory_client.fetch_mastery")
+def test_start_review_attaches_source_topic_to_questions(
+    mock_fetch, mock_llm, client_gate_on, session_id_gate_on
+):
+    """Cross-topic review must label each question with the topic it came from
+    so the UI can show 'from <topic>' instead of an orphan KP name."""
+    from src.llm.schemas import QuizQuestion
+
+    mock_fetch.return_value = [
+        {
+            "subtopic": "因式分解", "topic": "乘法定理",
+            "last_seen_at": "2026-04-01T00:00:00Z",
+            "session_count": 1, "total_questions": 4,
+            "total_correct": 2, "last_accuracy": 0.5,
+        },
+        {
+            "subtopic": "斜边", "topic": "勾股定理",
+            "last_seen_at": "2026-04-01T00:00:00Z",
+            "session_count": 1, "total_questions": 4,
+            "total_correct": 3, "last_accuracy": 0.75,
+        },
+    ]
+    mock_llm.return_value.chat.completions.create.return_value = [
+        QuizQuestion(id="rq_0", knowledge_point="因式分解",
+                     question="q1", options=["a", "b", "c", "d"], answer=0),
+        QuizQuestion(id="rq_1", knowledge_point="斜边",
+                     question="q2", options=["a", "b", "c", "d"], answer=1),
+    ]
+
+    r = client_gate_on.post(f"/api/chat/{session_id_gate_on}/start-review")
+    assert r.status_code == 200, r.text
+    qs = r.json()["questions"]
+    by_kp = {q["knowledge_point"]: q for q in qs}
+    assert by_kp["因式分解"]["topic"] == "乘法定理"
+    assert by_kp["斜边"]["topic"] == "勾股定理"
+
+
+# ---------------------------------------------------------------------------
 # Gate ON, no history → 404
 # ---------------------------------------------------------------------------
 

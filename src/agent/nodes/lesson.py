@@ -60,10 +60,16 @@ def _extract_weak_points(state: dict) -> tuple[str, list[dict]]:
         if (b.status if hasattr(b, "status") else b["status"]) == "weak"
     ]
 
+    review_strong = set(
+        (state.get("review_result") or {}).get("strong_kps") or []
+    )
+
     weak_points = []
     for item in weak_items:
         name = item.name if hasattr(item, "name") else item["name"]
         if not name or not name.strip():
+            continue
+        if name in review_strong:
             continue
         node = node_map.get(name)
         desc = ""

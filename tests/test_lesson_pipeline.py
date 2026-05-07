@@ -173,6 +173,48 @@ def test_retrieve_skills_filters_blank_names():
     assert mock_client.chat.completions.create.call_count == 1
 
 
+def test_retrieve_skills_drops_review_strong_kps():
+    """KPs marked strong by the latest review must not reach lesson generation.
+
+    Without this filter, focus_directive is only a soft prompt hint and the
+    lesson still produces a section per diagnosis-weak point — defeating the
+    point of the review.
+    """
+    from src.agent.nodes.lesson import retrieve_skills
+
+    graph, diagnosis = _make_graph_and_diagnosis(["基础", "应用", "拓展"])
+    state = {
+        "topic": "勾股定理",
+        "knowledge_graph": graph,
+        "diagnosis_result": diagnosis,
+        "use_knowledge_skills": False,
+        "review_result": {
+            "weak_kps": ["应用"],
+            "strong_kps": ["基础", "拓展"],
+            "score": 0.33,
+            "focus_directive": "...",
+        },
+    }
+    _, _, weak_points = retrieve_skills(state)
+    assert [wp["name"] for wp in weak_points] == ["应用"]
+
+
+def test_retrieve_skills_no_review_keeps_all_weak():
+    """Sanity: missing review_result leaves the diagnosis-weak list untouched."""
+    from src.agent.nodes.lesson import retrieve_skills
+
+    graph, diagnosis = _make_graph_and_diagnosis(["基础", "应用"])
+    state = {
+        "topic": "勾股定理",
+        "knowledge_graph": graph,
+        "diagnosis_result": diagnosis,
+        "use_knowledge_skills": False,
+        "review_result": None,
+    }
+    _, _, weak_points = retrieve_skills(state)
+    assert {wp["name"] for wp in weak_points} == {"基础", "应用"}
+
+
 def test_retrieve_skills_skips_when_disabled():
     from src.agent.nodes.lesson import retrieve_skills
 

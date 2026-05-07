@@ -7,6 +7,7 @@ not via the LangGraph state machine — review is a session-side-channel.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 
 from src.llm.client import get_llm_client, get_reviewer_model_name
@@ -51,7 +52,7 @@ def select_candidate_kps(
     Tie-break is stable by input order, so output is deterministic.
     """
     now = now or datetime.now(timezone.utc)
-    one_day = 86400.0
+    one_day = float(os.environ.get("REVIEW_MIN_AGE_SECONDS", "86400"))
 
     eligible = []
     for item in items:

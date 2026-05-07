@@ -9,7 +9,21 @@ Organize the knowledge graph according to the above teaching method.
 {% if focus_directive %}
 ## Focus Directive
 {{ focus_directive }}
-Bias the graph toward the weak knowledge points; if a strong KP appears, mark it as "extension" instead of "core".
+
+{% endif %}
+{% if review_strong_kps or review_weak_kps %}
+## Mastery Constraints (HARD RULES — must follow)
+{% if review_strong_kps %}
+- The student has DEMONSTRATED MASTERY of: {{ review_strong_kps | join(', ') }}.
+  - DO NOT include these as `core` or `prerequisite` nodes.
+  - Either OMIT them entirely, or include only as `extension` nodes if they are genuinely advanced.
+  - Treat the student as already competent — do not re-teach them.
+{% endif %}
+{% if review_weak_kps %}
+- The student is STILL WEAK on: {{ review_weak_kps | join(', ') }}.
+  - These MUST appear as `core` nodes.
+  - Add prerequisite nodes that scaffold understanding of these weak points.
+{% endif %}
 
 {% endif %}
 Topic: {{ topic }}
