@@ -26,6 +26,16 @@ Organize the knowledge graph according to the above teaching method.
 {% endif %}
 
 {% endif %}
+{% if existing_mastery %}
+## 已有学习记录（Prior Mastery Hints）
+该学生在此主题下的历史学习子主题如下：
+{% for m in existing_mastery %}
+- {{ m.subtopic }}（上次正确率 {{ m.last_accuracy }}，{{ m.last_seen_at }}，状态 {{ m.status }}）
+{% endfor %}
+
+生成 KG 时，若你打算包含这些已有子主题，请**直接复用上述名字作为节点 `name`**（一字不差），以便系统跨会话关联记忆。新增的概念可自由命名。
+
+{% endif %}
 Topic: {{ topic }}
 Maximum nodes: {{ max_nodes }}
 

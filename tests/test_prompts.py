@@ -191,3 +191,51 @@ def test_lesson_point_prompt_includes_directive_when_provided() -> None:
     )
     assert "复习反馈指令" in out
     assert "分配律" in out
+
+
+# ---- KG prompt: existing_mastery block ----
+
+
+class TestKnowledgeGraphMasteryBlock:
+    def test_no_mastery_no_block(self) -> None:
+        text = render_prompt(
+            "knowledge_graph",
+            topic="二次方程",
+            max_nodes=10,
+            skill_instructions="",
+            focus_directive="",
+            review_weak_kps=[],
+            review_strong_kps=[],
+            existing_mastery=[],
+        )
+        assert "已有学习记录" not in text
+        assert "Prior Mastery Hints" not in text
+
+    def test_mastery_block_lists_subtopics(self) -> None:
+        text = render_prompt(
+            "knowledge_graph",
+            topic="二次方程",
+            max_nodes=10,
+            skill_instructions="",
+            focus_directive="",
+            review_weak_kps=[],
+            review_strong_kps=[],
+            existing_mastery=[
+                {
+                    "subtopic": "判别式",
+                    "last_accuracy": 0.5,
+                    "last_seen_at": "2026-04-30T10:00:00Z",
+                    "status": "weak",
+                },
+                {
+                    "subtopic": "求根公式",
+                    "last_accuracy": 1.0,
+                    "last_seen_at": "2026-04-30T11:00:00Z",
+                    "status": "mastered",
+                },
+            ],
+        )
+        assert "判别式" in text
+        assert "求根公式" in text
+        # The block must instruct the LLM to reuse subtopic names as node names
+        assert "复用" in text or "reuse" in text.lower()
