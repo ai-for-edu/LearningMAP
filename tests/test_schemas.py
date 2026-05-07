@@ -1,3 +1,4 @@
+import pytest
 from src.llm.schemas import KnowledgeNode, KnowledgeEdge, KnowledgeGraph, QuizQuestion, DiagnosisBreakdown, DiagnosisResult, KCSkill, MasteryMeta
 
 
@@ -103,6 +104,22 @@ class TestMasteryMeta:
             forgetting_model="ebbinghaus_v1",
         )
         assert m.last_accuracy is None
+
+    def test_last_seen_at_required_str_rejects_none(self) -> None:
+        # Lock in Pydantic v2's rejection of None for a str-typed field —
+        # this is the safety net that prevents a NULL DB timestamp from
+        # silently becoming the string "None" in storage.
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            MasteryMeta(
+                last_accuracy=0.5,
+                last_seen_at=None,  # type: ignore[arg-type]
+                session_count=1,
+                retention=0.4,
+                status="weak",
+                forgetting_model="ebbinghaus_v1",
+            )
 
 
 class TestKnowledgeNodeMastery:
