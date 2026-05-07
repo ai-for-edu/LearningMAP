@@ -49,12 +49,15 @@ def test_knowledge_graph_node_uses_kc_when_topic_matches():
             node_mod, "resolve_kc_graph", return_value=fake_graph
         ) as mock_resolve,
         patch.object(node_mod, "_llm_generate_graph") as mock_llm,
+        patch.object(node_mod, "fetch_mastery", return_value=[]),
     ):
         result = node_mod.knowledge_graph_node(state)
         mock_resolve.assert_called_once_with("乘法原理", max_nodes=node_mod.MAX_NODES)
         mock_llm.assert_not_called()
 
-    assert result["knowledge_graph"] is fake_graph
+    # annotate_graph_with_mastery returns a model_copy, so use equality not identity
+    assert result["knowledge_graph"].topic == fake_graph.topic
+    assert len(result["knowledge_graph"].nodes) == len(fake_graph.nodes)
     assert result["mode"] == "graph"
 
 
@@ -67,6 +70,7 @@ def test_knowledge_graph_node_falls_back_to_llm_on_miss():
         patch.object(
             node_mod, "_llm_generate_graph", return_value=_fake_llm_graph()
         ) as mock_llm,
+        patch.object(node_mod, "fetch_mastery", return_value=[]),
     ):
         result = node_mod.knowledge_graph_node(state)
         mock_llm.assert_called_once()
@@ -83,6 +87,7 @@ def test_knowledge_graph_node_skips_kc_when_flag_off():
         patch.object(
             node_mod, "_llm_generate_graph", return_value=_fake_llm_graph()
         ) as mock_llm,
+        patch.object(node_mod, "fetch_mastery", return_value=[]),
     ):
         node_mod.knowledge_graph_node(state)
         mock_resolve.assert_not_called()
@@ -97,6 +102,7 @@ def test_knowledge_graph_node_returns_failure_when_both_paths_miss():
     with (
         patch.object(node_mod, "resolve_kc_graph", return_value=None),
         patch.object(node_mod, "_llm_generate_graph", return_value=None),
+        patch.object(node_mod, "fetch_mastery", return_value=[]),
     ):
         result = node_mod.knowledge_graph_node(state)
 
