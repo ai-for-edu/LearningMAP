@@ -6,6 +6,7 @@ Verifies:
 - annotate_graph_with_mastery is applied regardless of generation path
 - empty mastery degrades gracefully (no annotation, no prompt block)
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -32,7 +33,8 @@ def _fake_graph() -> KnowledgeGraph:
 @patch("src.agent.nodes.knowledge_graph.fetch_mastery")
 @patch("src.agent.nodes.knowledge_graph.resolve_kc_graph")
 def test_kc_path_still_annotated(
-    mock_resolve: MagicMock, mock_fetch: MagicMock,
+    mock_resolve: MagicMock,
+    mock_fetch: MagicMock,
 ) -> None:
     """When kc_skills resolver hits, the result must still be annotated.
 
@@ -43,13 +45,15 @@ def test_kc_path_still_annotated(
     """
     mock_resolve.return_value = _fake_graph()
     now = datetime(2026, 5, 7, 12, tzinfo=UTC)
-    mock_fetch.return_value = [{
-        "subtopic": "判别式",
-        "topic": "二次方程",
-        "last_accuracy": 0.9,
-        "last_seen_at": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "session_count": 1,
-    }]
+    mock_fetch.return_value = [
+        {
+            "subtopic": "判别式",
+            "topic": "二次方程",
+            "last_accuracy": 0.9,
+            "last_seen_at": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "session_count": 1,
+        }
+    ]
 
     state = {"topic": "二次方程", "use_kc_skills": True}
     out = knowledge_graph_node(state)
@@ -77,11 +81,15 @@ def test_llm_path_receives_mastery_in_prompt(
     """LLM generator must be called with existing_mastery list."""
     mock_resolve.return_value = None  # force LLM fallback
     mock_llm.return_value = _fake_graph()
-    mock_fetch.return_value = [{
-        "subtopic": "判别式", "topic": "二次方程",
-        "last_accuracy": 0.9, "last_seen_at": "2026-05-05T10:00:00Z",
-        "session_count": 1,
-    }]
+    mock_fetch.return_value = [
+        {
+            "subtopic": "判别式",
+            "topic": "二次方程",
+            "last_accuracy": 0.9,
+            "last_seen_at": "2026-05-05T10:00:00Z",
+            "session_count": 1,
+        }
+    ]
 
     state = {"topic": "二次方程", "use_kc_skills": False}
     knowledge_graph_node(state)
@@ -96,7 +104,8 @@ def test_llm_path_receives_mastery_in_prompt(
 @patch("src.agent.nodes.knowledge_graph.fetch_mastery")
 @patch("src.agent.nodes.knowledge_graph.resolve_kc_graph")
 def test_no_mastery_means_unseen_nodes(
-    mock_resolve: MagicMock, mock_fetch: MagicMock,
+    mock_resolve: MagicMock,
+    mock_fetch: MagicMock,
 ) -> None:
     mock_resolve.return_value = _fake_graph()
     mock_fetch.return_value = []
@@ -111,7 +120,8 @@ def test_no_mastery_means_unseen_nodes(
 @patch("src.agent.nodes.knowledge_graph.fetch_mastery")
 @patch("src.agent.nodes.knowledge_graph.resolve_kc_graph")
 def test_fetch_mastery_failure_does_not_break_graph(
-    mock_resolve: MagicMock, mock_fetch: MagicMock,
+    mock_resolve: MagicMock,
+    mock_fetch: MagicMock,
 ) -> None:
     """The node must produce a graph even if fetch_mastery itself blows up.
 

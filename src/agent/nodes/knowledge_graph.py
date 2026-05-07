@@ -30,14 +30,16 @@ def _build_prompt_mastery(
         sub = row.get("subtopic")
         if not isinstance(sub, str) or not sub:
             continue
-        out.append({
-            "subtopic": sub,
-            "last_accuracy": row.get("last_accuracy"),
-            "last_seen_at": row.get("last_seen_at"),
-            # Coarse status hint for the LLM — annotator will recompute
-            # the authoritative one. We only need a string here.
-            "status": _coarse_status_for_prompt(row.get("last_accuracy")),
-        })
+        out.append(
+            {
+                "subtopic": sub,
+                "last_accuracy": row.get("last_accuracy"),
+                "last_seen_at": row.get("last_seen_at"),
+                # Coarse status hint for the LLM — annotator will recompute
+                # the authoritative one. We only need a string here.
+                "status": _coarse_status_for_prompt(row.get("last_accuracy")),
+            }
+        )
     return out
 
 

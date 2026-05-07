@@ -6,6 +6,7 @@ Covers:
 - Unmatched nodes get mastery=None (sentinel for "unseen" without metadata)
 - forgetting_model name is propagated
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -55,20 +56,23 @@ class TestNormalizeName:
 
 
 class TestComputeStatus:
-    @pytest.mark.parametrize("retention,expected", [
-        (1.00, "mastered"),
-        (0.90, "mastered"),
-        (0.85, "mastered"),       # boundary
-        (0.84999, "partial"),
-        (0.70, "partial"),
-        (0.60, "partial"),        # boundary
-        (0.59999, "weak"),
-        (0.45, "weak"),
-        (0.30, "weak"),           # boundary
-        (0.29999, "forgotten"),
-        (0.10, "forgotten"),
-        (0.0, "forgotten"),
-    ])
+    @pytest.mark.parametrize(
+        "retention,expected",
+        [
+            (1.00, "mastered"),
+            (0.90, "mastered"),
+            (0.85, "mastered"),  # boundary
+            (0.84999, "partial"),
+            (0.70, "partial"),
+            (0.60, "partial"),  # boundary
+            (0.59999, "weak"),
+            (0.45, "weak"),
+            (0.30, "weak"),  # boundary
+            (0.29999, "forgotten"),
+            (0.10, "forgotten"),
+            (0.0, "forgotten"),
+        ],
+    )
     def test_thresholds(self, retention: float, expected: str) -> None:
         assert _compute_status(retention) == expected
 
@@ -78,7 +82,10 @@ class TestAnnotateGraphWithMastery:
         self, graph: KnowledgeGraph, now: datetime
     ) -> None:
         out = annotate_graph_with_mastery(
-            graph, mastery_rows=[], model=EbbinghausV1(), now=now,
+            graph,
+            mastery_rows=[],
+            model=EbbinghausV1(),
+            now=now,
         )
         for node in out.nodes:
             assert node.mastery is None  # unseen sentinel
@@ -86,15 +93,22 @@ class TestAnnotateGraphWithMastery:
     def test_exact_name_match_attaches_mastery(
         self, graph: KnowledgeGraph, now: datetime
     ) -> None:
-        rows = [{
-            "subtopic": "判别式",
-            "topic": "二次方程",
-            "last_accuracy": 1.0,
-            "last_seen_at": (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "session_count": 1,
-        }]
+        rows = [
+            {
+                "subtopic": "判别式",
+                "topic": "二次方程",
+                "last_accuracy": 1.0,
+                "last_seen_at": (now - timedelta(hours=1)).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+                "session_count": 1,
+            }
+        ]
         out = annotate_graph_with_mastery(
-            graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
+            graph,
+            mastery_rows=rows,
+            model=EbbinghausV1(),
+            now=now,
         )
         n1 = next(n for n in out.nodes if n.name == "判别式")
         assert n1.mastery is not None
@@ -104,18 +118,23 @@ class TestAnnotateGraphWithMastery:
         n3 = next(n for n in out.nodes if n.name == "配方法")
         assert n3.mastery is None
 
-    def test_normalized_match(
-        self, graph: KnowledgeGraph, now: datetime
-    ) -> None:
-        rows = [{
-            "subtopic": "判别式（Δ）",  # KG has "判别式" → match via normalization
-            "topic": "二次方程",
-            "last_accuracy": 0.5,
-            "last_seen_at": (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "session_count": 1,
-        }]
+    def test_normalized_match(self, graph: KnowledgeGraph, now: datetime) -> None:
+        rows = [
+            {
+                "subtopic": "判别式（Δ）",  # KG has "判别式" → match via normalization
+                "topic": "二次方程",
+                "last_accuracy": 0.5,
+                "last_seen_at": (now - timedelta(days=2)).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+                "session_count": 1,
+            }
+        ]
         out = annotate_graph_with_mastery(
-            graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
+            graph,
+            mastery_rows=rows,
+            model=EbbinghausV1(),
+            now=now,
         )
         n1 = next(n for n in out.nodes if n.name == "判别式")
         assert n1.mastery is not None
@@ -123,35 +142,45 @@ class TestAnnotateGraphWithMastery:
     def test_unmatched_row_does_not_crash(
         self, graph: KnowledgeGraph, now: datetime
     ) -> None:
-        rows = [{
-            "subtopic": "完全无关的主题",
-            "topic": "其他",
-            "last_accuracy": 0.9,
-            "last_seen_at": (now - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "session_count": 1,
-        }]
+        rows = [
+            {
+                "subtopic": "完全无关的主题",
+                "topic": "其他",
+                "last_accuracy": 0.9,
+                "last_seen_at": (now - timedelta(days=1)).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+                "session_count": 1,
+            }
+        ]
         out = annotate_graph_with_mastery(
-            graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
+            graph,
+            mastery_rows=rows,
+            model=EbbinghausV1(),
+            now=now,
         )
         # All graph nodes still unseen
         for node in out.nodes:
             assert node.mastery is None
 
-    def test_malformed_row_skipped(
-        self, graph: KnowledgeGraph, now: datetime
-    ) -> None:
+    def test_malformed_row_skipped(self, graph: KnowledgeGraph, now: datetime) -> None:
         rows = [
             {"subtopic": "判别式"},  # missing required keys
             {
                 "subtopic": "求根公式",
                 "topic": "二次方程",
                 "last_accuracy": 0.95,
-                "last_seen_at": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "last_seen_at": (now - timedelta(hours=2)).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
                 "session_count": 1,
             },
         ]
         out = annotate_graph_with_mastery(
-            graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
+            graph,
+            mastery_rows=rows,
+            model=EbbinghausV1(),
+            now=now,
         )
         # 判别式 row malformed → unseen
         n1 = next(n for n in out.nodes if n.name == "判别式")
@@ -163,15 +192,23 @@ class TestAnnotateGraphWithMastery:
     def test_returns_new_graph_does_not_mutate_input(
         self, graph: KnowledgeGraph, now: datetime
     ) -> None:
-        rows = [{
-            "subtopic": "判别式", "topic": "二次方程",
-            "last_accuracy": 0.9,
-            "last_seen_at": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "session_count": 1,
-        }]
+        rows = [
+            {
+                "subtopic": "判别式",
+                "topic": "二次方程",
+                "last_accuracy": 0.9,
+                "last_seen_at": (now - timedelta(hours=2)).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+                "session_count": 1,
+            }
+        ]
         original_n1 = next(n for n in graph.nodes if n.name == "判别式")
         out = annotate_graph_with_mastery(
-            graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
+            graph,
+            mastery_rows=rows,
+            model=EbbinghausV1(),
+            now=now,
         )
         assert original_n1.mastery is None  # original unchanged
         out_n1 = next(n for n in out.nodes if n.name == "判别式")
@@ -183,15 +220,22 @@ class TestAnnotateGraphWithMastery:
         """A mastery row with last_accuracy=None still attaches MasteryMeta,
         but with status='unseen' and retention=0. Distinct from mastery=None
         (truly unmatched)."""
-        rows = [{
-            "subtopic": "判别式",
-            "topic": "二次方程",
-            "last_accuracy": None,
-            "last_seen_at": (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "session_count": 1,
-        }]
+        rows = [
+            {
+                "subtopic": "判别式",
+                "topic": "二次方程",
+                "last_accuracy": None,
+                "last_seen_at": (now - timedelta(hours=1)).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+                "session_count": 1,
+            }
+        ]
         out = annotate_graph_with_mastery(
-            graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
+            graph,
+            mastery_rows=rows,
+            model=EbbinghausV1(),
+            now=now,
         )
         n1 = next(n for n in out.nodes if n.name == "判别式")
         assert n1.mastery is not None  # matched, not unseen-by-absence

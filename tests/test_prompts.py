@@ -2,7 +2,9 @@ from src.prompts.loader import render_prompt
 
 
 def test_render_intent_prompt():
-    result = render_prompt("intent", messages=[{"role": "user", "content": "我想学二元一次方程"}])
+    result = render_prompt(
+        "intent", messages=[{"role": "user", "content": "我想学二元一次方程"}]
+    )
     assert "二元一次方程" in result
     assert len(result) > 50
 
@@ -15,7 +17,9 @@ def test_render_knowledge_graph_prompt():
 
 def test_render_quiz_prompt():
     nodes = [{"name": "一元一次方程", "description": "基础"}]
-    result = render_prompt("quiz_generate", knowledge_points=nodes, questions_per_point=2)
+    result = render_prompt(
+        "quiz_generate", knowledge_points=nodes, questions_per_point=2
+    )
     assert "一元一次方程" in result
 
 
@@ -63,13 +67,16 @@ def test_render_kc_skill_from_bank_prompt():
 
 def test_render_kc_skill_block_with_content():
     from src.prompts.loader import render_kc_skill_block
-    block = render_kc_skill_block({
-        "description": "desc",
-        "考察重点": "重点内容",
-        "考察形式": "形式内容",
-        "易错点": "易错内容",
-        "难度提示": "难度内容",
-    })
+
+    block = render_kc_skill_block(
+        {
+            "description": "desc",
+            "考察重点": "重点内容",
+            "考察形式": "形式内容",
+            "易错点": "易错内容",
+            "难度提示": "难度内容",
+        }
+    )
     assert "考察重点" in block
     assert "重点内容" in block
     assert "易错内容" in block
@@ -78,6 +85,7 @@ def test_render_kc_skill_block_with_content():
 
 def test_render_kc_skill_block_empty_returns_empty_string():
     from src.prompts.loader import render_kc_skill_block
+
     assert render_kc_skill_block(None) == ""
     assert render_kc_skill_block({}) == ""
 
@@ -139,42 +147,70 @@ def test_slide_outline_renders_kc_skill_block():
 
 def test_knowledge_graph_prompt_omits_section_when_no_directive() -> None:
     from src.prompts.loader import render_prompt
-    out = render_prompt("knowledge_graph", topic="X", max_nodes=8,
-                       skill_instructions="", focus_directive="")
+
+    out = render_prompt(
+        "knowledge_graph",
+        topic="X",
+        max_nodes=8,
+        skill_instructions="",
+        focus_directive="",
+    )
     assert "Focus Directive" not in out
 
 
 def test_knowledge_graph_prompt_includes_directive_when_provided() -> None:
     from src.prompts.loader import render_prompt
-    out = render_prompt("knowledge_graph", topic="X", max_nodes=8,
-                       skill_instructions="",
-                       focus_directive="学生在 分配律 上仍薄弱.")
+
+    out = render_prompt(
+        "knowledge_graph",
+        topic="X",
+        max_nodes=8,
+        skill_instructions="",
+        focus_directive="学生在 分配律 上仍薄弱.",
+    )
     assert "Focus Directive" in out
     assert "分配律" in out
 
 
 def test_lesson_plan_prompt_omits_section_when_no_directive() -> None:
     from src.prompts.loader import render_prompt
-    out = render_prompt("lesson_plan", topic="X", weak_points=[],
-                       skill_instructions="", focus_directive="")
+
+    out = render_prompt(
+        "lesson_plan",
+        topic="X",
+        weak_points=[],
+        skill_instructions="",
+        focus_directive="",
+    )
     assert "Focus Directive" not in out
 
 
 def test_lesson_plan_prompt_includes_directive_when_provided() -> None:
     from src.prompts.loader import render_prompt
-    out = render_prompt("lesson_plan", topic="X", weak_points=[],
-                       skill_instructions="",
-                       focus_directive="A 已掌握, B 仍薄弱.")
+
+    out = render_prompt(
+        "lesson_plan",
+        topic="X",
+        weak_points=[],
+        skill_instructions="",
+        focus_directive="A 已掌握, B 仍薄弱.",
+    )
     assert "B 仍薄弱" in out
 
 
 def test_lesson_point_prompt_omits_directive_when_empty() -> None:
     from src.prompts.loader import render_prompt
+
     out = render_prompt(
         "lesson_point",
-        topic="X", knowledge_point_name="A", knowledge_point_description="...",
-        pedagogy_instructions="x", knowledge_skill="无额外教学技能",
-        point_index=1, total_points=1, kc_skill_block="",
+        topic="X",
+        knowledge_point_name="A",
+        knowledge_point_description="...",
+        pedagogy_instructions="x",
+        knowledge_skill="无额外教学技能",
+        point_index=1,
+        total_points=1,
+        kc_skill_block="",
         focus_directive="",
     )
     assert "复习反馈指令" not in out
@@ -182,11 +218,17 @@ def test_lesson_point_prompt_omits_directive_when_empty() -> None:
 
 def test_lesson_point_prompt_includes_directive_when_provided() -> None:
     from src.prompts.loader import render_prompt
+
     out = render_prompt(
         "lesson_point",
-        topic="X", knowledge_point_name="A", knowledge_point_description="...",
-        pedagogy_instructions="x", knowledge_skill="无额外教学技能",
-        point_index=1, total_points=1, kc_skill_block="",
+        topic="X",
+        knowledge_point_name="A",
+        knowledge_point_description="...",
+        pedagogy_instructions="x",
+        knowledge_skill="无额外教学技能",
+        point_index=1,
+        total_points=1,
+        kc_skill_block="",
         focus_directive="学生在 分配律 上薄弱，已掌握 求根公式。",
     )
     assert "复习反馈指令" in out

@@ -8,6 +8,7 @@ Two-stage match between KG nodes and memory mastery rows:
 Anything still unmatched stays as `mastery=None`, which the frontend
 renders as "unseen". Malformed rows are skipped (graceful degradation).
 """
+
 from __future__ import annotations
 
 import logging
@@ -57,6 +58,7 @@ def _normalize_name(name: str) -> str:
 
 # ---- timestamp parsing --------------------------------------------
 
+
 def _parse_ts(s: str) -> datetime | None:
     if not s:
         return None
@@ -70,6 +72,7 @@ def _parse_ts(s: str) -> datetime | None:
 
 
 # ---- main ----------------------------------------------------------
+
 
 def annotate_graph_with_mastery(
     graph: KnowledgeGraph,

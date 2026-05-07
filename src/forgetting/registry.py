@@ -1,4 +1,5 @@
 """Lookup table for ForgettingModel implementations."""
+
 from __future__ import annotations
 
 from src.forgetting.base import ForgettingModel

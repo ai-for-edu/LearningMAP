@@ -4,6 +4,7 @@ A ForgettingModel takes a (timestamp, accuracy, repetition count) tuple
 and returns a retention score in [0, 1]. Implementations are pure functions
 on their input — no I/O, no caching — so they're safe to call per-node.
 """
+
 from __future__ import annotations
 
 from datetime import datetime

@@ -93,7 +93,10 @@ def quiz_node(state: LearningState) -> dict:
     if not questions:
         graph = state.get("knowledge_graph")
         if not graph:
-            return {"mode": "chat", "messages": [AIMessage(content="请先选择一个学习主题。")]}
+            return {
+                "mode": "chat",
+                "messages": [AIMessage(content="请先选择一个学习主题。")],
+            }
 
         raw_nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
         nodes = [_coerce_node(n) for n in raw_nodes]
@@ -131,16 +134,22 @@ def quiz_node(state: LearningState) -> dict:
             "current_question_index": 0,
             "answers": [],
             "mode": "quiz",
-            "messages": [AIMessage(content=f"共 {len(all_generated)} 道题，开始作答！")],
+            "messages": [
+                AIMessage(content=f"共 {len(all_generated)} 道题，开始作答！")
+            ],
         }
 
     if current_idx < len(questions):
         q = questions[current_idx]
-        q_name = q.knowledge_point if hasattr(q, "knowledge_point") else q["knowledge_point"]
+        q_name = (
+            q.knowledge_point if hasattr(q, "knowledge_point") else q["knowledge_point"]
+        )
         q_text = q.question if hasattr(q, "question") else q["question"]
         opts = q.options if hasattr(q, "options") else q["options"]
-        options_text = "\n".join(f"  {chr(65+i)}) {opt}" for i, opt in enumerate(opts))
-        reply = f"[{q_name}] 第 {current_idx+1}/{len(questions)} 题\n\n{q_text}\n\n{options_text}"
+        options_text = "\n".join(
+            f"  {chr(65 + i)}) {opt}" for i, opt in enumerate(opts)
+        )
+        reply = f"[{q_name}] 第 {current_idx + 1}/{len(questions)} 题\n\n{q_text}\n\n{options_text}"
         return {"mode": "quiz", "messages": [AIMessage(content=reply)]}
 
     return {"mode": "result"}
@@ -167,7 +176,9 @@ def quiz_generate_progressive(state: dict):
         if count <= 0:
             continue
         point = {"name": node.name, "description": node.description}
-        kc_skill_block = render_kc_skill_block((state.get("kc_skills") or {}).get(node.name))
+        kc_skill_block = render_kc_skill_block(
+            (state.get("kc_skills") or {}).get(node.name)
+        )
         prompt = render_prompt(
             "quiz_generate",
             knowledge_points=[point],
@@ -184,4 +195,6 @@ def quiz_generate_progressive(state: dict):
             )
             yield batch
         except Exception:
-            logger.exception("Failed to generate quiz for knowledge point: %s", node.name)
+            logger.exception(
+                "Failed to generate quiz for knowledge point: %s", node.name
+            )

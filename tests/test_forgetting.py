@@ -1,4 +1,5 @@
 """Forgetting model contract + EbbinghausV1 default."""
+
 from __future__ import annotations
 
 import math
@@ -41,15 +42,21 @@ class TestEbbinghausV1:
     def test_decay_over_time(self) -> None:
         r1 = self.model.retention(
             last_seen=self.now - timedelta(days=1),
-            last_accuracy=1.0, session_count=1, now=self.now,
+            last_accuracy=1.0,
+            session_count=1,
+            now=self.now,
         )
         r7 = self.model.retention(
             last_seen=self.now - timedelta(days=7),
-            last_accuracy=1.0, session_count=1, now=self.now,
+            last_accuracy=1.0,
+            session_count=1,
+            now=self.now,
         )
         r30 = self.model.retention(
             last_seen=self.now - timedelta(days=30),
-            last_accuracy=1.0, session_count=1, now=self.now,
+            last_accuracy=1.0,
+            session_count=1,
+            now=self.now,
         )
         assert r1 > r7 > r30
 
@@ -62,7 +69,8 @@ class TestEbbinghausV1:
     def test_more_repetitions_better_retention(self) -> None:
         kw = dict(
             last_seen=self.now - timedelta(days=3),
-            last_accuracy=0.8, now=self.now,
+            last_accuracy=0.8,
+            now=self.now,
         )
         r_once = self.model.retention(session_count=1, **kw)
         r_many = self.model.retention(session_count=5, **kw)
@@ -73,7 +81,9 @@ class TestEbbinghausV1:
         # retention=1.0 (treated as just-seen), not a >1 overflow.
         r = self.model.retention(
             last_seen=self.now + timedelta(days=1),
-            last_accuracy=1.0, session_count=1, now=self.now,
+            last_accuracy=1.0,
+            session_count=1,
+            now=self.now,
         )
         assert r == 1.0
 
@@ -88,7 +98,9 @@ class TestEbbinghausV1:
         #   R = exp(-2/3) ≈ 0.5134
         r = self.model.retention(
             last_seen=self.now - timedelta(days=2),
-            last_accuracy=0.5, session_count=1, now=self.now,
+            last_accuracy=0.5,
+            session_count=1,
+            now=self.now,
         )
         assert math.isclose(r, math.exp(-2.0 / 3.0), rel_tol=1e-6)
 

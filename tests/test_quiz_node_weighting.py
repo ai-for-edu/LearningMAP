@@ -1,18 +1,27 @@
 """Quiz weighting: forgotten/weak nodes get more questions, mastered get fewer."""
+
 from __future__ import annotations
 
 from src.agent.nodes.quiz import _allocate_questions_per_node
 from src.llm.schemas import KnowledgeNode, MasteryMeta
 
 
-def _node(name: str, retention: float | None = None, status: str = "unseen") -> KnowledgeNode:
+def _node(
+    name: str, retention: float | None = None, status: str = "unseen"
+) -> KnowledgeNode:
     if retention is None:
         return KnowledgeNode(id=name, name=name, description="d", level="core")
     return KnowledgeNode(
-        id=name, name=name, description="d", level="core",
+        id=name,
+        name=name,
+        description="d",
+        level="core",
         mastery=MasteryMeta(
-            last_accuracy=0.5, last_seen_at="2026-05-01T10:00:00Z",
-            session_count=1, retention=retention, status=status,
+            last_accuracy=0.5,
+            last_seen_at="2026-05-01T10:00:00Z",
+            session_count=1,
+            retention=retention,
+            status=status,
             forgetting_model="ebbinghaus_v1",
         ),
     )
@@ -63,9 +72,7 @@ class TestAllocateQuestionsPerNode:
         # 4 mastered + 1 forgotten: raw allocation gives the forgotten
         # node ~all the budget, but other nodes are pinned at MIN_PER_NODE.
         # Total must still equal base_per_node × N.
-        nodes = [
-            _node(f"m{i}", retention=1.0, status="mastered") for i in range(4)
-        ] + [
+        nodes = [_node(f"m{i}", retention=1.0, status="mastered") for i in range(4)] + [
             _node("f1", retention=0.05, status="forgotten"),
         ]
         alloc = _allocate_questions_per_node(nodes, base_per_node=2)
@@ -98,7 +105,10 @@ class TestCoerceNode:
         from src.agent.nodes.quiz import _coerce_node
 
         d = {
-            "id": "x", "name": "x", "description": "d", "level": "core",
+            "id": "x",
+            "name": "x",
+            "description": "d",
+            "level": "core",
             "mastery": {
                 "last_accuracy": 0.5,
                 "last_seen_at": "2026-05-01T10:00:00Z",

@@ -4,6 +4,7 @@ R = exp(-t / S)   where t is days since last_seen and S is "stability"
 in days. Stability grows with last_accuracy (you remember mastered
 material longer) and with session_count (spaced repetition compounds).
 """
+
 from __future__ import annotations
 
 import math
@@ -45,9 +46,7 @@ class EbbinghausV1:
             return 0.0
         days = max((now - last_seen).total_seconds() / 86400.0, 0.0)
         stability = (
-            self.S0
-            + self.alpha * last_accuracy
-            + self.beta * max(session_count - 1, 0)
+            self.S0 + self.alpha * last_accuracy + self.beta * max(session_count - 1, 0)
         )
         if stability <= 0:
             return 0.0

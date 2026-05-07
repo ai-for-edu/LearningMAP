@@ -1,13 +1,29 @@
 import pytest
-from src.llm.schemas import KnowledgeNode, KnowledgeEdge, KnowledgeGraph, QuizQuestion, DiagnosisBreakdown, DiagnosisResult, KCSkill, MasteryMeta
+from src.llm.schemas import (
+    KnowledgeNode,
+    KnowledgeEdge,
+    KnowledgeGraph,
+    QuizQuestion,
+    DiagnosisBreakdown,
+    DiagnosisResult,
+    KCSkill,
+    MasteryMeta,
+)
 
 
 def test_knowledge_graph_schema():
     graph = KnowledgeGraph(
         topic="二元一次方程",
         nodes=[
-            KnowledgeNode(id="n1", name="一元一次方程", description="基础方程", level="prerequisite"),
-            KnowledgeNode(id="n2", name="二元一次方程组", description="核心内容", level="core"),
+            KnowledgeNode(
+                id="n1",
+                name="一元一次方程",
+                description="基础方程",
+                level="prerequisite",
+            ),
+            KnowledgeNode(
+                id="n2", name="二元一次方程组", description="核心内容", level="core"
+            ),
         ],
         edges=[KnowledgeEdge(source="n1", target="n2", relation="prerequisite")],
     )
@@ -33,7 +49,9 @@ def test_diagnosis_result_schema():
         correct=7,
         incorrect=3,
         breakdown=[
-            DiagnosisBreakdown(name="一元一次方程", status="mastered", detail="2/2 已掌握"),
+            DiagnosisBreakdown(
+                name="一元一次方程", status="mastered", detail="2/2 已掌握"
+            ),
             DiagnosisBreakdown(name="不等式", status="weak", detail="1/2 需复习"),
         ],
     )
@@ -129,10 +147,16 @@ class TestKnowledgeNodeMastery:
 
     def test_with_mastery(self) -> None:
         n = KnowledgeNode(
-            id="n1", name="判别式", description="...", level="core",
+            id="n1",
+            name="判别式",
+            description="...",
+            level="core",
             mastery=MasteryMeta(
-                last_accuracy=0.5, last_seen_at="2026-04-30T10:00:00Z",
-                session_count=1, retention=0.4, status="weak",
+                last_accuracy=0.5,
+                last_seen_at="2026-04-30T10:00:00Z",
+                session_count=1,
+                retention=0.4,
+                status="weak",
                 forgetting_model="ebbinghaus_v1",
             ),
         )
@@ -140,10 +164,16 @@ class TestKnowledgeNodeMastery:
 
     def test_round_trip_dict(self) -> None:
         n = KnowledgeNode(
-            id="n1", name="x", description="d", level="core",
+            id="n1",
+            name="x",
+            description="d",
+            level="core",
             mastery=MasteryMeta(
-                last_accuracy=0.9, last_seen_at="2026-04-30T10:00:00Z",
-                session_count=2, retention=0.88, status="mastered",
+                last_accuracy=0.9,
+                last_seen_at="2026-04-30T10:00:00Z",
+                session_count=2,
+                retention=0.88,
+                status="mastered",
                 forgetting_model="ebbinghaus_v1",
             ),
         )
