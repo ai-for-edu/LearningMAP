@@ -27,7 +27,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     Wiring deferred until startup so unit tests that import
     ``app.main`` do not pay for SQLite, hnswlib, or model loads.
     """
-    settings: Settings = app.state.settings if hasattr(app.state, "settings") else get_settings()
+    settings: Settings = (
+        app.state.settings if hasattr(app.state, "settings") else get_settings()
+    )
     app.state.settings = settings
     configure_logging(settings.log_level)
     logger.info(
@@ -43,6 +45,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from app.api.routes import wire_app
 
     wire_app(app, settings)
+
+    # 30 天 retention prune (op_errors 启动时清理一次)
+    import time as _time
+
+    app.state.repo.prune_op_errors(cutoff_ts=int(_time.time()) - 30 * 86400)
+
     try:
         yield
     finally:

@@ -176,6 +176,37 @@ def _row_to_mastery(row: sqlite3.Row) -> MasteryRecord:
     )
 
 
+@dataclass(frozen=True)
+class ErrorRecord:
+    id: int
+    ts: int
+    source: str
+    user_id: str | None
+    session_id: str | None
+    correlation_id: str | None
+    op: str
+    status: str
+    error_class: str | None
+    error_msg: str | None
+    payload_excerpt: str | None
+
+
+def _row_to_error(row: sqlite3.Row) -> ErrorRecord:
+    return ErrorRecord(
+        id=row["id"],
+        ts=row["ts"],
+        source=row["source"],
+        user_id=row["user_id"],
+        session_id=row["session_id"],
+        correlation_id=row["correlation_id"],
+        op=row["op"],
+        status=row["status"],
+        error_class=row["error_class"],
+        error_msg=row["error_msg"],
+        payload_excerpt=row["payload_excerpt"],
+    )
+
+
 class SqliteRepo:
     """Thin wrapper around a single ``sqlite3.Connection``."""
 
@@ -608,6 +639,80 @@ class SqliteRepo:
             (user_id, threshold),
         )
         return [_row_to_mastery(r) for r in cur.fetchall()]
+
+    # ------------------------------------------------------------------
+    # op_errors (错误追踪 + 30 天 prune)
+    # ------------------------------------------------------------------
+    ERROR_FIELD_MAX = 500
+
+    @staticmethod
+    def _truncate(s: str | None, n: int = 500) -> str | None:
+        if s is None:
+            return None
+        return s if len(s) <= n else s[: n - 1] + "…"
+
+    def log_op_error(
+        self,
+        *,
+        ts: int,
+        source: str,
+        user_id: str | None,
+        session_id: str | None,
+        correlation_id: str | None,
+        op: str,
+        status: str,
+        error_class: str | None,
+        error_msg: str | None,
+        payload_excerpt: str | None,
+    ) -> None:
+        with self.transaction() as cur:
+            cur.execute(
+                "INSERT INTO op_errors "
+                "(ts, source, user_id, session_id, correlation_id, op, status, "
+                "error_class, error_msg, payload_excerpt) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    ts,
+                    source,
+                    user_id,
+                    session_id,
+                    correlation_id,
+                    op,
+                    status,
+                    self._truncate(error_class, 200),
+                    self._truncate(error_msg),
+                    self._truncate(payload_excerpt),
+                ),
+            )
+
+    def list_errors_for_user(
+        self,
+        user_id: str,
+        *,
+        limit: int = 100,
+    ) -> list[ErrorRecord]:
+        cur = self._conn.execute(
+            "SELECT * FROM op_errors WHERE user_id = ? "
+            "ORDER BY ts DESC, id DESC LIMIT ?",
+            (user_id, limit),
+        )
+        return [_row_to_error(r) for r in cur.fetchall()]
+
+    def list_errors_for_correlation(
+        self,
+        correlation_id: str,
+    ) -> list[ErrorRecord]:
+        cur = self._conn.execute(
+            "SELECT * FROM op_errors WHERE correlation_id = ? ORDER BY ts ASC",
+            (correlation_id,),
+        )
+        return [_row_to_error(r) for r in cur.fetchall()]
+
+    def prune_op_errors(self, *, cutoff_ts: int) -> int:
+        """删除 ts < cutoff_ts 的行, 返回删除条数."""
+        with self.transaction() as cur:
+            cur.execute("DELETE FROM op_errors WHERE ts < ?", (cutoff_ts,))
+            return int(cur.rowcount)
 
     # ------------------------------------------------------------------
     # reads
