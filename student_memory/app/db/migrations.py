@@ -65,6 +65,86 @@ CREATE TABLE IF NOT EXISTS ingested_sessions (
     ingested_at TEXT NOT NULL,
     PRIMARY KEY (user_id, session_id)
 );
+
+-- L2 主观笔记 (4 category) ----------------------------------------------
+CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    category TEXT NOT NULL CHECK(category IN ('misconception','preference','style','goal')),
+    content TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    source_session_id TEXT,
+    source_event TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    archived INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_notes_user_active
+    ON notes(user_id, category, created_at DESC) WHERE archived = 0;
+CREATE INDEX IF NOT EXISTS idx_notes_user_hash
+    ON notes(user_id, content_hash) WHERE archived = 0;
+
+-- 审计: 每个 reviewer 决策 (含 NOOP/REJECT) 都留痕 -----------------------
+CREATE TABLE IF NOT EXISTS notes_history (
+    id INTEGER PRIMARY KEY,
+    note_id INTEGER,
+    event TEXT NOT NULL CHECK(event IN ('ADD','UPDATE','DELETE','NOOP','REJECT')),
+    old_content TEXT,
+    new_content TEXT,
+    reason TEXT NOT NULL,
+    source_session_id TEXT,
+    source_event TEXT,
+    ts INTEGER NOT NULL,
+    FOREIGN KEY (note_id) REFERENCES notes(id)
+);
+CREATE INDEX IF NOT EXISTS idx_history_note  ON notes_history(note_id, ts);
+CREATE INDEX IF NOT EXISTS idx_history_event ON notes_history(event, ts);
+
+-- 主题级里程碑 ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS progress_snapshots (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('in_progress','mastered','abandoned')),
+    started_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    mastery_overall REAL NOT NULL,
+    last_session_id TEXT,
+    UNIQUE(user_id, topic)
+);
+CREATE INDEX IF NOT EXISTS idx_progress_user_recent
+    ON progress_snapshots(user_id, last_seen_at DESC);
+
+-- KP 级时间序列 (每 KP 上限 10 采样) ------------------------------------
+CREATE TABLE IF NOT EXISTS mastery_curve (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    knowledge_point TEXT NOT NULL,
+    score REAL NOT NULL,
+    ts INTEGER NOT NULL,
+    source TEXT NOT NULL CHECK(source IN ('quiz','review','lesson_completion'))
+);
+CREATE INDEX IF NOT EXISTS idx_curve_user_kp
+    ON mastery_curve(user_id, topic, knowledge_point, ts);
+
+-- 错误追踪 (30 天 retention, 启动时 prune) ------------------------------
+CREATE TABLE IF NOT EXISTS op_errors (
+    id INTEGER PRIMARY KEY,
+    ts INTEGER NOT NULL,
+    source TEXT NOT NULL CHECK(source IN ('main_app','memory_service')),
+    user_id TEXT,
+    session_id TEXT,
+    correlation_id TEXT,
+    op TEXT NOT NULL,
+    status TEXT NOT NULL,
+    error_class TEXT,
+    error_msg TEXT,
+    payload_excerpt TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_op_errors_user_ts ON op_errors(user_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_op_errors_corr   ON op_errors(correlation_id);
+CREATE INDEX IF NOT EXISTS idx_op_errors_op_ts  ON op_errors(op, ts DESC);
 """
 
 

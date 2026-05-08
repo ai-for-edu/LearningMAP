@@ -329,3 +329,63 @@ class TestAggregateMastery:
         repo.insert_memories([rec])
         items = repo.aggregate_mastery("u_001")
         assert items[0]["weighted_accuracy"] is None
+
+
+def test_init_db_creates_notes_tables(tmp_sqlite_path):
+    """5 张新表都被 init_db 创建。"""
+    from app.db.sqlite_repo import SqliteRepo
+
+    repo = SqliteRepo(tmp_sqlite_path)
+    try:
+        cur = repo._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        )
+        names = {row["name"] for row in cur.fetchall()}
+        for required in ("notes", "notes_history", "progress_snapshots",
+                         "mastery_curve", "op_errors"):
+            assert required in names, f"missing table: {required}"
+    finally:
+        repo.close()
+
+
+def test_init_db_creates_notes_indexes(tmp_sqlite_path):
+    from app.db.sqlite_repo import SqliteRepo
+
+    repo = SqliteRepo(tmp_sqlite_path)
+    try:
+        cur = repo._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' ORDER BY name"
+        )
+        names = {row["name"] for row in cur.fetchall()}
+        for required in (
+            "idx_notes_user_active",
+            "idx_notes_user_hash",
+            "idx_history_note",
+            "idx_history_event",
+            "idx_progress_user_recent",
+            "idx_curve_user_kp",
+            "idx_op_errors_user_ts",
+            "idx_op_errors_corr",
+            "idx_op_errors_op_ts",
+        ):
+            assert required in names, f"missing index: {required}"
+    finally:
+        repo.close()
+
+
+def test_notes_category_check_constraint(tmp_sqlite_path):
+    """category 不在 4 个白名单值时 INSERT 必须失败。"""
+    import sqlite3
+    from app.db.sqlite_repo import SqliteRepo
+
+    repo = SqliteRepo(tmp_sqlite_path)
+    try:
+        with pytest.raises(sqlite3.IntegrityError):
+            repo._conn.execute(
+                "INSERT INTO notes (user_id, category, content, content_hash, "
+                "source_event, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                ("u1", "INVALID", "x", "h", "submit-quiz", 1, 1),
+            )
+    finally:
+        repo.close()
