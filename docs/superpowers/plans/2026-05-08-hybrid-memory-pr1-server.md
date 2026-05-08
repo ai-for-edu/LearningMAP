@@ -379,7 +379,7 @@ uv run python -m pytest tests/test_notes.py -v
 
 预期：8 个 FAIL（`add_note` 等方法不存在）。
 
-- [ ] **Step 3: 实现 NoteRecord dataclass + 8 个方法**
+- [ ] **Step 3: 实现 NoteRecord dataclass + 6 个方法**
 
 在 `student_memory/app/db/sqlite_repo.py` 顶部已有的 `MemoryRecord` 定义后追加：
 

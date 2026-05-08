@@ -90,6 +90,21 @@ def _row_to_record(row: sqlite3.Row) -> MemoryRecord:
     )
 
 
+def _row_to_note(row: sqlite3.Row) -> NoteRecord:
+    return NoteRecord(
+        id=row["id"],
+        user_id=row["user_id"],
+        category=row["category"],
+        content=row["content"],
+        content_hash=row["content_hash"],
+        source_session_id=row["source_session_id"],
+        source_event=row["source_event"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        archived=row["archived"],
+    )
+
+
 class SqliteRepo:
     """Thin wrapper around a single ``sqlite3.Connection``."""
 
@@ -282,7 +297,7 @@ class SqliteRepo:
                 ),
             )
             new_id = int(cur.lastrowid)
-            # LRU: 同 (user, category) active 超过上限就 archived=1 最老一条
+            # LRU: active 超过上限时 archived=1 所有最老的超额行
             cur.execute(
                 "SELECT id FROM notes "
                 "WHERE user_id = ? AND category = ? AND archived = 0 "
@@ -301,20 +316,7 @@ class SqliteRepo:
     def get_note(self, note_id: int) -> NoteRecord | None:
         cur = self._conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,))
         row = cur.fetchone()
-        if row is None:
-            return None
-        return NoteRecord(
-            id=row["id"],
-            user_id=row["user_id"],
-            category=row["category"],
-            content=row["content"],
-            content_hash=row["content_hash"],
-            source_session_id=row["source_session_id"],
-            source_event=row["source_event"],
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-            archived=row["archived"],
-        )
+        return _row_to_note(row) if row else None
 
     def list_active_notes(
         self,
@@ -329,21 +331,7 @@ class SqliteRepo:
             "ORDER BY created_at DESC, id DESC LIMIT ?",
             (user_id, category, limit),
         )
-        return [
-            NoteRecord(
-                id=r["id"],
-                user_id=r["user_id"],
-                category=r["category"],
-                content=r["content"],
-                content_hash=r["content_hash"],
-                source_session_id=r["source_session_id"],
-                source_event=r["source_event"],
-                created_at=r["created_at"],
-                updated_at=r["updated_at"],
-                archived=r["archived"],
-            )
-            for r in cur.fetchall()
-        ]
+        return [_row_to_note(r) for r in cur.fetchall()]
 
     def update_note(
         self,
