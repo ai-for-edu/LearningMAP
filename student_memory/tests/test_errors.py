@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -135,3 +136,99 @@ def test_prune_op_errors_removes_old_rows(repo: SqliteRepo) -> None:
     assert deleted == 1
     remaining = repo._conn.execute("SELECT correlation_id FROM op_errors").fetchall()
     assert {r["correlation_id"] for r in remaining} == {"new"}
+
+
+# ----------------------------------------------------------------------
+# Integration tests for HTTP endpoints
+# ----------------------------------------------------------------------
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.core.config import Settings  # noqa: E402
+
+
+@pytest.fixture
+def client(settings_override: Settings) -> TestClient:
+    from app.main import create_app
+
+    os.environ["SM_USE_FAKE_EMBEDDER"] = "1"
+    app = create_app(settings=settings_override)
+    with TestClient(app) as c:
+        yield c
+
+
+def test_post_errors_log_returns_200_on_success(client: TestClient) -> None:
+    r = client.post(
+        "/errors/log",
+        json={
+            "source": "main_app",
+            "user_id": "u1",
+            "session_id": "s1",
+            "correlation_id": "corr1",
+            "op": "fetch_snapshot",
+            "status": "http_5xx",
+            "error_class": "HTTPError",
+            "error_msg": "boom",
+            "payload_excerpt": "user_id=u1",
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["logged"] is True
+
+
+def test_post_errors_log_returns_200_even_when_required_minimal(
+    client: TestClient,
+) -> None:
+    """用最小有效 body 也能成功."""
+    r = client.post(
+        "/errors/log",
+        json={
+            "source": "memory_service",
+            "op": "x",
+            "status": "y",
+        },
+    )
+    assert r.status_code == 200
+
+
+def test_get_errors_for_user(client: TestClient) -> None:
+    client.post(
+        "/errors/log",
+        json={
+            "source": "main_app",
+            "user_id": "u1",
+            "session_id": "s",
+            "correlation_id": "c",
+            "op": "x",
+            "status": "y",
+            "error_class": "E",
+            "error_msg": "m",
+            "payload_excerpt": "",
+        },
+    )
+    r = client.get("/errors/u1")
+    assert r.status_code == 200
+    errors = r.json()["errors"]
+    assert len(errors) == 1
+    assert errors[0]["op"] == "x"
+
+
+def test_get_errors_correlation_chain(client: TestClient) -> None:
+    for op in ("a", "b", "c"):
+        client.post(
+            "/errors/log",
+            json={
+                "source": "main_app",
+                "user_id": "u1",
+                "session_id": "s",
+                "correlation_id": "same",
+                "op": op,
+                "status": "y",
+                "error_class": "E",
+                "error_msg": "m",
+                "payload_excerpt": "",
+            },
+        )
+    r = client.get("/errors/correlation/same")
+    assert r.status_code == 200
+    ops = {e["op"] for e in r.json()["errors"]}
+    assert ops == {"a", "b", "c"}

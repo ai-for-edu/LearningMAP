@@ -20,6 +20,10 @@ from typing import Literal
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
 
 from app.api.schemas import (
+    ErrorLog,
+    ErrorLogResponse,
+    ErrorOut,
+    ErrorsListResponse,
     HealthResponse,
     IngestRequest,
     IngestResponse,
@@ -530,3 +534,93 @@ def get_snapshot(
     repo: SqliteRepo = Depends(get_repo),
 ) -> SnapshotResponse:
     return render_snapshot(repo, user_id=user_id, now_ts=_now_ts())
+
+
+# ----------------------------------------------------------------------
+# /errors (sink + queries)
+# NOTE: /errors/correlation/{correlation_id} MUST be registered BEFORE
+#       /errors/{user_id} so FastAPI does not match "correlation" as a
+#       user_id path segment.
+# ----------------------------------------------------------------------
+@router.get("/errors/correlation/{correlation_id}", response_model=ErrorsListResponse)
+def errors_for_correlation(
+    correlation_id: str,
+    repo: SqliteRepo = Depends(get_repo),
+) -> ErrorsListResponse:
+    rows = repo.list_errors_for_correlation(correlation_id)
+    return ErrorsListResponse(
+        errors=[
+            ErrorOut(
+                id=r.id,
+                ts=r.ts,
+                source=r.source,
+                user_id=r.user_id,
+                session_id=r.session_id,
+                correlation_id=r.correlation_id,
+                op=r.op,
+                status=r.status,
+                error_class=r.error_class,
+                error_msg=r.error_msg,
+                payload_excerpt=r.payload_excerpt,
+            )
+            for r in rows
+        ]
+    )
+
+
+@router.post("/errors/log", response_model=ErrorLogResponse)
+def errors_log(
+    payload: ErrorLog,
+    repo: SqliteRepo = Depends(get_repo),
+) -> ErrorLogResponse:
+    """永不返回 5xx. 写库失败也返回 200 (logged=False) + server stderr warning."""
+    try:
+        repo.log_op_error(
+            ts=_now_ts(),
+            source=payload.source,
+            user_id=payload.user_id,
+            session_id=payload.session_id,
+            correlation_id=payload.correlation_id,
+            op=payload.op,
+            status=payload.status,
+            error_class=payload.error_class,
+            error_msg=payload.error_msg,
+            payload_excerpt=payload.payload_excerpt,
+        )
+        return ErrorLogResponse(logged=True)
+    except Exception:
+        logger.exception("errors/log itself failed; returning 200 anyway")
+        return ErrorLogResponse(logged=False)
+
+
+@router.get("/errors/{user_id}", response_model=ErrorsListResponse)
+def errors_for_user(
+    user_id: str,
+    op: str | None = None,
+    since: int | None = None,
+    limit: int = 100,
+    repo: SqliteRepo = Depends(get_repo),
+) -> ErrorsListResponse:
+    rows = repo.list_errors_for_user(user_id, limit=limit)
+    if op:
+        rows = [r for r in rows if r.op == op]
+    if since:
+        rows = [r for r in rows if r.ts >= since]
+    return ErrorsListResponse(
+        errors=[
+            ErrorOut(
+                id=r.id,
+                ts=r.ts,
+                source=r.source,
+                user_id=r.user_id,
+                session_id=r.session_id,
+                correlation_id=r.correlation_id,
+                op=r.op,
+                status=r.status,
+                error_class=r.error_class,
+                error_msg=r.error_msg,
+                payload_excerpt=r.payload_excerpt,
+            )
+            for r in rows
+        ]
+    )
