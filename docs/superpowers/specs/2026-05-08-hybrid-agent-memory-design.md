@@ -368,7 +368,9 @@ class SnapshotResponse(BaseModel):
     sections: dict[str, int]   # {"progress": 240, "misconception": 180, ...}
 ```
 
-### 5.6 `GET /notes/{user_id}/history`（可选，运营/调试用）
+### 5.6 `GET /history`（可选，运营/调试用）
+
+> **实施时调整**：endpoint 改为顶层 `/history`，因为 `notes_history` 表无 `user_id` 列，按 user 过滤需要 join `notes` 表但 REJECT 条目 `note_id` 为 NULL 无法 join。本节内容是最终设计。
 
 ```http
 Query: event (optional), limit (default 100)
@@ -376,11 +378,15 @@ Query: event (optional), limit (default 100)
 
 返回 `notes_history` 行，按 `ts DESC`。本 spec 不在主流程使用，但 PR-1 一起做掉，便于事后 prompt 迭代。
 
-### 5.7 `GET /notes/{note_id}`（by-id 单条）
+### 5.7 `GET /notes/by-id/{note_id}`（by-id 单条）
+
+> **实施时调整**：path 改为 `/notes/by-id/{note_id}` 以避免与 `/notes/{user_id}` 路径模板歧义；本节内容是最终设计。
 
 reviewer 在 UPDATE / DELETE action 中需要读旧值供审计。返回 `{id, user_id, category, content, content_hash, created_at, updated_at, archived}`。404 若不存在。
 
-### 5.8 `PATCH /notes/{note_id}`
+### 5.8 `PATCH /notes/by-id/{note_id}`
+
+> **实施时调整**：path 改为 `/notes/by-id/{note_id}` 以避免与 `/notes/{user_id}` 路径模板歧义；本节内容是最终设计。
 
 ```http
 Body: {content}
@@ -393,7 +399,9 @@ reviewer UPDATE action 调用。服务端：
 
 返回 `{note_id, updated_at}`。
 
-### 5.9 `DELETE /notes/{note_id}`
+### 5.9 `DELETE /notes/by-id/{note_id}`
+
+> **实施时调整**：path 改为 `/notes/by-id/{note_id}` 以避免与 `/notes/{user_id}` 路径模板歧义；本节内容是最终设计。
 
 reviewer DELETE action 调用。**软删**：置 `archived=1`，**不**物理删；从 hnswlib 索引中移除该 vector_id。返回 `{note_id, archived: true}`。
 
@@ -699,9 +707,9 @@ def _apply_decision(decision, candidate, user_id, session_id, source_event):
 ```
 
 服务端补充端点（PR-1 内做掉）：
-- `GET /notes/{note_id}` — 读单条 note（UPDATE/DELETE 时取旧值）
-- `PATCH /notes/{note_id}` — 改 content + updated_at（UPDATE）
-- `DELETE /notes/{note_id}` — 软删，置 archived=1（DELETE action）
+- `GET /notes/by-id/{note_id}` — 读单条 note（UPDATE/DELETE 时取旧值）
+- `PATCH /notes/by-id/{note_id}` — 改 content + updated_at（UPDATE）
+- `DELETE /notes/by-id/{note_id}` — 软删，置 archived=1（DELETE action）
 
 这三个 by-id endpoint 在 §5.7-5.9 已展开。
 
