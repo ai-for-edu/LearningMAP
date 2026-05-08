@@ -37,6 +37,7 @@ from app.api.schemas import (
     RetrievedMemory,
     RetrieveRequest,
     RetrieveResponse,
+    SnapshotResponse,
 )
 from app.core.config import Settings
 from app.core.logging import get_logger
@@ -49,6 +50,7 @@ from app.memory.notes_index import NotesIndex
 from app.memory.parser import IngestValidationError
 from app.memory.reranker import RerankConfig
 from app.memory.retriever import Retriever
+from app.memory.snapshot import render_snapshot
 
 logger = get_logger(__name__)
 
@@ -517,3 +519,14 @@ def upsert_progress(
         new_status=new_status,
         sample_count=len(payload.kp_samples),
     )
+
+
+# ----------------------------------------------------------------------
+# /memory/snapshot
+# ----------------------------------------------------------------------
+@router.get("/memory/snapshot/{user_id}", response_model=SnapshotResponse)
+def get_snapshot(
+    user_id: str,
+    repo: SqliteRepo = Depends(get_repo),
+) -> SnapshotResponse:
+    return render_snapshot(repo, user_id=user_id, now_ts=_now_ts())
