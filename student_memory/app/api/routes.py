@@ -32,6 +32,8 @@ from app.api.schemas import (
     NotePatch,
     NotesListResponse,
     NoteWriteResult,
+    ProgressUpsert,
+    ProgressUpsertResponse,
     RetrievedMemory,
     RetrieveRequest,
     RetrieveResponse,
@@ -451,4 +453,67 @@ def list_notes(
             )
             for n in notes
         ]
+    )
+
+
+# ----------------------------------------------------------------------
+# /progress
+# ----------------------------------------------------------------------
+def _next_status(
+    curr: str | None,
+    mastery: float,
+    last_seen_at: int,
+    now: int,
+) -> str:
+    age_days = (now - last_seen_at) / 86400
+    if mastery >= 0.85 and age_days < 7:
+        return "mastered"
+    if curr is None:
+        return "in_progress"
+    if curr != "mastered" and age_days > 30:
+        return "abandoned"
+    if curr == "abandoned" and mastery > 0:
+        return "in_progress"
+    return curr
+
+
+@router.post("/progress", response_model=ProgressUpsertResponse)
+def upsert_progress(
+    payload: ProgressUpsert,
+    repo: SqliteRepo = Depends(get_repo),
+) -> ProgressUpsertResponse:
+    now = _now_ts()
+    existing = repo.get_progress(payload.user_id, payload.topic)
+    started_at = existing.started_at if existing else now
+    new_status = _next_status(
+        curr=existing.status if existing else None,
+        mastery=payload.mastery_overall,
+        last_seen_at=now,
+        now=now,
+    )
+
+    repo.upsert_progress(
+        user_id=payload.user_id,
+        topic=payload.topic,
+        status=new_status,
+        started_at=started_at,
+        last_seen_at=now,
+        mastery_overall=payload.mastery_overall,
+        last_session_id=payload.last_session_id,
+    )
+
+    for s in payload.kp_samples:
+        repo.add_mastery_sample(
+            user_id=payload.user_id,
+            topic=payload.topic,
+            knowledge_point=s.kp,
+            score=s.score,
+            ts=now,
+            source=s.source,
+        )
+
+    return ProgressUpsertResponse(
+        topic=payload.topic,
+        new_status=new_status,
+        sample_count=len(payload.kp_samples),
     )
