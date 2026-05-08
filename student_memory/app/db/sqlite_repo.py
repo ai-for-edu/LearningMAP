@@ -132,6 +132,29 @@ def _row_to_history(row: sqlite3.Row) -> HistoryRecord:
     )
 
 
+@dataclass(frozen=True)
+class ProgressRecord:
+    user_id: str
+    topic: str
+    status: str
+    started_at: int
+    last_seen_at: int
+    mastery_overall: float
+    last_session_id: str | None
+
+
+def _row_to_progress(row: sqlite3.Row) -> ProgressRecord:
+    return ProgressRecord(
+        user_id=row["user_id"],
+        topic=row["topic"],
+        status=row["status"],
+        started_at=row["started_at"],
+        last_seen_at=row["last_seen_at"],
+        mastery_overall=row["mastery_overall"],
+        last_session_id=row["last_session_id"],
+    )
+
+
 class SqliteRepo:
     """Thin wrapper around a single ``sqlite3.Connection``."""
 
@@ -432,6 +455,59 @@ class SqliteRepo:
             (note_id,),
         )
         return [_row_to_history(r) for r in cur.fetchall()]
+
+    # ------------------------------------------------------------------
+    # progress_snapshots
+    # ------------------------------------------------------------------
+    def upsert_progress(
+        self,
+        *,
+        user_id: str,
+        topic: str,
+        status: str,
+        started_at: int,
+        last_seen_at: int,
+        mastery_overall: float,
+        last_session_id: str | None,
+    ) -> None:
+        """UPSERT by (user_id, topic). started_at 不被新值覆盖."""
+        with self.transaction() as cur:
+            cur.execute(
+                "INSERT INTO progress_snapshots "
+                "(user_id, topic, status, started_at, last_seen_at, "
+                "mastery_overall, last_session_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(user_id, topic) DO UPDATE SET "
+                "  status = excluded.status, "
+                "  last_seen_at = excluded.last_seen_at, "
+                "  mastery_overall = excluded.mastery_overall, "
+                "  last_session_id = excluded.last_session_id",
+                (
+                    user_id,
+                    topic,
+                    status,
+                    started_at,
+                    last_seen_at,
+                    mastery_overall,
+                    last_session_id,
+                ),
+            )
+
+    def get_progress(self, user_id: str, topic: str) -> ProgressRecord | None:
+        cur = self._conn.execute(
+            "SELECT * FROM progress_snapshots WHERE user_id = ? AND topic = ?",
+            (user_id, topic),
+        )
+        row = cur.fetchone()
+        return _row_to_progress(row) if row else None
+
+    def list_progress_for_user(self, user_id: str) -> list[ProgressRecord]:
+        cur = self._conn.execute(
+            "SELECT * FROM progress_snapshots WHERE user_id = ? "
+            "ORDER BY last_seen_at DESC",
+            (user_id,),
+        )
+        return [_row_to_progress(r) for r in cur.fetchall()]
 
     # ------------------------------------------------------------------
     # reads
