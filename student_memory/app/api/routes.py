@@ -25,6 +25,8 @@ from app.api.schemas import (
     ErrorOut,
     ErrorsListResponse,
     HealthResponse,
+    HistoryListResponse,
+    HistoryOut,
     IngestRequest,
     IngestResponse,
     MasteryItem,
@@ -620,6 +622,34 @@ def errors_for_user(
                 error_class=r.error_class,
                 error_msg=r.error_msg,
                 payload_excerpt=r.payload_excerpt,
+            )
+            for r in rows
+        ]
+    )
+
+
+# ----------------------------------------------------------------------
+# /history
+# ----------------------------------------------------------------------
+@router.get("/history", response_model=HistoryListResponse)
+def list_history(
+    event: Literal["ADD", "UPDATE", "DELETE", "NOOP", "REJECT"] | None = None,
+    limit: int = 100,
+    repo: SqliteRepo = Depends(get_repo),
+) -> HistoryListResponse:
+    rows = repo.list_history(event=event, limit=limit)
+    return HistoryListResponse(
+        history=[
+            HistoryOut(
+                id=r.id,
+                note_id=r.note_id,
+                event=r.event,
+                old_content=r.old_content,
+                new_content=r.new_content,
+                reason=r.reason,
+                source_session_id=r.source_session_id,
+                source_event=r.source_event,
+                ts=r.ts,
             )
             for r in rows
         ]

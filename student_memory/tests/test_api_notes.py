@@ -223,3 +223,64 @@ def test_get_neighbors_empty_category_returns_empty(client: TestClient) -> None:
     )
     assert r.status_code == 200
     assert r.json()["neighbors"] == []
+
+
+def test_get_history_returns_recent_first(client: TestClient) -> None:
+    """`/history` returns rows in descending ts order (most recent first)."""
+    repo = client.app.state.repo
+    repo.add_history(
+        note_id=None,
+        event="ADD",
+        old_content=None,
+        new_content="v1",
+        reason="r1",
+        source_session_id="s1",
+        source_event="submit-quiz",
+        now_ts=1000,
+    )
+    repo.add_history(
+        note_id=None,
+        event="UPDATE",
+        old_content="v1",
+        new_content="v2",
+        reason="r2",
+        source_session_id="s2",
+        source_event="submit-review",
+        now_ts=2000,
+    )
+
+    r = client.get("/history", params={"limit": 100})
+    assert r.status_code == 200
+    rows = r.json()["history"]
+    assert len(rows) >= 2
+    events_in_order = [row["event"] for row in rows[:2]]
+    assert events_in_order == ["UPDATE", "ADD"]
+
+
+def test_get_history_filter_by_event(client: TestClient) -> None:
+    repo = client.app.state.repo
+    repo.add_history(
+        note_id=None,
+        event="REJECT",
+        old_content=None,
+        new_content="x",
+        reason="hash dup",
+        source_session_id="s",
+        source_event="submit-quiz",
+        now_ts=1000,
+    )
+    repo.add_history(
+        note_id=None,
+        event="ADD",
+        old_content=None,
+        new_content="y",
+        reason="new",
+        source_session_id="s",
+        source_event="submit-quiz",
+        now_ts=2000,
+    )
+
+    r = client.get("/history", params={"event": "REJECT"})
+    rows = r.json()["history"]
+    assert all(row["event"] == "REJECT" for row in rows)
+    assert len(rows) >= 1

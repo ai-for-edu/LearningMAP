@@ -508,6 +508,22 @@ class SqliteRepo:
         )
         return [_row_to_history(r) for r in cur.fetchall()]
 
+    def list_history(
+        self,
+        *,
+        event: str | None = None,
+        limit: int = 100,
+    ) -> list[HistoryRecord]:
+        sql = "SELECT * FROM notes_history"
+        params: tuple = ()
+        if event is not None:
+            sql += " WHERE event = ?"
+            params = (event,)
+        sql += " ORDER BY ts DESC, id DESC LIMIT ?"
+        params = params + (limit,)
+        cur = self._conn.execute(sql, params)
+        return [_row_to_history(r) for r in cur.fetchall()]
+
     # ------------------------------------------------------------------
     # progress_snapshots
     # ------------------------------------------------------------------
