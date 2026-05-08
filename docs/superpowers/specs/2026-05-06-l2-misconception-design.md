@@ -1,6 +1,12 @@
 # L2 Misconception 记忆 — Review 出题增强 设计
 
-**状态**：草案 / 待评审
+> **⚠️ 本 spec 已被 [2026-05-08-hybrid-agent-memory-design.md](2026-05-08-hybrid-agent-memory-design.md) 超集替代**
+>
+> 新 spec 把 L2 范围从 misconception-only 扩展到 4 category（misconception / preference / style / goal）+ 结构化学习进程，并借鉴 Mem0 的 5-action consolidation 与 Hermes-agent 的 frozen snapshot。本 spec 的设计细节已作为 misconception category 的实现指引被新 spec 完整继承。
+>
+> 由于本 spec 未实施（无对应 plan 文件），不存在代码包袱。新 spec 直接覆盖。
+
+**状态**：已超集替代（superseded by 2026-05-08-hybrid-agent-memory-design.md）
 **日期**：2026-05-06
 **范围**：`student_memory/`、`src/memory_client.py`、`src/reviewer.py`（新建）、`src/agent/nodes/review.py`、`src/prompts/`、`src/llm/schemas.py`、`src/api/chat.py`
 **前置文档**：
