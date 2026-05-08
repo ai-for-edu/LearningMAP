@@ -12,6 +12,11 @@ touching ``app.state`` directly.
 
 from __future__ import annotations
 
+import hashlib
+import re
+import time
+from typing import Literal
+
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
 
 from app.api.schemas import (
@@ -20,6 +25,11 @@ from app.api.schemas import (
     IngestResponse,
     MasteryItem,
     MasteryResponse,
+    NoteCreate,
+    NoteOut,
+    NotePatch,
+    NotesListResponse,
+    NoteWriteResult,
     RetrievedMemory,
     RetrieveRequest,
     RetrieveResponse,
@@ -31,6 +41,7 @@ from app.embedding.factory import build_embedder
 from app.index.hnsw_index import HnswIndex
 from app.index.label_store import SqliteLabelStore
 from app.memory.ingestor import DuplicateSessionError, Ingestor
+from app.memory.notes_index import NotesIndex
 from app.memory.parser import IngestValidationError
 from app.memory.reranker import RerankConfig
 from app.memory.retriever import Retriever
@@ -57,6 +68,35 @@ def get_retriever(request: Request) -> Retriever:
 
 def get_repo(request: Request) -> SqliteRepo:
     return request.app.state.repo
+
+
+def get_notes_index(request: Request) -> NotesIndex:
+    return request.app.state.notes_index
+
+
+# ----------------------------------------------------------------------
+# Injection scan + content helpers
+# ----------------------------------------------------------------------
+_INJECTION_PATTERNS = [
+    re.compile(r"(?i)ignore (previous|all|the above) instructions"),
+    re.compile(r"(?i)disregard (the )?(system|prior) (prompt|message)"),
+    re.compile(r"(?i)you are now"),
+    re.compile(r"<\|.*?\|>"),
+    re.compile(r"(?i)system\s*:"),
+]
+
+
+def _is_injection(text: str) -> bool:
+    return any(p.search(text) for p in _INJECTION_PATTERNS)
+
+
+def _content_hash(text: str) -> str:
+    norm = text.lower().strip().encode("utf-8")
+    return hashlib.sha256(norm).hexdigest()[:16]
+
+
+def _now_ts() -> int:
+    return int(time.time())
 
 
 # ----------------------------------------------------------------------
@@ -225,3 +265,151 @@ def wire_app(app: FastAPI, settings: Settings) -> None:
             recall_k=settings.recall_k,
             top_k_default=settings.top_k,
         )
+
+    if not hasattr(app.state, "notes_index"):
+        notes_index = NotesIndex(
+            index_path=settings.data_dir / "notes_hnsw.bin",
+            embedder=app.state.embedder,
+            dimension=settings.embedding_dim,
+            max_elements=10000,
+        )
+        notes_index.load()
+        app.state.notes_index = notes_index
+
+
+# ----------------------------------------------------------------------
+# /notes
+# ----------------------------------------------------------------------
+@router.post("/notes", response_model=NoteWriteResult)
+def create_note(
+    payload: NoteCreate,
+    repo: SqliteRepo = Depends(get_repo),
+    notes_index: NotesIndex = Depends(get_notes_index),
+) -> NoteWriteResult:
+    if _is_injection(payload.content):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="injection pattern detected",
+        )
+
+    chash = _content_hash(payload.content)
+    if repo.hash_exists_active(payload.user_id, chash):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="duplicate content_hash for active note",
+        )
+
+    now_ts = _now_ts()
+    note_id = repo.add_note(
+        user_id=payload.user_id,
+        category=payload.category,
+        content=payload.content,
+        content_hash=chash,
+        source_session_id=payload.source_session_id,
+        source_event=payload.source_event,
+        now_ts=now_ts,
+    )
+    notes_index.add(note_id=note_id, text=payload.content)
+
+    active = repo.list_active_notes(
+        user_id=payload.user_id,
+        category=payload.category,
+    )
+    return NoteWriteResult(note_id=note_id, active_count_in_category=len(active))
+
+
+@router.get("/notes/by-id/{note_id}", response_model=NoteOut)
+def get_note_by_id(
+    note_id: int,
+    repo: SqliteRepo = Depends(get_repo),
+) -> NoteOut:
+    note = repo.get_note(note_id)
+    if note is None:
+        raise HTTPException(status_code=404, detail="note not found")
+    return NoteOut(
+        id=note.id,
+        category=note.category,
+        content=note.content,
+        content_hash=note.content_hash,
+        created_at=note.created_at,
+        updated_at=note.updated_at,
+    )
+
+
+@router.patch("/notes/by-id/{note_id}", response_model=NoteOut)
+def patch_note(
+    note_id: int,
+    payload: NotePatch,
+    repo: SqliteRepo = Depends(get_repo),
+    notes_index: NotesIndex = Depends(get_notes_index),
+) -> NoteOut:
+    if _is_injection(payload.content):
+        raise HTTPException(status_code=422, detail="injection pattern detected")
+
+    existing = repo.get_note(note_id)
+    if existing is None or existing.archived:
+        raise HTTPException(status_code=404, detail="note not found or archived")
+
+    new_hash = _content_hash(payload.content)
+    if new_hash != existing.content_hash and repo.hash_exists_active(
+        existing.user_id, new_hash
+    ):
+        raise HTTPException(status_code=409, detail="hash conflict")
+
+    now_ts = _now_ts()
+    ok = repo.update_note(
+        note_id=note_id,
+        content=payload.content,
+        content_hash=new_hash,
+        now_ts=now_ts,
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="note not found or archived")
+    notes_index.update(note_id=note_id, text=payload.content)
+
+    updated = repo.get_note(note_id)
+    return NoteOut(
+        id=updated.id,
+        category=updated.category,
+        content=updated.content,
+        content_hash=updated.content_hash,
+        created_at=updated.created_at,
+        updated_at=updated.updated_at,
+    )
+
+
+@router.delete("/notes/by-id/{note_id}")
+def delete_note(
+    note_id: int,
+    repo: SqliteRepo = Depends(get_repo),
+    notes_index: NotesIndex = Depends(get_notes_index),
+) -> dict:
+    ok = repo.archive_note(note_id)
+    if not ok:
+        raise HTTPException(
+            status_code=404, detail="note not found or already archived"
+        )
+    notes_index.remove(note_id=note_id)
+    return {"note_id": note_id, "archived": True}
+
+
+@router.get("/notes/{user_id}", response_model=NotesListResponse)
+def list_notes(
+    user_id: str,
+    category: Literal["misconception", "preference", "style", "goal"],
+    repo: SqliteRepo = Depends(get_repo),
+) -> NotesListResponse:
+    notes = repo.list_active_notes(user_id=user_id, category=category)
+    return NotesListResponse(
+        notes=[
+            NoteOut(
+                id=n.id,
+                category=n.category,
+                content=n.content,
+                content_hash=n.content_hash,
+                created_at=n.created_at,
+                updated_at=n.updated_at,
+            )
+            for n in notes
+        ]
+    )
