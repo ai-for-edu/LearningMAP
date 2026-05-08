@@ -63,6 +63,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 index.save()
             except Exception:  # pragma: no cover - best-effort shutdown
                 logger.exception("failed to save hnsw index on shutdown")
+        notes_index = getattr(app.state, "notes_index", None)
+        if notes_index is not None:
+            try:
+                notes_index.save()
+            except Exception:  # pragma: no cover - best-effort shutdown
+                logger.exception("failed to save notes hnsw index on shutdown")
         logger.info("student_memory stopped")
 
 

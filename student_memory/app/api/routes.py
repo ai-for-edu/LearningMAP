@@ -474,10 +474,10 @@ def _next_status(
     now: int,
 ) -> str:
     age_days = (now - last_seen_at) / 86400
-    if mastery >= 0.85 and age_days < 7:
-        return "mastered"
     if curr is None:
         return "in_progress"
+    if mastery >= 0.85 and age_days < 7:
+        return "mastered"
     if curr != "mastered" and age_days > 30:
         return "abandoned"
     if curr == "abandoned" and mastery > 0:

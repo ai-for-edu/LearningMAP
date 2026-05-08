@@ -42,8 +42,9 @@ def test_post_progress_inserts_with_in_progress_status(client: TestClient) -> No
 
 
 def test_post_progress_transitions_to_mastered_when_high(client: TestClient) -> None:
-    """mastery_overall >= 0.85 within 7 days → mastered."""
-    r = client.post(
+    """First quiz never directly gives mastered (in_progress); subsequent
+    quiz with mastery >= 0.85 within 7 days transitions to mastered."""
+    r1 = client.post(
         "/progress",
         json={
             "user_id": "u1",
@@ -53,8 +54,23 @@ def test_post_progress_transitions_to_mastered_when_high(client: TestClient) -> 
             "kp_samples": [{"kp": "k", "score": 0.9, "source": "quiz"}],
         },
     )
-    assert r.status_code == 200
-    assert r.json()["new_status"] == "mastered"
+    # First call: brand-new topic → always in_progress, regardless of mastery
+    assert r1.status_code == 200
+    assert r1.json()["new_status"] == "in_progress"
+
+    # Second call shortly after with high mastery → mastered
+    r2 = client.post(
+        "/progress",
+        json={
+            "user_id": "u1",
+            "topic": "addition",
+            "mastery_overall": 0.9,
+            "last_session_id": "s2",
+            "kp_samples": [{"kp": "k", "score": 0.9, "source": "review"}],
+        },
+    )
+    assert r2.status_code == 200
+    assert r2.json()["new_status"] == "mastered"
 
 
 def test_post_progress_repeated_keeps_started_at(client: TestClient) -> None:
