@@ -55,6 +55,19 @@ class NoteRecord:
     archived: int
 
 
+@dataclass(frozen=True)
+class HistoryRecord:
+    id: int
+    note_id: int | None
+    event: str
+    old_content: str | None
+    new_content: str | None
+    reason: str
+    source_session_id: str | None
+    source_event: str | None
+    ts: int
+
+
 _COLUMNS = (
     "memory_id",
     "user_id",
@@ -102,6 +115,20 @@ def _row_to_note(row: sqlite3.Row) -> NoteRecord:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         archived=row["archived"],
+    )
+
+
+def _row_to_history(row: sqlite3.Row) -> HistoryRecord:
+    return HistoryRecord(
+        id=row["id"],
+        note_id=row["note_id"],
+        event=row["event"],
+        old_content=row["old_content"],
+        new_content=row["new_content"],
+        reason=row["reason"],
+        source_session_id=row["source_session_id"],
+        source_event=row["source_event"],
+        ts=row["ts"],
     )
 
 
@@ -364,6 +391,47 @@ class SqliteRepo:
             (user_id, content_hash),
         )
         return cur.fetchone() is not None
+
+    # ------------------------------------------------------------------
+    # notes_history (audit)
+    # ------------------------------------------------------------------
+    def add_history(
+        self,
+        *,
+        note_id: int | None,
+        event: str,
+        old_content: str | None,
+        new_content: str | None,
+        reason: str,
+        source_session_id: str | None,
+        source_event: str | None,
+        now_ts: int,
+    ) -> int:
+        with self.transaction() as cur:
+            cur.execute(
+                "INSERT INTO notes_history "
+                "(note_id, event, old_content, new_content, reason, "
+                "source_session_id, source_event, ts) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    note_id,
+                    event,
+                    old_content,
+                    new_content,
+                    reason,
+                    source_session_id,
+                    source_event,
+                    now_ts,
+                ),
+            )
+            return int(cur.lastrowid)
+
+    def list_history_for_note(self, note_id: int) -> list[HistoryRecord]:
+        cur = self._conn.execute(
+            "SELECT * FROM notes_history WHERE note_id = ? ORDER BY ts ASC, id ASC",
+            (note_id,),
+        )
+        return [_row_to_history(r) for r in cur.fetchall()]
 
     # ------------------------------------------------------------------
     # reads
