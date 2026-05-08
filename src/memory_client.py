@@ -201,3 +201,134 @@ def ingest_session(
         logger.warning("Memory service /ingest HTTP error, skipping", exc_info=True)
     except Exception:
         logger.error("Unexpected error in ingest_session", exc_info=True)
+
+
+# ------------------------------------------------------------------
+# Review ingest — cross-topic
+# ------------------------------------------------------------------
+
+
+def _re_slug(s: str) -> str:
+    """Stable per-topic suffix for session_id deduplication.
+
+    Memory service dedupes by session_id; one review can span multiple
+    topics, so each per-topic ingest needs its own session_id.
+    """
+    import re
+    return re.sub(r"\W+", "_", s).strip("_")[:32] or "x"
+
+
+def _build_review_payloads(
+    user_id: str,
+    session_id: str,
+    state: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """One payload per topic that the review touched.
+
+    Cross-topic review pulls questions from any kp the user has history
+    in. Memory service stores rows per-topic, so we split here. Topic
+    lookup uses state['mastery_snapshot'] (cached at start_review).
+    """
+    review_questions = state.get("review_questions") or []
+    review_answers = state.get("review_answers") or []
+    snapshot = state.get("mastery_snapshot") or []
+    review_result = state.get("review_result") or {}
+
+    topic_by_kp: dict[str, str] = {}
+    for row in snapshot:
+        sub = row.get("subtopic") if isinstance(row, dict) else None
+        if not sub:
+            continue
+        topic_by_kp[sub] = (row.get("topic") or "") if isinstance(row, dict) else ""
+
+    # status hint for the per-subtopic summary block
+    weak_set = set(review_result.get("weak_kps") or [])
+    strong_set = set(review_result.get("strong_kps") or [])
+
+    by_topic: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for i, q in enumerate(review_questions):
+        kp = (
+            q.knowledge_point
+            if hasattr(q, "knowledge_point")
+            else q.get("knowledge_point", "")
+        )
+        if not kp:
+            continue
+        topic = topic_by_kp.get(kp) or ""
+        correct_idx = q.answer if hasattr(q, "answer") else q.get("answer", -1)
+        student_ans = review_answers[i] if i < len(review_answers) else -1
+        is_correct = student_ans == correct_idx
+
+        by_topic.setdefault(topic, {}).setdefault(kp, []).append({
+            "question_id": q.id if hasattr(q, "id") else q.get("id", f"rq{i}"),
+            "question_text": (
+                q.question if hasattr(q, "question") else q.get("question", "")
+            ),
+            "student_answer": str(student_ans),
+            "is_correct": is_correct,
+            "error_type": None if is_correct else "wrong_answer",
+        })
+
+    payloads: list[dict[str, Any]] = []
+    for topic, by_kp in by_topic.items():
+        if not by_kp:
+            continue
+        subtopics = []
+        for kp, qs in by_kp.items():
+            if kp in strong_set:
+                summary = "review-strong: 复习答对"
+            elif kp in weak_set:
+                summary = "review-weak: 复习答错"
+            else:
+                summary = "review"
+            subtopics.append({"name": kp, "summary": summary, "questions": qs})
+        payloads.append({
+            "user_id": user_id,
+            "session_id": f"{session_id}_review_{_re_slug(topic or 'notopic')}",
+            "goal_text": f"复习 {topic}" if topic else "复习",
+            "topic": topic or None,
+            "subtopics": subtopics,
+        })
+    return payloads
+
+
+def ingest_review_session(
+    user_id: str,
+    session_id: str,
+    state: dict[str, Any],
+) -> None:
+    """Persist review answers as memory rows, one ingest per touched topic.
+
+    Fails silently like ingest_session — memory is an enhancement.
+    """
+    payloads = _build_review_payloads(user_id, session_id, state)
+    if not payloads:
+        logger.debug("No review subtopics to ingest, skipping")
+        return
+
+    client = _get_client()
+    for p in payloads:
+        try:
+            resp = client.post("/ingest", json=p)
+            if resp.status_code == 409:
+                logger.debug(
+                    "Review session %s already ingested (duplicate)",
+                    p["session_id"],
+                )
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            logger.info(
+                "Ingested review session %s: %d memory units",
+                p["session_id"],
+                data.get("memory_count", 0),
+            )
+        except httpx.HTTPError:
+            logger.warning(
+                "Memory service /ingest (review) HTTP error, skipping",
+                exc_info=True,
+            )
+        except Exception:
+            logger.error(
+                "Unexpected error in ingest_review_session", exc_info=True
+            )

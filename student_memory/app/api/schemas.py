@@ -85,6 +85,10 @@ class MasteryItem(BaseModel):
     total_questions: int
     total_correct: int
     last_accuracy: float | None = None
+    # Time-decay-weighted average accuracy across all sessions for this
+    # subtopic. Each session weighted by question_count * 2^(-age/half_life).
+    # None if no session had a non-null accuracy.
+    weighted_accuracy: float | None = None
 
 
 class MasteryResponse(BaseModel):

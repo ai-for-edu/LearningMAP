@@ -277,3 +277,55 @@ class TestAnnotateGraphWithMastery:
         n2 = next(n for n in out.nodes if n.name == "求根公式")
         assert n2.mastery is not None
         assert n2.mastery.last_accuracy == 0.9
+
+
+class TestWeightedAccuracyPreference:
+    """Annotator should feed weighted_accuracy (when present) to the
+    forgetting model, not last_accuracy. Pinning prevents future
+    refactors from silently dropping the time-weighted aggregation."""
+
+    def test_uses_weighted_accuracy_when_present(
+        self, graph, now
+    ) -> None:
+        # Big gap: last_accuracy=0.0 (just answered wrong), but the
+        # weighted blend across history is 0.9 → annotator should treat
+        # this as mastered, since the user has historically known it.
+        rows = [{
+            "subtopic": "判别式",
+            "topic": "二次方程",
+            "last_accuracy": 0.0,
+            "weighted_accuracy": 0.9,
+            "last_seen_at": (now - timedelta(seconds=10)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
+            "session_count": 5,
+        }]
+        out = annotate_graph_with_mastery(
+            graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
+        )
+        n1 = next(n for n in out.nodes if n.name == "判别式")
+        # retention ≈ 0.9 × exp(-tiny/S) ≈ 0.9 → mastered
+        assert n1.mastery is not None
+        assert n1.mastery.status == "mastered"
+        # last_accuracy field on MasteryMeta still preserved for UI
+        assert n1.mastery.last_accuracy == 0.0
+
+    def test_falls_back_to_last_accuracy_when_weighted_missing(
+        self, graph, now
+    ) -> None:
+        rows = [{
+            "subtopic": "判别式",
+            "topic": "二次方程",
+            "last_accuracy": 0.9,
+            # no weighted_accuracy key (legacy memory response)
+            "last_seen_at": (now - timedelta(seconds=10)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
+            "session_count": 1,
+        }]
+        out = annotate_graph_with_mastery(
+            graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
+        )
+        n1 = next(n for n in out.nodes if n.name == "判别式")
+        assert n1.mastery is not None
+        assert n1.mastery.status == "mastered"

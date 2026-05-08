@@ -274,6 +274,7 @@ class SqliteRepo:
         topic: str | None = None,
         since_days: int | None = None,
         min_seen: int = 1,
+        half_life_days: float = 30.0,
     ) -> list[dict]:
         """Aggregate mastery per subtopic for review-flow.
 
@@ -282,27 +283,27 @@ class SqliteRepo:
           - session_count: distinct sessions touched
           - total_questions / total_correct: across all sessions
           - last_accuracy: accuracy of the most recent session
+          - weighted_accuracy: time-decay-weighted average across all
+            sessions for this subtopic. Each session's accuracy is
+            weighted by question_count * exp(-age_days * ln2 / half_life).
+            None if no session had a non-null accuracy.
 
         Sorted by last_seen_at DESC. Rows with NULL subtopic are excluded.
         Fails closed: returns [] for unknown user_id (no exception).
         """
+        import math
         from datetime import timedelta
 
-        from app.utils.time import format_timestamp, utcnow
+        from app.utils.time import format_timestamp, parse_timestamp, utcnow
 
+        # Fetch the full row set (no GROUP BY) so we can do per-session
+        # time-weighting in Python. SQLite has no native exp().
         sql_parts = [
             """
             SELECT
-                subtopic, topic,
-                MAX(timestamp) AS last_seen_at,
-                COUNT(DISTINCT session_id) AS session_count,
-                COALESCE(SUM(question_count), 0) AS total_questions,
-                COALESCE(SUM(correct_count), 0) AS total_correct,
-                (SELECT accuracy FROM memories m2
-                   WHERE m2.user_id = m.user_id
-                     AND m2.subtopic = m.subtopic
-                   ORDER BY timestamp DESC LIMIT 1) AS last_accuracy
-            FROM memories m
+                subtopic, topic, timestamp, session_id,
+                question_count, correct_count, accuracy
+            FROM memories
             WHERE user_id = ?
               AND subtopic IS NOT NULL
             """
@@ -318,25 +319,59 @@ class SqliteRepo:
             sql_parts.append("AND timestamp >= ?")
             params.append(cutoff_iso)
 
-        sql_parts.append("GROUP BY subtopic, topic")
-        sql_parts.append("HAVING session_count >= ?")
-        params.append(min_seen)
-        sql_parts.append("ORDER BY last_seen_at DESC")
-
         sql = "\n".join(sql_parts)
         rows = self._conn.execute(sql, params).fetchall()
-        return [
-            {
-                "subtopic": row["subtopic"],
-                "topic": row["topic"],
-                "last_seen_at": row["last_seen_at"],
-                "session_count": row["session_count"],
-                "total_questions": row["total_questions"],
-                "total_correct": row["total_correct"],
-                "last_accuracy": row["last_accuracy"],
-            }
-            for row in rows
-        ]
+
+        # Group in Python by (subtopic, topic).
+        groups: dict[tuple[str, str | None], list] = {}
+        for r in rows:
+            key = (r["subtopic"], r["topic"])
+            groups.setdefault(key, []).append(r)
+
+        now = utcnow()
+        ln2 = math.log(2.0)
+        out: list[dict] = []
+        for (subtopic, t), grp in groups.items():
+            sessions = {r["session_id"] for r in grp}
+            if len(sessions) < min_seen:
+                continue
+            # Sort newest-first for last_accuracy and last_seen_at picks.
+            grp_sorted = sorted(grp, key=lambda r: r["timestamp"], reverse=True)
+            last_seen_at = grp_sorted[0]["timestamp"]
+            last_accuracy = grp_sorted[0]["accuracy"]
+            total_q = sum((r["question_count"] or 0) for r in grp)
+            total_c = sum((r["correct_count"] or 0) for r in grp)
+
+            # Weighted accuracy across all rows with non-null accuracy.
+            wsum = 0.0
+            wnum = 0.0
+            for r in grp:
+                acc = r["accuracy"]
+                if acc is None:
+                    continue
+                ts = parse_timestamp(r["timestamp"])
+                if ts is None:
+                    continue
+                age_days = max((now - ts).total_seconds() / 86400.0, 0.0)
+                qc = r["question_count"] or 1
+                w = qc * math.exp(-age_days * ln2 / max(half_life_days, 1e-6))
+                wnum += float(acc) * w
+                wsum += w
+            weighted_accuracy = (wnum / wsum) if wsum > 0 else None
+
+            out.append({
+                "subtopic": subtopic,
+                "topic": t,
+                "last_seen_at": last_seen_at,
+                "session_count": len(sessions),
+                "total_questions": total_q,
+                "total_correct": total_c,
+                "last_accuracy": last_accuracy,
+                "weighted_accuracy": weighted_accuracy,
+            })
+
+        out.sort(key=lambda d: d["last_seen_at"], reverse=True)
+        return out
 
     def iter_all(self) -> Iterator[MemoryRecord]:
         cur = self._conn.execute("SELECT * FROM memories ORDER BY rowid")

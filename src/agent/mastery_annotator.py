@@ -145,26 +145,43 @@ def _row_to_meta(
     except (TypeError, ValueError):
         logger.warning("dropping mastery row with bad session_count: %r", row)
         return None
-    last_accuracy = row.get("last_accuracy")
-    if last_accuracy is not None:
+    # Prefer the time-weighted accuracy when memory provides it.
+    # Falls back to last_accuracy (most-recent-session) for older payloads
+    # or when only one session exists. The forgetting model still applies
+    # exp(-t/S) on top: weighted_accuracy answers "how well did the
+    # student know it across sessions", retention curve answers "how
+    # much has decayed since the last touch".
+    accuracy_val = row.get("weighted_accuracy")
+    if accuracy_val is None:
+        accuracy_val = row.get("last_accuracy")
+    if accuracy_val is not None:
         try:
-            last_accuracy = float(last_accuracy)
+            accuracy_val = float(accuracy_val)
         except (TypeError, ValueError):
             logger.warning(
-                "non-numeric last_accuracy in mastery row, treating as unseen: %r",
+                "non-numeric accuracy in mastery row, treating as unseen: %r",
                 row,
             )
-            last_accuracy = None
+            accuracy_val = None
+
+    # Keep last_accuracy on MasteryMeta for UI/debug visibility, separate
+    # from what we feed the forgetting model.
+    last_accuracy_for_meta = row.get("last_accuracy")
+    if last_accuracy_for_meta is not None:
+        try:
+            last_accuracy_for_meta = float(last_accuracy_for_meta)
+        except (TypeError, ValueError):
+            last_accuracy_for_meta = None
 
     retention = model.retention(
         last_seen=last_seen,
-        last_accuracy=last_accuracy,
+        last_accuracy=accuracy_val,
         session_count=session_count,
         now=now,
     )
-    status = "unseen" if last_accuracy is None else _compute_status(retention)
+    status = "unseen" if accuracy_val is None else _compute_status(retention)
     return MasteryMeta(
-        last_accuracy=last_accuracy,
+        last_accuracy=last_accuracy_for_meta,
         last_seen_at=last_seen_str,
         session_count=session_count,
         retention=retention,

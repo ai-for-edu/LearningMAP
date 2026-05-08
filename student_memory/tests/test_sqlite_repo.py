@@ -246,3 +246,86 @@ class TestAggregateMastery:
         repo.insert_memories([rec_old, rec_new])
         items = repo.aggregate_mastery("u_001")
         assert items[0]["last_accuracy"] == 1.0
+
+    def test_weighted_accuracy_recent_wins_over_old(
+        self, repo: SqliteRepo
+    ) -> None:
+        # 100% three months ago + 0% today (with the same question_count).
+        # half_life=30d → old session weight = 2^(-90/30) = 0.125;
+        # new session weight = 1.0. Weighted: 0.125*1 / (0.125+1) ≈ 0.111.
+        from datetime import timedelta
+
+        from app.utils.time import format_timestamp, utcnow
+
+        now = utcnow()
+        old_ts = format_timestamp(now - timedelta(days=90))
+        new_ts = format_timestamp(now - timedelta(seconds=10))
+        rec_old = MemoryRecord(
+            memory_id="m1", user_id="u_001", session_id="s1",
+            memory_type="subtopic", topic="T", subtopic="A",
+            timestamp=old_ts, retrieval_text="x", raw_json="{}",
+            question_count=2, correct_count=2, accuracy=1.0,
+            error_types=None,
+        )
+        rec_new = MemoryRecord(
+            memory_id="m2", user_id="u_001", session_id="s2",
+            memory_type="subtopic", topic="T", subtopic="A",
+            timestamp=new_ts, retrieval_text="y", raw_json="{}",
+            question_count=2, correct_count=0, accuracy=0.0,
+            error_types=None,
+        )
+        repo.insert_memories([rec_old, rec_new])
+        items = repo.aggregate_mastery("u_001", half_life_days=30.0)
+        assert items[0]["last_accuracy"] == 0.0  # most recent
+        # weighted should be much closer to the new (low) value than to old
+        wa = items[0]["weighted_accuracy"]
+        assert wa is not None
+        assert 0.05 < wa < 0.15
+
+    def test_weighted_accuracy_blends_close_in_time(
+        self, repo: SqliteRepo
+    ) -> None:
+        # Two sessions same day → roughly equal weights → near average
+        from datetime import timedelta
+
+        from app.utils.time import format_timestamp, utcnow
+
+        now = utcnow()
+        ts1 = format_timestamp(now - timedelta(hours=2))
+        ts2 = format_timestamp(now - timedelta(hours=1))
+        repo.insert_memories([
+            MemoryRecord(
+                memory_id="m1", user_id="u_001", session_id="s1",
+                memory_type="subtopic", topic="T", subtopic="A",
+                timestamp=ts1, retrieval_text="x", raw_json="{}",
+                question_count=2, correct_count=1, accuracy=0.5,
+                error_types=None,
+            ),
+            MemoryRecord(
+                memory_id="m2", user_id="u_001", session_id="s2",
+                memory_type="subtopic", topic="T", subtopic="A",
+                timestamp=ts2, retrieval_text="y", raw_json="{}",
+                question_count=2, correct_count=2, accuracy=1.0,
+                error_types=None,
+            ),
+        ])
+        items = repo.aggregate_mastery("u_001", half_life_days=30.0)
+        wa = items[0]["weighted_accuracy"]
+        # Both sessions have nearly equal weight, average ≈ 0.75
+        assert wa is not None
+        assert 0.74 < wa < 0.76
+
+    def test_weighted_accuracy_none_when_all_accuracies_null(
+        self, repo: SqliteRepo
+    ) -> None:
+        rec = MemoryRecord(
+            memory_id="m1", user_id="u_001", session_id="s1",
+            memory_type="subtopic", topic="T", subtopic="A",
+            timestamp="2026-04-01T10:00:00Z",
+            retrieval_text="x", raw_json="{}",
+            question_count=0, correct_count=0, accuracy=None,
+            error_types=None,
+        )
+        repo.insert_memories([rec])
+        items = repo.aggregate_mastery("u_001")
+        assert items[0]["weighted_accuracy"] is None

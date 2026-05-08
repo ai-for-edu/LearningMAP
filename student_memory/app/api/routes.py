@@ -129,6 +129,7 @@ def mastery(
     since_days: int | None = None,
     min_seen: int = 1,
     repo: SqliteRepo = Depends(get_repo),
+    settings: Settings = Depends(get_settings_dep),
 ) -> MasteryResponse:
     if min_seen < 1:
         raise HTTPException(
@@ -141,7 +142,11 @@ def mastery(
             detail="since_days must be >= 1",
         )
     rows = repo.aggregate_mastery(
-        user_id, topic=topic, since_days=since_days, min_seen=min_seen,
+        user_id,
+        topic=topic,
+        since_days=since_days,
+        min_seen=min_seen,
+        half_life_days=settings.half_life_days,
     )
     return MasteryResponse(
         user_id=user_id,

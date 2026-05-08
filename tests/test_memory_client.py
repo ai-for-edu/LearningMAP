@@ -387,3 +387,144 @@ class TestFetchMastery:
 
         # Missing "items" key — should degrade to []
         assert fetch_mastery("u1") == []
+
+
+# ------------------------------------------------------------------
+# ingest_review_session — cross-topic review write
+# ------------------------------------------------------------------
+
+
+class TestIngestReviewSession:
+    """submit-review writes per-topic ingest payloads, dedup-safe via
+    session_id suffix `{session_id}_review_{topic_slug}`."""
+
+    def _state_with_review(self, snapshot: list[dict]) -> dict:
+        return {
+            "review_questions": [
+                QuizQuestion(
+                    id="rq1",
+                    knowledge_point="判别式",
+                    question="b²-4ac > 0?",
+                    options=["a", "b", "c", "d"],
+                    answer=0,
+                ),
+                QuizQuestion(
+                    id="rq2",
+                    knowledge_point="加乘原理",
+                    question="2×3=?",
+                    options=["5", "6", "8", "9"],
+                    answer=1,
+                ),
+            ],
+            "review_answers": [0, 0],  # rq1 right, rq2 wrong
+            "review_result": {
+                "weak_kps": ["加乘原理"],
+                "strong_kps": ["判别式"],
+                "score": 0.5,
+                "focus_directive": "...",
+            },
+            "mastery_snapshot": snapshot,
+        }
+
+    @patch("src.memory_client._get_client")
+    def test_splits_by_topic_one_call_per_topic(
+        self, mock_get_client: MagicMock
+    ) -> None:
+        from src.memory_client import ingest_review_session
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {"status": "ok", "memory_count": 1}
+        mock_get_client.return_value.post.return_value = mock_resp
+
+        snapshot = [
+            {"subtopic": "判别式", "topic": "二次方程"},
+            {"subtopic": "加乘原理", "topic": "乘法原理"},
+        ]
+        ingest_review_session("u1", "s1", self._state_with_review(snapshot))
+
+        # 2 different topics → 2 ingest calls
+        assert mock_get_client.return_value.post.call_count == 2
+        call_topics = [
+            c.kwargs["json"]["topic"]
+            for c in mock_get_client.return_value.post.call_args_list
+        ]
+        assert set(call_topics) == {"二次方程", "乘法原理"}
+
+    @patch("src.memory_client._get_client")
+    def test_session_id_suffixed_per_topic(
+        self, mock_get_client: MagicMock
+    ) -> None:
+        from src.memory_client import ingest_review_session
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {"status": "ok", "memory_count": 1}
+        mock_get_client.return_value.post.return_value = mock_resp
+
+        snapshot = [
+            {"subtopic": "判别式", "topic": "二次方程"},
+            {"subtopic": "加乘原理", "topic": "乘法原理"},
+        ]
+        ingest_review_session("u1", "sess123", self._state_with_review(snapshot))
+
+        ids = sorted(
+            c.kwargs["json"]["session_id"]
+            for c in mock_get_client.return_value.post.call_args_list
+        )
+        # Each is "sess123_review_<slug>" and they differ
+        assert all(i.startswith("sess123_review_") for i in ids)
+        assert ids[0] != ids[1]
+
+    @patch("src.memory_client._get_client")
+    def test_summary_marks_review_strong_vs_weak(
+        self, mock_get_client: MagicMock
+    ) -> None:
+        from src.memory_client import ingest_review_session
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {"status": "ok", "memory_count": 1}
+        mock_get_client.return_value.post.return_value = mock_resp
+
+        snapshot = [
+            {"subtopic": "判别式", "topic": "二次方程"},
+            {"subtopic": "加乘原理", "topic": "乘法原理"},
+        ]
+        ingest_review_session("u1", "s1", self._state_with_review(snapshot))
+
+        # Find the call for "二次方程" and check its summary contains "strong"
+        for c in mock_get_client.return_value.post.call_args_list:
+            payload = c.kwargs["json"]
+            sub = payload["subtopics"][0]
+            if payload["topic"] == "二次方程":
+                assert "strong" in sub["summary"]
+            elif payload["topic"] == "乘法原理":
+                assert "weak" in sub["summary"]
+
+    @patch("src.memory_client._get_client")
+    def test_no_questions_means_no_post(
+        self, mock_get_client: MagicMock
+    ) -> None:
+        from src.memory_client import ingest_review_session
+
+        ingest_review_session("u1", "s1", {})
+        mock_get_client.return_value.post.assert_not_called()
+
+    @patch("src.memory_client._get_client")
+    def test_http_error_silent(self, mock_get_client: MagicMock) -> None:
+        from src.memory_client import ingest_review_session
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 500
+        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "500", request=MagicMock(), response=MagicMock()
+        )
+        mock_get_client.return_value.post.return_value = mock_resp
+
+        snapshot = [{"subtopic": "判别式", "topic": "二次方程"}]
+        # Should not raise
+        ingest_review_session("u1", "s1", self._state_with_review(snapshot))

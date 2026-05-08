@@ -23,6 +23,7 @@ from src.llm.schemas import KnowledgeGraph
 from src.memory_client import (
     DEFAULT_USER_ID,
     fetch_mastery,
+    ingest_review_session,
     ingest_session,
 )
 from src.skills.loader import get_skill, list_skills
@@ -1025,5 +1026,11 @@ async def submit_review(session_id: str, req: SubmitReviewRequest) -> dict:
     state["review_result"] = result.model_dump()
     _save(session_id, state)
     _has_history_cache.pop(DEFAULT_USER_ID, None)
+
+    # Persist review answers as memory rows (one ingest per touched topic).
+    # Background, non-blocking — same pattern as submit-quiz.
+    asyncio.get_event_loop().run_in_executor(
+        None, ingest_review_session, DEFAULT_USER_ID, session_id, state
+    )
 
     return {"review_result": result.model_dump()}
