@@ -275,3 +275,52 @@ def test_list_history_for_note_returns_ordered(repo) -> None:
     assert len(rows) == 2
     assert rows[0].event == "ADD"
     assert rows[1].event == "UPDATE"
+
+
+def test_hard_delete_note_nullifies_history_note_id(repo) -> None:
+    """ON DELETE SET NULL: audit rows survive note hard-delete with note_id=NULL."""
+    note_id = repo.add_note(
+        user_id="u1",
+        category="misconception",
+        content="x",
+        content_hash="hx_fk_test",
+        source_session_id=None,
+        source_event="submit-quiz",
+        now_ts=1,
+    )
+    repo.add_history(
+        note_id=note_id,
+        event="ADD",
+        old_content=None,
+        new_content="x",
+        reason="r",
+        source_session_id=None,
+        source_event=None,
+        now_ts=2,
+    )
+
+    # Hard delete the note (bypassing archive_note's soft-delete)
+    with repo.transaction() as cur:
+        cur.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+
+    # The history row should still exist, with note_id NULL
+    rows = repo._conn.execute(
+        "SELECT note_id FROM notes_history WHERE ts = 2"
+    ).fetchall()
+    assert len(rows) == 1
+    assert rows[0]["note_id"] is None
+
+
+def test_add_history_rejects_invalid_event_via_repo(repo) -> None:
+    """The CHECK constraint also fires when going through repo.add_history."""
+    with pytest.raises(sqlite3.IntegrityError):
+        repo.add_history(
+            note_id=None,
+            event="TYPO",
+            old_content=None,
+            new_content=None,
+            reason="x",
+            source_session_id=None,
+            source_event=None,
+            now_ts=1,
+        )
