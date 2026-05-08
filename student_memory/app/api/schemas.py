@@ -6,7 +6,7 @@ branch. Do not break them without bumping an API version.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -102,3 +102,137 @@ class MasteryResponse(BaseModel):
 class ErrorResponse(BaseModel):
     error: str
     detail: Any | None = None
+
+
+# ----------------------------------------------------------------------
+# /notes (L2 主观笔记)
+# ----------------------------------------------------------------------
+NoteCategory = Literal["misconception", "preference", "style", "goal"]
+SourceEvent = Literal["submit-quiz", "submit-review", "generate-lesson"]
+
+
+class NoteCreate(BaseModel):
+    user_id: str
+    category: NoteCategory
+    content: str = Field(..., min_length=1, max_length=200)
+    source_session_id: str | None = None
+    source_event: SourceEvent
+
+
+class NoteOut(BaseModel):
+    id: int
+    category: NoteCategory
+    content: str
+    content_hash: str
+    created_at: int
+    updated_at: int
+
+
+class NotesListResponse(BaseModel):
+    notes: list[NoteOut]
+
+
+class NotePatch(BaseModel):
+    content: str = Field(..., min_length=1, max_length=200)
+
+
+class NoteWriteResult(BaseModel):
+    note_id: int
+    active_count_in_category: int
+
+
+class NeighborOut(BaseModel):
+    id: int
+    content: str
+    sim_score: float
+    age_days: float
+
+
+class NeighborsResponse(BaseModel):
+    neighbors: list[NeighborOut]
+
+
+class HistoryOut(BaseModel):
+    id: int
+    note_id: int | None
+    event: Literal["ADD", "UPDATE", "DELETE", "NOOP", "REJECT"]
+    old_content: str | None
+    new_content: str | None
+    reason: str
+    source_session_id: str | None
+    source_event: str | None
+    ts: int
+
+
+class HistoryListResponse(BaseModel):
+    history: list[HistoryOut]
+
+
+# ----------------------------------------------------------------------
+# /progress + mastery
+# ----------------------------------------------------------------------
+class MasterySample(BaseModel):
+    kp: str
+    score: float = Field(..., ge=0.0, le=1.0)
+    source: Literal["quiz", "review", "lesson_completion"]
+
+
+class ProgressUpsert(BaseModel):
+    user_id: str
+    topic: str
+    mastery_overall: float = Field(..., ge=0.0, le=1.0)
+    last_session_id: str
+    kp_samples: list[MasterySample] = Field(default_factory=list)
+
+
+class ProgressUpsertResponse(BaseModel):
+    topic: str
+    new_status: Literal["in_progress", "mastered", "abandoned"]
+    sample_count: int
+
+
+# ----------------------------------------------------------------------
+# /memory/snapshot
+# ----------------------------------------------------------------------
+class SnapshotResponse(BaseModel):
+    snapshot_md: str = Field(..., max_length=3500)
+    char_count: int
+    truncated: bool
+    sections: dict[str, int]
+
+
+# ----------------------------------------------------------------------
+# /errors
+# ----------------------------------------------------------------------
+class ErrorLog(BaseModel):
+    source: Literal["main_app", "memory_service"]
+    user_id: str | None = None
+    session_id: str | None = None
+    correlation_id: str | None = None
+    op: str
+    status: str
+    error_class: str | None = None
+    error_msg: str | None = None
+    payload_excerpt: str | None = None
+
+
+class ErrorLogResponse(BaseModel):
+    logged: bool
+
+
+class ErrorOut(BaseModel):
+    id: int
+    ts: int
+    source: str
+    user_id: str | None
+    session_id: str | None
+    correlation_id: str | None
+    op: str
+    status: str
+    error_class: str | None
+    error_msg: str | None
+    payload_excerpt: str | None
+
+
+class ErrorsListResponse(BaseModel):
+    errors: list[ErrorOut]
