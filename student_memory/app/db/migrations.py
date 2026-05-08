@@ -10,6 +10,14 @@ information: the embedding model name that was used the last time the
 hnswlib index was populated. On startup we compare it against the
 configured model name and force a full rebuild if they disagree —
 embeddings from different models are not interchangeable.
+
+The L2 agent-memory tables added by PR-1 of the hybrid agent memory
+spec (``docs/superpowers/specs/2026-05-08-hybrid-agent-memory-design.md``):
+``notes`` (4-category subjective notes with LRU eviction), ``notes_history``
+(audit log of reviewer decisions including NOOP/REJECT), ``progress_snapshots``
+(per-topic milestones), ``mastery_curve`` (KP-level time series, ≤10
+samples per KP), and ``op_errors`` (operational error tracking with 30-day
+retention pruned at startup).
 """
 
 from __future__ import annotations
@@ -95,10 +103,12 @@ CREATE TABLE IF NOT EXISTS notes_history (
     source_session_id TEXT,
     source_event TEXT,
     ts INTEGER NOT NULL,
-    FOREIGN KEY (note_id) REFERENCES notes(id)
+    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE SET NULL
 );
-CREATE INDEX IF NOT EXISTS idx_history_note  ON notes_history(note_id, ts);
-CREATE INDEX IF NOT EXISTS idx_history_event ON notes_history(event, ts);
+CREATE INDEX IF NOT EXISTS idx_history_note
+    ON notes_history(note_id, ts);
+CREATE INDEX IF NOT EXISTS idx_history_event
+    ON notes_history(event, ts);
 
 -- 主题级里程碑 ----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS progress_snapshots (
@@ -142,9 +152,12 @@ CREATE TABLE IF NOT EXISTS op_errors (
     error_msg TEXT,
     payload_excerpt TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_op_errors_user_ts ON op_errors(user_id, ts DESC);
-CREATE INDEX IF NOT EXISTS idx_op_errors_corr   ON op_errors(correlation_id);
-CREATE INDEX IF NOT EXISTS idx_op_errors_op_ts  ON op_errors(op, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_op_errors_user_ts
+    ON op_errors(user_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_op_errors_corr
+    ON op_errors(correlation_id);
+CREATE INDEX IF NOT EXISTS idx_op_errors_op_ts
+    ON op_errors(op, ts DESC);
 """
 
 

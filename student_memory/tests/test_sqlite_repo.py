@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -73,7 +74,9 @@ def test_insert_memories_batch_and_list_by_user_orders_by_timestamp(
 
 
 def test_get_memories_preserves_request_order(repo: SqliteRepo) -> None:
-    repo.insert_memories([_make_record("m_a"), _make_record("m_b"), _make_record("m_c")])
+    repo.insert_memories(
+        [_make_record("m_a"), _make_record("m_b"), _make_record("m_c")]
+    )
     out = repo.get_memories(["m_c", "m_a"])
     assert [r.memory_id for r in out] == ["m_c", "m_a"]
 
@@ -127,7 +130,9 @@ def test_set_and_get_meta(repo: SqliteRepo) -> None:
     assert repo.get_meta("embedding_model") == "BAAI/bge-small-zh-v1.5"
 
 
-def test_transaction_rolls_back_on_exception(repo: SqliteRepo, tmp_sqlite_path: Path) -> None:
+def test_transaction_rolls_back_on_exception(
+    repo: SqliteRepo, tmp_sqlite_path: Path
+) -> None:
     with pytest.raises(RuntimeError):
         with repo.transaction() as cur:
             cur.execute(
@@ -158,12 +163,24 @@ class TestAggregateMastery:
         # Two sessions on Discriminant, one on Factoring
         repo.insert_memories(
             [
-                _make_record("m1", session_id="s1", subtopic="Discriminant",
-                             timestamp="2026-04-01T10:00:00Z"),
-                _make_record("m2", session_id="s2", subtopic="Discriminant",
-                             timestamp="2026-04-15T10:00:00Z"),
-                _make_record("m3", session_id="s3", subtopic="Factoring",
-                             timestamp="2026-04-10T10:00:00Z"),
+                _make_record(
+                    "m1",
+                    session_id="s1",
+                    subtopic="Discriminant",
+                    timestamp="2026-04-01T10:00:00Z",
+                ),
+                _make_record(
+                    "m2",
+                    session_id="s2",
+                    subtopic="Discriminant",
+                    timestamp="2026-04-15T10:00:00Z",
+                ),
+                _make_record(
+                    "m3",
+                    session_id="s3",
+                    subtopic="Factoring",
+                    timestamp="2026-04-10T10:00:00Z",
+                ),
             ]
         )
         items = repo.aggregate_mastery("u_001")
@@ -174,41 +191,49 @@ class TestAggregateMastery:
         disc = items[0]
         assert disc["session_count"] == 2
         assert disc["last_seen_at"] == "2026-04-15T10:00:00Z"
-        assert disc["total_questions"] == 4   # 2 questions per record
+        assert disc["total_questions"] == 4  # 2 questions per record
         assert disc["total_correct"] == 2
-        assert disc["last_accuracy"] == 0.5   # from _make_record default
+        assert disc["last_accuracy"] == 0.5  # from _make_record default
 
     def test_filters_other_users(self, repo: SqliteRepo) -> None:
-        repo.insert_memories([
-            _make_record("m1", user_id="u_001", subtopic="A"),
-            _make_record("m2", user_id="u_002", subtopic="A"),
-        ])
+        repo.insert_memories(
+            [
+                _make_record("m1", user_id="u_001", subtopic="A"),
+                _make_record("m2", user_id="u_002", subtopic="A"),
+            ]
+        )
         items = repo.aggregate_mastery("u_001")
         assert len(items) == 1
 
     def test_excludes_null_subtopic_rows(self, repo: SqliteRepo) -> None:
-        repo.insert_memories([
-            _make_record("m1", subtopic="A"),
-            _make_record("m2", subtopic=None),  # goal-level row, must skip
-        ])
+        repo.insert_memories(
+            [
+                _make_record("m1", subtopic="A"),
+                _make_record("m2", subtopic=None),  # goal-level row, must skip
+            ]
+        )
         items = repo.aggregate_mastery("u_001")
         assert {i["subtopic"] for i in items} == {"A"}
 
     def test_topic_filter(self, repo: SqliteRepo) -> None:
-        repo.insert_memories([
-            _make_record("m1", topic="Algebra", subtopic="A"),
-            _make_record("m2", topic="Geometry", subtopic="B"),
-        ])
+        repo.insert_memories(
+            [
+                _make_record("m1", topic="Algebra", subtopic="A"),
+                _make_record("m2", topic="Geometry", subtopic="B"),
+            ]
+        )
         items = repo.aggregate_mastery("u_001", topic="Algebra")
         assert {i["subtopic"] for i in items} == {"A"}
 
     def test_min_seen_filter(self, repo: SqliteRepo) -> None:
         # Subtopic A: 1 session; B: 2 sessions
-        repo.insert_memories([
-            _make_record("m1", session_id="s1", subtopic="A"),
-            _make_record("m2", session_id="s1", subtopic="B"),
-            _make_record("m3", session_id="s2", subtopic="B"),
-        ])
+        repo.insert_memories(
+            [
+                _make_record("m1", session_id="s1", subtopic="A"),
+                _make_record("m2", session_id="s1", subtopic="B"),
+                _make_record("m3", session_id="s2", subtopic="B"),
+            ]
+        )
         items = repo.aggregate_mastery("u_001", min_seen=2)
         assert {i["subtopic"] for i in items} == {"B"}
 
@@ -216,40 +241,55 @@ class TestAggregateMastery:
         # 100 days old → excluded; 1 day old → included
         from datetime import timedelta
         from app.utils.time import format_timestamp, utcnow
+
         old_ts = format_timestamp(utcnow() - timedelta(days=100))
         new_ts = format_timestamp(utcnow() - timedelta(days=1))
-        repo.insert_memories([
-            _make_record("m1", subtopic="Old", timestamp=old_ts),
-            _make_record("m2", subtopic="New", timestamp=new_ts),
-        ])
+        repo.insert_memories(
+            [
+                _make_record("m1", subtopic="Old", timestamp=old_ts),
+                _make_record("m2", subtopic="New", timestamp=new_ts),
+            ]
+        )
         items = repo.aggregate_mastery("u_001", since_days=30)
         assert {i["subtopic"] for i in items} == {"New"}
 
     def test_last_accuracy_uses_most_recent_session(self, repo: SqliteRepo) -> None:
         # Insert two records same subtopic; later one should win
         rec_old = MemoryRecord(
-            memory_id="m1", user_id="u_001", session_id="s1",
-            memory_type="subtopic", topic="T", subtopic="A",
+            memory_id="m1",
+            user_id="u_001",
+            session_id="s1",
+            memory_type="subtopic",
+            topic="T",
+            subtopic="A",
             timestamp="2026-04-01T10:00:00Z",
-            retrieval_text="x", raw_json="{}",
-            question_count=2, correct_count=1, accuracy=0.5,
+            retrieval_text="x",
+            raw_json="{}",
+            question_count=2,
+            correct_count=1,
+            accuracy=0.5,
             error_types=None,
         )
         rec_new = MemoryRecord(
-            memory_id="m2", user_id="u_001", session_id="s2",
-            memory_type="subtopic", topic="T", subtopic="A",
+            memory_id="m2",
+            user_id="u_001",
+            session_id="s2",
+            memory_type="subtopic",
+            topic="T",
+            subtopic="A",
             timestamp="2026-04-20T10:00:00Z",
-            retrieval_text="y", raw_json="{}",
-            question_count=2, correct_count=2, accuracy=1.0,
+            retrieval_text="y",
+            raw_json="{}",
+            question_count=2,
+            correct_count=2,
+            accuracy=1.0,
             error_types=None,
         )
         repo.insert_memories([rec_old, rec_new])
         items = repo.aggregate_mastery("u_001")
         assert items[0]["last_accuracy"] == 1.0
 
-    def test_weighted_accuracy_recent_wins_over_old(
-        self, repo: SqliteRepo
-    ) -> None:
+    def test_weighted_accuracy_recent_wins_over_old(self, repo: SqliteRepo) -> None:
         # 100% three months ago + 0% today (with the same question_count).
         # half_life=30d → old session weight = 2^(-90/30) = 0.125;
         # new session weight = 1.0. Weighted: 0.125*1 / (0.125+1) ≈ 0.111.
@@ -261,17 +301,33 @@ class TestAggregateMastery:
         old_ts = format_timestamp(now - timedelta(days=90))
         new_ts = format_timestamp(now - timedelta(seconds=10))
         rec_old = MemoryRecord(
-            memory_id="m1", user_id="u_001", session_id="s1",
-            memory_type="subtopic", topic="T", subtopic="A",
-            timestamp=old_ts, retrieval_text="x", raw_json="{}",
-            question_count=2, correct_count=2, accuracy=1.0,
+            memory_id="m1",
+            user_id="u_001",
+            session_id="s1",
+            memory_type="subtopic",
+            topic="T",
+            subtopic="A",
+            timestamp=old_ts,
+            retrieval_text="x",
+            raw_json="{}",
+            question_count=2,
+            correct_count=2,
+            accuracy=1.0,
             error_types=None,
         )
         rec_new = MemoryRecord(
-            memory_id="m2", user_id="u_001", session_id="s2",
-            memory_type="subtopic", topic="T", subtopic="A",
-            timestamp=new_ts, retrieval_text="y", raw_json="{}",
-            question_count=2, correct_count=0, accuracy=0.0,
+            memory_id="m2",
+            user_id="u_001",
+            session_id="s2",
+            memory_type="subtopic",
+            topic="T",
+            subtopic="A",
+            timestamp=new_ts,
+            retrieval_text="y",
+            raw_json="{}",
+            question_count=2,
+            correct_count=0,
+            accuracy=0.0,
             error_types=None,
         )
         repo.insert_memories([rec_old, rec_new])
@@ -282,9 +338,7 @@ class TestAggregateMastery:
         assert wa is not None
         assert 0.05 < wa < 0.15
 
-    def test_weighted_accuracy_blends_close_in_time(
-        self, repo: SqliteRepo
-    ) -> None:
+    def test_weighted_accuracy_blends_close_in_time(self, repo: SqliteRepo) -> None:
         # Two sessions same day → roughly equal weights → near average
         from datetime import timedelta
 
@@ -293,22 +347,40 @@ class TestAggregateMastery:
         now = utcnow()
         ts1 = format_timestamp(now - timedelta(hours=2))
         ts2 = format_timestamp(now - timedelta(hours=1))
-        repo.insert_memories([
-            MemoryRecord(
-                memory_id="m1", user_id="u_001", session_id="s1",
-                memory_type="subtopic", topic="T", subtopic="A",
-                timestamp=ts1, retrieval_text="x", raw_json="{}",
-                question_count=2, correct_count=1, accuracy=0.5,
-                error_types=None,
-            ),
-            MemoryRecord(
-                memory_id="m2", user_id="u_001", session_id="s2",
-                memory_type="subtopic", topic="T", subtopic="A",
-                timestamp=ts2, retrieval_text="y", raw_json="{}",
-                question_count=2, correct_count=2, accuracy=1.0,
-                error_types=None,
-            ),
-        ])
+        repo.insert_memories(
+            [
+                MemoryRecord(
+                    memory_id="m1",
+                    user_id="u_001",
+                    session_id="s1",
+                    memory_type="subtopic",
+                    topic="T",
+                    subtopic="A",
+                    timestamp=ts1,
+                    retrieval_text="x",
+                    raw_json="{}",
+                    question_count=2,
+                    correct_count=1,
+                    accuracy=0.5,
+                    error_types=None,
+                ),
+                MemoryRecord(
+                    memory_id="m2",
+                    user_id="u_001",
+                    session_id="s2",
+                    memory_type="subtopic",
+                    topic="T",
+                    subtopic="A",
+                    timestamp=ts2,
+                    retrieval_text="y",
+                    raw_json="{}",
+                    question_count=2,
+                    correct_count=2,
+                    accuracy=1.0,
+                    error_types=None,
+                ),
+            ]
+        )
         items = repo.aggregate_mastery("u_001", half_life_days=30.0)
         wa = items[0]["weighted_accuracy"]
         # Both sessions have nearly equal weight, average ≈ 0.75
@@ -319,11 +391,18 @@ class TestAggregateMastery:
         self, repo: SqliteRepo
     ) -> None:
         rec = MemoryRecord(
-            memory_id="m1", user_id="u_001", session_id="s1",
-            memory_type="subtopic", topic="T", subtopic="A",
+            memory_id="m1",
+            user_id="u_001",
+            session_id="s1",
+            memory_type="subtopic",
+            topic="T",
+            subtopic="A",
             timestamp="2026-04-01T10:00:00Z",
-            retrieval_text="x", raw_json="{}",
-            question_count=0, correct_count=0, accuracy=None,
+            retrieval_text="x",
+            raw_json="{}",
+            question_count=0,
+            correct_count=0,
+            accuracy=None,
             error_types=None,
         )
         repo.insert_memories([rec])
@@ -331,26 +410,28 @@ class TestAggregateMastery:
         assert items[0]["weighted_accuracy"] is None
 
 
-def test_init_db_creates_notes_tables(tmp_sqlite_path):
+def test_init_db_creates_notes_tables(tmp_sqlite_path: Path) -> None:
     """5 张新表都被 init_db 创建。"""
-    from app.db.sqlite_repo import SqliteRepo
-
     repo = SqliteRepo(tmp_sqlite_path)
     try:
         cur = repo._conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
         )
         names = {row["name"] for row in cur.fetchall()}
-        for required in ("notes", "notes_history", "progress_snapshots",
-                         "mastery_curve", "op_errors"):
+        for required in (
+            "notes",
+            "notes_history",
+            "progress_snapshots",
+            "mastery_curve",
+            "op_errors",
+        ):
             assert required in names, f"missing table: {required}"
     finally:
         repo.close()
 
 
-def test_init_db_creates_notes_indexes(tmp_sqlite_path):
-    from app.db.sqlite_repo import SqliteRepo
-
+def test_init_db_creates_notes_indexes(tmp_sqlite_path: Path) -> None:
+    """All 9 indexes for the new tables exist after init_db."""
     repo = SqliteRepo(tmp_sqlite_path)
     try:
         cur = repo._conn.execute(
@@ -373,11 +454,8 @@ def test_init_db_creates_notes_indexes(tmp_sqlite_path):
         repo.close()
 
 
-def test_notes_category_check_constraint(tmp_sqlite_path):
+def test_notes_category_check_constraint(tmp_sqlite_path: Path) -> None:
     """category 不在 4 个白名单值时 INSERT 必须失败。"""
-    import sqlite3
-    from app.db.sqlite_repo import SqliteRepo
-
     repo = SqliteRepo(tmp_sqlite_path)
     try:
         with pytest.raises(sqlite3.IntegrityError):
