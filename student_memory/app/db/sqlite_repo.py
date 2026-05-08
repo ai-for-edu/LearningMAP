@@ -155,6 +155,27 @@ def _row_to_progress(row: sqlite3.Row) -> ProgressRecord:
     )
 
 
+@dataclass(frozen=True)
+class MasteryRecord:
+    user_id: str
+    topic: str
+    knowledge_point: str
+    score: float
+    ts: int
+    source: str
+
+
+def _row_to_mastery(row: sqlite3.Row) -> MasteryRecord:
+    return MasteryRecord(
+        user_id=row["user_id"],
+        topic=row["topic"],
+        knowledge_point=row["knowledge_point"],
+        score=row["score"],
+        ts=row["ts"],
+        source=row["source"],
+    )
+
+
 class SqliteRepo:
     """Thin wrapper around a single ``sqlite3.Connection``."""
 
@@ -508,6 +529,85 @@ class SqliteRepo:
             (user_id,),
         )
         return [_row_to_progress(r) for r in cur.fetchall()]
+
+    # ------------------------------------------------------------------
+    # mastery_curve (KP 时间序列, 上限 10 采样/KP)
+    # ------------------------------------------------------------------
+    MASTERY_SAMPLES_PER_KP = 10
+
+    def add_mastery_sample(
+        self,
+        *,
+        user_id: str,
+        topic: str,
+        knowledge_point: str,
+        score: float,
+        ts: int,
+        source: str,
+    ) -> None:
+        with self.transaction() as cur:
+            cur.execute(
+                "INSERT INTO mastery_curve "
+                "(user_id, topic, knowledge_point, score, ts, source) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, topic, knowledge_point, score, ts, source),
+            )
+            # 上限淘汰: 删最老的若干行让总数回到 cap
+            cur.execute(
+                "SELECT id FROM mastery_curve "
+                "WHERE user_id = ? AND topic = ? AND knowledge_point = ? "
+                "ORDER BY ts ASC, id ASC",
+                (user_id, topic, knowledge_point),
+            )
+            ids = [r["id"] for r in cur.fetchall()]
+            if len(ids) > self.MASTERY_SAMPLES_PER_KP:
+                to_delete = ids[: len(ids) - self.MASTERY_SAMPLES_PER_KP]
+                cur.executemany(
+                    "DELETE FROM mastery_curve WHERE id = ?",
+                    [(i,) for i in to_delete],
+                )
+
+    def list_mastery_for_kp(
+        self,
+        user_id: str,
+        topic: str,
+        knowledge_point: str,
+    ) -> list[MasteryRecord]:
+        cur = self._conn.execute(
+            "SELECT * FROM mastery_curve "
+            "WHERE user_id = ? AND topic = ? AND knowledge_point = ? "
+            "ORDER BY ts ASC",
+            (user_id, topic, knowledge_point),
+        )
+        return [_row_to_mastery(r) for r in cur.fetchall()]
+
+    def list_weak_mastery(
+        self,
+        *,
+        user_id: str,
+        threshold: float,
+    ) -> list[MasteryRecord]:
+        """返回每个 (topic, KP) 的最新采样, 且 score < threshold."""
+        cur = self._conn.execute(
+            """
+            SELECT mc.*
+            FROM mastery_curve mc
+            JOIN (
+                SELECT user_id, topic, knowledge_point, MAX(ts) AS max_ts
+                FROM mastery_curve
+                WHERE user_id = ?
+                GROUP BY user_id, topic, knowledge_point
+            ) latest
+              ON mc.user_id = latest.user_id
+             AND mc.topic = latest.topic
+             AND mc.knowledge_point = latest.knowledge_point
+             AND mc.ts = latest.max_ts
+            WHERE mc.score < ?
+            ORDER BY mc.score ASC
+            """,
+            (user_id, threshold),
+        )
+        return [_row_to_mastery(r) for r in cur.fetchall()]
 
     # ------------------------------------------------------------------
     # reads

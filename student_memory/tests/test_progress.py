@@ -88,3 +88,81 @@ def test_list_progress_for_user_orders_by_recency(repo: SqliteRepo) -> None:
 
     items = repo.list_progress_for_user("u1")
     assert [i.topic for i in items] == ["B", "A"]
+
+
+def test_add_mastery_sample_inserts_row(repo: SqliteRepo) -> None:
+    repo.add_mastery_sample(
+        user_id="u1",
+        topic="A",
+        knowledge_point="kp1",
+        score=0.5,
+        ts=1000,
+        source="quiz",
+    )
+    row = repo._conn.execute(
+        "SELECT * FROM mastery_curve WHERE user_id='u1' AND knowledge_point='kp1'"
+    ).fetchone()
+    assert row["score"] == pytest.approx(0.5)
+    assert row["source"] == "quiz"
+
+
+def test_mastery_curve_caps_at_10_samples_per_kp(repo: SqliteRepo) -> None:
+    """同一 (user, topic, kp) 最多保留 10 行。超出删最老。"""
+    for i in range(15):
+        repo.add_mastery_sample(
+            user_id="u1",
+            topic="A",
+            knowledge_point="kp1",
+            score=0.1 * i,
+            ts=1000 + i,
+            source="quiz",
+        )
+
+    rows = repo._conn.execute(
+        "SELECT score, ts FROM mastery_curve "
+        "WHERE user_id='u1' AND knowledge_point='kp1' ORDER BY ts ASC"
+    ).fetchall()
+    assert len(rows) == 10
+    # 最老 5 条 (i=0..4) 被删, 留 i=5..14
+    assert rows[0]["ts"] == 1005
+    assert rows[-1]["ts"] == 1014
+
+
+def test_list_mastery_for_kp_returns_chronological(repo: SqliteRepo) -> None:
+    for i, score in enumerate([0.1, 0.4, 0.7]):
+        repo.add_mastery_sample(
+            user_id="u1",
+            topic="A",
+            knowledge_point="kp1",
+            score=score,
+            ts=1000 + i,
+            source="quiz",
+        )
+
+    samples = repo.list_mastery_for_kp("u1", "A", "kp1")
+    assert [s.score for s in samples] == pytest.approx([0.1, 0.4, 0.7])
+
+
+def test_list_weak_mastery_filters_below_threshold(repo: SqliteRepo) -> None:
+    """list_weak_mastery 只返回当前 mastery (最新采样) < threshold 的 KP。"""
+    repo.add_mastery_sample(
+        user_id="u1",
+        topic="A",
+        knowledge_point="weak_kp",
+        score=0.3,
+        ts=1000,
+        source="quiz",
+    )
+    repo.add_mastery_sample(
+        user_id="u1",
+        topic="A",
+        knowledge_point="strong_kp",
+        score=0.9,
+        ts=1000,
+        source="quiz",
+    )
+
+    weak = repo.list_weak_mastery(user_id="u1", threshold=0.7)
+    kps = {w.knowledge_point for w in weak}
+    assert "weak_kp" in kps
+    assert "strong_kp" not in kps
