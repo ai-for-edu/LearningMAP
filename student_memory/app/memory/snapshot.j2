@@ -1,0 +1,27 @@
+{% if progress -%}
+## 该学生的学习进程
+{% for p in progress -%}
+- {{ p.status_label }}：{{ p.topic }}（{{ p.elapsed_label }}，整体掌握度 {{ p.mastery_pct }}%）
+{% endfor -%}
+{%- if weak_kps %}
+- 当前薄弱 KP：{% for k in weak_kps %}{{ k.knowledge_point }}（{{ k.score_pct }}%{% if k.trend %}，{{ k.trend }}{% endif %}）{% if not loop.last %}、{% endif %}{% endfor %}
+{% endif -%}
+{% endif -%}
+{% if misconceptions %}
+## 该学生的历史易混点
+{% for m in misconceptions -%}
+- {{ m.content }}
+{% endfor -%}
+{% endif -%}
+{% if style_pref %}
+## 该学生的学习风格与偏好
+{% for s in style_pref -%}
+- ({{ s.category }}) {{ s.content }}
+{% endfor -%}
+{% endif -%}
+{% if goals %}
+## 该学生的长期目标
+{% for g in goals -%}
+- {{ g.content }}
+{% endfor -%}
+{% endif -%}
