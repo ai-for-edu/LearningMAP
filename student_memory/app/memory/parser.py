@@ -91,7 +91,9 @@ def _parse_subtopic(raw: Any, idx: int) -> RawSubtopic:
         raise IngestValidationError(f"subtopics[{idx}].summary must be a string")
     return RawSubtopic(
         name=name.strip(),
-        summary=summary.strip() if isinstance(summary, str) and summary.strip() else None,
+        summary=summary.strip()
+        if isinstance(summary, str) and summary.strip()
+        else None,
         questions=questions,
     )
 

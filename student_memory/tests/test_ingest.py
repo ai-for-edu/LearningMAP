@@ -57,7 +57,9 @@ def test_ingest_records_embedding_model(stack, sample_session_payload: dict) -> 
     assert repo.get_meta("embedding_model") == "fake-test"
 
 
-def test_ingest_search_returns_inserted_records(stack, sample_session_payload: dict) -> None:
+def test_ingest_search_returns_inserted_records(
+    stack, sample_session_payload: dict
+) -> None:
     ingestor, _, embedder, index = stack
     ingestor.ingest(sample_session_payload)
     query = embedder.encode(["I want to study quadratic equations"])
@@ -67,7 +69,9 @@ def test_ingest_search_returns_inserted_records(stack, sample_session_payload: d
     assert sims[0] >= sims[1]
 
 
-def test_ingest_persists_index_to_disk(stack, sample_session_payload: dict, tmp_path: Path) -> None:
+def test_ingest_persists_index_to_disk(
+    stack, sample_session_payload: dict, tmp_path: Path
+) -> None:
     ingestor, repo, _, _ = stack
     ingestor.ingest(sample_session_payload)
     # Re-open the index against the same SQLite-backed label store.

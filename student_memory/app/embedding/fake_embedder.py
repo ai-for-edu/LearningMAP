@@ -45,9 +45,7 @@ _TOKEN_RE = re.compile(r"[a-zA-Z\u4e00-\u9fff]+")
 class FakeEmbedder(Embedder):
     """Deterministic, model-free embedder for tests."""
 
-    def __init__(
-        self, dimension: int = _DEFAULT_DIM, model_name: str = "fake"
-    ) -> None:
+    def __init__(self, dimension: int = _DEFAULT_DIM, model_name: str = "fake") -> None:
         if dimension < len(_KEYWORDS):
             raise ValueError(
                 f"FakeEmbedder dimension must be >= {len(_KEYWORDS)} "

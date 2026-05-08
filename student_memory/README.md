@@ -636,3 +636,24 @@ rm -rf data/memory.db data/hnsw.bin
 ### Q: demo 分支应该如何处理 memory 服务不可用的情况？
 
 demo 侧应优雅降级：如果 `POST /retrieve` 超时或返回非 200，不注入 `context_text` 即可，不应阻塞对话流程。memory 服务是增强组件，不是必要组件。
+
+---
+
+## L2 / Progress Endpoints (PR-1, 2026-05-08)
+
+| Method | Path | 用途 |
+|---|---|---|
+| POST | `/notes` | 创建一条 4-category note (reviewer ADD action) |
+| GET  | `/notes/{user_id}?category=` | 列 active notes (按 category) |
+| GET  | `/notes/{user_id}/neighbors` | hnswlib top-K 召回 (reviewer call B 输入) |
+| GET  | `/notes/by-id/{note_id}` | 读单条 note (reviewer UPDATE/DELETE 取旧值) |
+| PATCH | `/notes/by-id/{note_id}` | 更新 content (reviewer UPDATE action) |
+| DELETE | `/notes/by-id/{note_id}` | 软删 (reviewer DELETE action) |
+| POST | `/progress` | UPSERT 主题里程碑 + 追加 mastery 采样 |
+| GET  | `/memory/snapshot/{user_id}` | 渲染 frozen snapshot (≤3500 chars) |
+| POST | `/errors/log` | 错误 sink (永不 5xx) |
+| GET  | `/errors/{user_id}` | 查 user 最近 100 条错误 |
+| GET  | `/errors/correlation/{corr}` | 拉 reviewer 一次完整调用链 |
+| GET  | `/history` | 查 notes_history (reviewer 决策审计) |
+
+详见 `docs/superpowers/specs/2026-05-08-hybrid-agent-memory-design.md`。

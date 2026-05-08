@@ -117,7 +117,9 @@ class HnswIndex:
     # writes
     # ------------------------------------------------------------------
     def add(self, memory_id: str, vector: np.ndarray, label: int | None = None) -> int:
-        labels = self.add_batch([memory_id], vector.reshape(1, -1), [label] if label is not None else None)
+        labels = self.add_batch(
+            [memory_id], vector.reshape(1, -1), [label] if label is not None else None
+        )
         return labels[0]
 
     def add_batch(

@@ -116,7 +116,6 @@ def test_retrieve_empty_index_returns_stable_empty_payload(
 def test_health_via_router_module() -> None:
     """Confirm the router-mounted /health (Phase 7) is reachable as well
     as the eager one mounted in create_app (Phase 1)."""
-    from fastapi.testclient import TestClient
 
     from app.api.routes import router
 
@@ -153,7 +152,7 @@ def test_mastery_returns_aggregated_subtopics(
     assert disc["topic"] == "Quadratic Equations"
     assert disc["session_count"] == 1
     assert disc["total_questions"] == 2
-    assert disc["total_correct"] == 1   # 1 of 2 correct in fixture
+    assert disc["total_correct"] == 1  # 1 of 2 correct in fixture
     assert disc["last_accuracy"] == 0.5
 
 

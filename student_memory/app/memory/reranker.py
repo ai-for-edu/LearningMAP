@@ -129,6 +129,10 @@ def rank_candidates(
 ) -> list[ScoredCandidate]:
     scored = [score_candidate(c, now=now, cfg=cfg) for c in candidates]
     scored.sort(
-        key=lambda s: (-s.final_score, -s.sim_score, -s.candidate.timestamp.timestamp()),
+        key=lambda s: (
+            -s.final_score,
+            -s.sim_score,
+            -s.candidate.timestamp.timestamp(),
+        ),
     )
     return scored

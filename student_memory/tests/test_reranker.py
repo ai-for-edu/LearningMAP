@@ -174,16 +174,24 @@ def test_match_score_zero_when_query_fields_unset() -> None:
 def test_rerank_config_rejects_misweighted_construction() -> None:
     with pytest.raises(ValueError):
         RerankConfig(
-            w_sim=0.5, w_time=0.3, w_match=0.3,
-            half_life_days=30, topic_bonus=0.0, subtopic_bonus=0.0,
+            w_sim=0.5,
+            w_time=0.3,
+            w_match=0.3,
+            half_life_days=30,
+            topic_bonus=0.0,
+            subtopic_bonus=0.0,
         )
 
 
 def test_config_driven_weights_change_ranking() -> None:
     # With recency-heavy weights, the recent record should always win.
     recency_heavy = RerankConfig(
-        w_sim=0.10, w_time=0.85, w_match=0.05,
-        half_life_days=30, topic_bonus=0.03, subtopic_bonus=0.02,
+        w_sim=0.10,
+        w_time=0.85,
+        w_match=0.05,
+        half_life_days=30,
+        topic_bonus=0.03,
+        subtopic_bonus=0.02,
     )
     a = _candidate("m_old", sim=0.99, age_days_ago=200)
     b = _candidate("m_new", sim=0.50, age_days_ago=1)
