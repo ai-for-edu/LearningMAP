@@ -172,3 +172,54 @@ def test_delete_note_softdels(client: TestClient) -> None:
 
     r3 = client.get("/notes/u1?category=style")
     assert r3.json()["notes"] == []
+
+
+def test_get_neighbors_returns_top_k_same_category(client: TestClient) -> None:
+    """同 category 内召回；不跨 category。"""
+    client.post(
+        "/notes",
+        json={
+            "user_id": "u1",
+            "category": "misconception",
+            "content": "apples are fruit",
+            "source_event": "submit-quiz",
+        },
+    )
+    client.post(
+        "/notes",
+        json={
+            "user_id": "u1",
+            "category": "misconception",
+            "content": "bananas are yellow",
+            "source_event": "submit-quiz",
+        },
+    )
+    client.post(
+        "/notes",
+        json={
+            "user_id": "u1",
+            "category": "preference",
+            "content": "apples are fruit different category",
+            "source_event": "submit-quiz",
+        },
+    )
+
+    r = client.get(
+        "/notes/u1/neighbors",
+        params={"category": "misconception", "query_text": "apples", "top_k": 5},
+    )
+    assert r.status_code == 200
+    neighbors = r.json()["neighbors"]
+    assert len(neighbors) <= 5
+    contents = [n["content"] for n in neighbors]
+    # preference category 那条不应在结果里
+    assert all("different category" not in c for c in contents)
+
+
+def test_get_neighbors_empty_category_returns_empty(client: TestClient) -> None:
+    r = client.get(
+        "/notes/u_unknown/neighbors",
+        params={"category": "goal", "query_text": "anything", "top_k": 5},
+    )
+    assert r.status_code == 200
+    assert r.json()["neighbors"] == []

@@ -25,6 +25,8 @@ from app.api.schemas import (
     IngestResponse,
     MasteryItem,
     MasteryResponse,
+    NeighborOut,
+    NeighborsResponse,
     NoteCreate,
     NoteOut,
     NotePatch,
@@ -391,6 +393,43 @@ def delete_note(
         )
     notes_index.remove(note_id=note_id)
     return {"note_id": note_id, "archived": True}
+
+
+@router.get("/notes/{user_id}/neighbors", response_model=NeighborsResponse)
+def neighbors(
+    user_id: str,
+    category: Literal["misconception", "preference", "style", "goal"],
+    query_text: str,
+    top_k: int = 5,
+    repo: SqliteRepo = Depends(get_repo),
+    notes_index: NotesIndex = Depends(get_notes_index),
+) -> NeighborsResponse:
+    if not query_text.strip():
+        return NeighborsResponse(neighbors=[])
+
+    # 召回足量后再筛 (user, category), 避免单次召回里全是其他用户的 hits
+    raw = notes_index.search(query_text=query_text, top_k=top_k * 4)
+
+    out: list[NeighborOut] = []
+    now = _now_ts()
+    for hit in raw:
+        note = repo.get_note(hit.note_id)
+        if note is None or note.archived:
+            continue
+        if note.user_id != user_id or note.category != category:
+            continue
+        age_days = max((now - note.created_at) / 86400, 0)
+        out.append(
+            NeighborOut(
+                id=note.id,
+                content=note.content,
+                sim_score=hit.sim_score,
+                age_days=age_days,
+            )
+        )
+        if len(out) >= top_k:
+            break
+    return NeighborsResponse(neighbors=out)
 
 
 @router.get("/notes/{user_id}", response_model=NotesListResponse)
