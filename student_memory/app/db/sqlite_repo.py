@@ -41,6 +41,20 @@ class MemoryRecord:
     error_types: str | None  # comma-joined
 
 
+@dataclass(frozen=True)
+class NoteRecord:
+    id: int
+    user_id: str
+    category: str
+    content: str
+    content_hash: str
+    source_session_id: str | None
+    source_event: str
+    created_at: int
+    updated_at: int
+    archived: int
+
+
 _COLUMNS = (
     "memory_id",
     "user_id",
@@ -231,6 +245,139 @@ class SqliteRepo:
             cur.execute("DELETE FROM memories WHERE memory_id = ?", (memory_id,))
 
     # ------------------------------------------------------------------
+    # notes (L2 主观笔记)
+    # ------------------------------------------------------------------
+    NOTES_ACTIVE_CAP = 30
+
+    def add_note(
+        self,
+        *,
+        user_id: str,
+        category: str,
+        content: str,
+        content_hash: str,
+        source_session_id: str | None,
+        source_event: str,
+        now_ts: int,
+    ) -> int:
+        """插入一条 active note，触发 LRU 淘汰，返回新 note id。
+
+        category 必须是 'misconception'/'preference'/'style'/'goal' 之一
+        (SQL CHECK 强制). content/content_hash 由调用方校验长度与脱敏.
+        """
+        with self.transaction() as cur:
+            cur.execute(
+                "INSERT INTO notes (user_id, category, content, content_hash, "
+                "source_session_id, source_event, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    user_id,
+                    category,
+                    content,
+                    content_hash,
+                    source_session_id,
+                    source_event,
+                    now_ts,
+                    now_ts,
+                ),
+            )
+            new_id = int(cur.lastrowid)
+            # LRU: 同 (user, category) active 超过上限就 archived=1 最老一条
+            cur.execute(
+                "SELECT id FROM notes "
+                "WHERE user_id = ? AND category = ? AND archived = 0 "
+                "ORDER BY created_at ASC, id ASC",
+                (user_id, category),
+            )
+            ids = [r["id"] for r in cur.fetchall()]
+            if len(ids) > self.NOTES_ACTIVE_CAP:
+                to_archive = ids[: len(ids) - self.NOTES_ACTIVE_CAP]
+                cur.executemany(
+                    "UPDATE notes SET archived = 1 WHERE id = ?",
+                    [(nid,) for nid in to_archive],
+                )
+            return new_id
+
+    def get_note(self, note_id: int) -> NoteRecord | None:
+        cur = self._conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,))
+        row = cur.fetchone()
+        if row is None:
+            return None
+        return NoteRecord(
+            id=row["id"],
+            user_id=row["user_id"],
+            category=row["category"],
+            content=row["content"],
+            content_hash=row["content_hash"],
+            source_session_id=row["source_session_id"],
+            source_event=row["source_event"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            archived=row["archived"],
+        )
+
+    def list_active_notes(
+        self,
+        *,
+        user_id: str,
+        category: str,
+        limit: int = 30,
+    ) -> list[NoteRecord]:
+        cur = self._conn.execute(
+            "SELECT * FROM notes "
+            "WHERE user_id = ? AND category = ? AND archived = 0 "
+            "ORDER BY created_at DESC, id DESC LIMIT ?",
+            (user_id, category, limit),
+        )
+        return [
+            NoteRecord(
+                id=r["id"],
+                user_id=r["user_id"],
+                category=r["category"],
+                content=r["content"],
+                content_hash=r["content_hash"],
+                source_session_id=r["source_session_id"],
+                source_event=r["source_event"],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+                archived=r["archived"],
+            )
+            for r in cur.fetchall()
+        ]
+
+    def update_note(
+        self,
+        *,
+        note_id: int,
+        content: str,
+        content_hash: str,
+        now_ts: int,
+    ) -> bool:
+        with self.transaction() as cur:
+            cur.execute(
+                "UPDATE notes SET content = ?, content_hash = ?, updated_at = ? "
+                "WHERE id = ? AND archived = 0",
+                (content, content_hash, now_ts, note_id),
+            )
+            return cur.rowcount == 1
+
+    def archive_note(self, note_id: int) -> bool:
+        with self.transaction() as cur:
+            cur.execute(
+                "UPDATE notes SET archived = 1 WHERE id = ? AND archived = 0",
+                (note_id,),
+            )
+            return cur.rowcount == 1
+
+    def hash_exists_active(self, user_id: str, content_hash: str) -> bool:
+        cur = self._conn.execute(
+            "SELECT 1 FROM notes "
+            "WHERE user_id = ? AND content_hash = ? AND archived = 0 LIMIT 1",
+            (user_id, content_hash),
+        )
+        return cur.fetchone() is not None
+
+    # ------------------------------------------------------------------
     # reads
     # ------------------------------------------------------------------
     def get_memory(self, memory_id: str) -> MemoryRecord | None:
@@ -256,10 +403,7 @@ class SqliteRepo:
     def list_by_user(
         self, user_id: str, limit: int | None = None
     ) -> list[MemoryRecord]:
-        sql = (
-            "SELECT * FROM memories WHERE user_id = ? "
-            "ORDER BY timestamp DESC"
-        )
+        sql = "SELECT * FROM memories WHERE user_id = ? ORDER BY timestamp DESC"
         params: tuple = (user_id,)
         if limit is not None:
             sql += " LIMIT ?"
@@ -359,16 +503,18 @@ class SqliteRepo:
                 wsum += w
             weighted_accuracy = (wnum / wsum) if wsum > 0 else None
 
-            out.append({
-                "subtopic": subtopic,
-                "topic": t,
-                "last_seen_at": last_seen_at,
-                "session_count": len(sessions),
-                "total_questions": total_q,
-                "total_correct": total_c,
-                "last_accuracy": last_accuracy,
-                "weighted_accuracy": weighted_accuracy,
-            })
+            out.append(
+                {
+                    "subtopic": subtopic,
+                    "topic": t,
+                    "last_seen_at": last_seen_at,
+                    "session_count": len(sessions),
+                    "total_questions": total_q,
+                    "total_correct": total_c,
+                    "last_accuracy": last_accuracy,
+                    "weighted_accuracy": weighted_accuracy,
+                }
+            )
 
         out.sort(key=lambda d: d["last_seen_at"], reverse=True)
         return out
@@ -410,9 +556,7 @@ class SqliteRepo:
         return [(int(r["label"]), r["memory_id"]) for r in cur.fetchall()]
 
     def get_meta(self, key: str) -> str | None:
-        cur = self._conn.execute(
-            "SELECT value FROM index_meta WHERE key = ?", (key,)
-        )
+        cur = self._conn.execute("SELECT value FROM index_meta WHERE key = ?", (key,))
         row = cur.fetchone()
         return row["value"] if row else None
 
