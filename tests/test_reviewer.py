@@ -415,12 +415,13 @@ def test_extract_candidates_calls_llm_with_two_messages() -> None:
     assert "submit-quiz" in msgs[1]["content"]
 
 
-def test_extract_candidates_failure_returns_empty_result() -> None:
-    """LLM call A failure must NOT propagate; return empty candidates."""
-    from unittest.mock import MagicMock
+def test_extract_candidates_failure_returns_empty_result_and_writes_op_error() -> None:
+    """LLM call A failure must NOT propagate; return empty candidates AND
+    write one op_errors row so the silent fallback is observable per spec §12.9."""
+    from unittest.mock import MagicMock, patch
 
     from src.llm.schemas import ExtractResult
-    from src.reviewer import _extract_candidates
+    from src import reviewer as rv
 
     fake_client = MagicMock()
     fake_client.chat.completions.create.side_effect = RuntimeError("LLM down")
@@ -429,6 +430,18 @@ def test_extract_candidates_failure_returns_empty_result() -> None:
         "source_event": "submit-quiz",
         "wrong_items": [], "dialogue_tail": [], "existing": [],
     }
-    out = _extract_candidates(fake_client, extract_input, model="m1")
+    with patch.object(rv.memory_client, "log_error") as le:
+        out = rv._extract_candidates(
+            fake_client, extract_input, model="m1",
+            user_id="u1", session_id="s1", correlation_id="corr-x",
+        )
     assert isinstance(out, ExtractResult)
     assert out.candidates == []
+    le.assert_called_once()
+    kwargs = le.call_args.kwargs
+    assert kwargs["op"] == "extract_candidates"
+    assert kwargs["error_class"] == "RuntimeError"
+    assert kwargs["correlation_id"] == "corr-x"
+    assert kwargs["user_id"] == "u1"
+    assert kwargs["session_id"] == "s1"
+    assert "submit-quiz" in kwargs["payload_excerpt"]

@@ -18,6 +18,7 @@ import logging
 import re
 from typing import Any
 
+from src import memory_client
 from src.llm.schemas import ExtractResult
 from src.prompts.loader import render_prompt
 
@@ -130,12 +131,18 @@ def _extract_candidates(
     extract_input: dict[str, Any],
     *,
     model: str,
+    user_id: str | None = None,
+    session_id: str | None = None,
+    correlation_id: str | None = None,
 ) -> ExtractResult:
     """LLM call A. Returns empty ExtractResult on any failure (graceful degradation).
 
     The instructor-wrapped client must support response_model kwarg; the
-    caller (Task 15) passes `get_llm_client()`. We accept the client by
+    caller (Task 15) passes ``get_llm_client()``. We accept the client by
     parameter so tests can swap in a MagicMock without monkey-patching.
+
+    Failure path writes one op_errors row tagged with ``correlation_id``
+    so the silent fallback is observable per spec §12.9.
     """
     system = render_prompt("memory_extract_system")
     user = render_prompt("memory_extract_user", **extract_input)
@@ -148,6 +155,17 @@ def _extract_candidates(
                 {"role": "user", "content": user},
             ],
         )
-    except Exception:
+    except Exception as exc:
         logger.exception("LLM call A (extract) failed")
+        memory_client.log_error(
+            source="main_app",
+            user_id=user_id,
+            session_id=session_id,
+            correlation_id=correlation_id,
+            op="extract_candidates",
+            status="unexpected",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"source_event={extract_input.get('source_event')}",
+        )
         return ExtractResult(candidates=[])
