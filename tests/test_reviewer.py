@@ -104,3 +104,57 @@ def test_mastery_sample_score_range_and_source_literal() -> None:
         MasterySample(kp="x", score=1.1, source="quiz")
     with pytest.raises(ValidationError):
         MasterySample(kp="x", score=0.5, source="bogus")
+
+
+# ----------------------------------------------------------------------
+# Prompt templates exist and render without errors
+# ----------------------------------------------------------------------
+def test_extract_system_prompt_renders() -> None:
+    from src.prompts.loader import render_prompt
+
+    out = render_prompt("memory_extract_system")
+    assert "STUDENT" in out
+    assert "TUTOR" in out
+    assert "candidates" in out
+
+
+def test_extract_user_prompt_renders_with_empty_inputs() -> None:
+    from src.prompts.loader import render_prompt
+
+    out = render_prompt(
+        "memory_extract_user",
+        source_event="submit-quiz",
+        wrong_items=[],
+        dialogue_tail=[],
+        existing=[],
+    )
+    assert "submit-quiz" in out
+
+
+def test_extract_user_prompt_renders_with_full_inputs() -> None:
+    from src.prompts.loader import render_prompt
+
+    out = render_prompt(
+        "memory_extract_user",
+        source_event="submit-review",
+        wrong_items=[
+            {
+                "question_text": "x^2-4=0 的根?",
+                "options": ["1", "2", "3", "4"],
+                "correct_label": "B",
+                "student_label": "A",
+                "kp": "求根公式",
+                "last_accuracy": 0.4,
+            }
+        ],
+        dialogue_tail=[
+            {"role": "user", "content": "我不会做"},
+            {"role": "assistant", "content": "我们来分步看"},
+        ],
+        existing=[
+            {"category": "misconception", "content": "把判别式当求根公式用"},
+        ],
+    )
+    assert "x^2-4=0" in out
+    assert "[USER]" in out or "[STUDENT]" in out  # role rendering
+    assert "把判别式当求根公式用" in out

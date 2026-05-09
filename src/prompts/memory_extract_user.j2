@@ -1,0 +1,27 @@
+## 本次 source_event: {{ source_event }}
+
+{% if wrong_items %}
+## 错题片段
+{% for w in wrong_items %}
+[STUDENT] Q: {{ w.question_text }}
+         选项: A={{ w.options[0] }} B={{ w.options[1] }} C={{ w.options[2] }} D={{ w.options[3] }}
+         正确答案: {{ w.correct_label }}, 学生答案: {{ w.student_label }}
+         所属 KP: {{ w.kp }}, 此前正确率: {{ w.last_accuracy }}
+{% endfor %}
+{% endif %}
+
+{% if dialogue_tail %}
+## 对话片段（session 内最近 10 轮）
+{% for m in dialogue_tail %}
+[{{ m.role|upper }}] {{ m.content[:300] }}
+{% endfor %}
+{% endif %}
+
+{% if existing %}
+## 该学生现有 active notes（不要重复）
+{% for n in existing %}
+- ({{ n.category }}) {{ n.content }}
+{% endfor %}
+{% endif %}
+
+请按 system 指令输出 candidates。
