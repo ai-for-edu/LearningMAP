@@ -158,3 +158,40 @@ def test_extract_user_prompt_renders_with_full_inputs() -> None:
     assert "x^2-4=0" in out
     assert "[USER]" in out or "[STUDENT]" in out  # role rendering
     assert "把判别式当求根公式用" in out
+
+
+def test_consolidate_system_prompt_renders() -> None:
+    from src.prompts.loader import render_prompt
+
+    out = render_prompt("memory_consolidate_system")
+    for action in ("ADD", "UPDATE", "DELETE", "NOOP", "REJECT"):
+        assert action in out
+
+
+def test_consolidate_user_prompt_with_neighbors() -> None:
+    from src.prompts.loader import render_prompt
+
+    out = render_prompt(
+        "memory_consolidate_user",
+        candidate={"category": "misconception", "content": "新候选"},
+        neighbors=[
+            {"id": 1, "content": "旧条目 1", "sim_score": 0.91, "age_days": 3.0},
+            {"id": 2, "content": "旧条目 2", "sim_score": 0.85, "age_days": 7.5},
+        ],
+    )
+    assert "新候选" in out
+    assert "旧条目 1" in out
+    assert "id=1" in out
+    assert "0.91" in out
+
+
+def test_consolidate_user_prompt_empty_neighbors() -> None:
+    from src.prompts.loader import render_prompt
+
+    out = render_prompt(
+        "memory_consolidate_user",
+        candidate={"category": "goal", "content": "学完二次方程"},
+        neighbors=[],
+    )
+    assert "学完二次方程" in out
+    assert "邻居：无" in out

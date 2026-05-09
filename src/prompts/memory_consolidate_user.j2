@@ -1,0 +1,14 @@
+## 候选
+({{ candidate.category }}) {{ candidate.content }}
+
+{% if neighbors %}
+## 同 category 最相似的 5 条 active 邻居
+{% for n in neighbors %}
+[id={{ n.id }}, sim={{ "%.2f"|format(n.sim_score) }}, age_days={{ "%.1f"|format(n.age_days) }}]
+  {{ n.content }}
+{% endfor %}
+{% else %}
+## 邻居：无（同 category 当前为空集）
+{% endif %}
+
+请输出一个 ConsolidationDecision JSON。
