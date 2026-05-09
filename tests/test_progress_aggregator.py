@@ -110,3 +110,26 @@ def test_extract_kp_samples_handles_non_pydantic_dicts() -> None:
     assert len(samples) == 1
     assert samples[0].kp == "公式"
     assert samples[0].score == 0.2
+
+
+# ----------------------------------------------------------------------
+# _iter_kp_results (pure, precedence)
+# ----------------------------------------------------------------------
+def test_iter_kp_results_prefers_kp_results_over_weak_strong() -> None:
+    """When both kp_results and weak_kps/strong_kps are present, kp_results wins.
+
+    Pins the precedence contract so a future refactor that flips the order
+    (e.g., merging both sources) is caught by the test suite.
+    """
+    from types import SimpleNamespace
+
+    from src.progress_aggregator import _iter_kp_results
+
+    review = SimpleNamespace(
+        kp_results=[SimpleNamespace(kp="A", accuracy=0.9)],
+        weak_kps=["B"],
+        strong_kps=["C"],
+    )
+    results = _iter_kp_results(review)
+    # Only A from kp_results — B and C must NOT appear in the fallback shape.
+    assert results == [("A", 0.9)]
