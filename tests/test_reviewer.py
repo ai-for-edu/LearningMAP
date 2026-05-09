@@ -250,3 +250,132 @@ def test_is_injection_does_not_flag_normal_content() -> None:
     assert not _is_injection("学生不会用判别式")
     assert not _is_injection("apples are sweet")
     assert not _is_injection("")
+
+
+# ----------------------------------------------------------------------
+# _collect_extract_input
+# ----------------------------------------------------------------------
+def _make_msgs(n: int) -> list[dict]:
+    return [{"role": "user" if i % 2 == 0 else "assistant",
+             "content": f"msg-{i}"} for i in range(n)]
+
+
+def test_collect_extract_input_keeps_at_most_10_dialogue_msgs() -> None:
+    from src.reviewer import _collect_extract_input
+
+    state = {"messages": _make_msgs(50)}
+    out = _collect_extract_input(state, source_event="submit-quiz",
+                                  existing_notes=[])
+    assert len(out["dialogue_tail"]) == 10
+    # Must keep the LAST 10
+    assert out["dialogue_tail"][-1]["content"] == "msg-49"
+
+
+def test_collect_extract_input_truncates_long_messages_to_300() -> None:
+    from src.reviewer import _collect_extract_input
+
+    state = {"messages": [{"role": "user", "content": "x" * 5000}]}
+    out = _collect_extract_input(state, source_event="submit-quiz",
+                                  existing_notes=[])
+    assert len(out["dialogue_tail"][0]["content"]) <= 300
+
+
+def test_collect_extract_input_picks_up_to_4_wrong_items_sorted() -> None:
+    """Wrong items sorted by (last_accuracy ASC, then index ASC), then top-4."""
+    from src.reviewer import _collect_extract_input
+
+    questions = [
+        {"id": "q1", "knowledge_point": "kp1",
+         "question": "Q1", "options": ["a", "b", "c", "d"], "answer": 0},
+        {"id": "q2", "knowledge_point": "kp2",
+         "question": "Q2", "options": ["a", "b", "c", "d"], "answer": 1},
+        {"id": "q3", "knowledge_point": "kp3",
+         "question": "Q3", "options": ["a", "b", "c", "d"], "answer": 2},
+        {"id": "q4", "knowledge_point": "kp4",
+         "question": "Q4", "options": ["a", "b", "c", "d"], "answer": 3},
+        {"id": "q5", "knowledge_point": "kp5",
+         "question": "Q5", "options": ["a", "b", "c", "d"], "answer": 0},
+    ]
+    answers = [1, 1, 1, 1, 1]  # wrong: q1, q3, q4, q5; correct: q2
+    state = {
+        "questions": questions,
+        "answers": answers,
+        # Mock per-kp last_accuracy mapping (state-side)
+        "wrong_item_last_accuracy": {
+            "kp1": 0.6, "kp3": 0.1, "kp4": 0.4, "kp5": 0.5,
+        },
+    }
+    out = _collect_extract_input(state, source_event="submit-quiz",
+                                  existing_notes=[])
+    # Top 4 by ascending last_accuracy: kp3 (0.1), kp4 (0.4), kp5 (0.5), kp1 (0.6)
+    kps = [w["kp"] for w in out["wrong_items"]]
+    assert kps == ["kp3", "kp4", "kp5", "kp1"]
+
+
+def test_collect_extract_input_truncates_question_text_to_400() -> None:
+    from src.reviewer import _collect_extract_input
+
+    state = {
+        "questions": [
+            {"id": "q1", "knowledge_point": "kp1",
+             "question": "Q" * 5000,
+             "options": ["a", "b", "c", "d"], "answer": 0},
+        ],
+        "answers": [1],
+    }
+    out = _collect_extract_input(state, source_event="submit-quiz",
+                                  existing_notes=[])
+    assert len(out["wrong_items"][0]["question_text"]) <= 400
+
+
+def test_collect_extract_input_pads_options_to_length_4() -> None:
+    """Options shorter than 4 are padded so the template can index [0..3]."""
+    from src.reviewer import _collect_extract_input
+
+    state = {
+        "questions": [
+            {"id": "q1", "knowledge_point": "kp1",
+             "question": "Q1", "options": ["a", "b"], "answer": 0},
+        ],
+        "answers": [1],
+    }
+    out = _collect_extract_input(state, source_event="submit-quiz",
+                                  existing_notes=[])
+    assert len(out["wrong_items"][0]["options"]) == 4
+    assert out["wrong_items"][0]["options"][0] == "a"
+    assert out["wrong_items"][0]["options"][1] == "b"
+    assert out["wrong_items"][0]["options"][2] == ""
+    assert out["wrong_items"][0]["options"][3] == ""
+
+
+def test_collect_extract_input_passes_existing_notes_through() -> None:
+    from src.reviewer import _collect_extract_input
+
+    notes = [
+        {"category": "misconception", "content": "x"},
+        {"category": "preference", "content": "y"},
+    ]
+    out = _collect_extract_input({}, source_event="submit-review",
+                                  existing_notes=notes)
+    assert out["existing"] == notes
+    assert out["source_event"] == "submit-review"
+
+
+def test_collect_extract_input_handles_pydantic_question_objects() -> None:
+    """Questions can be Pydantic QuizQuestion objects in non-deserialized state."""
+    from src.llm.schemas import QuizQuestion
+    from src.reviewer import _collect_extract_input
+
+    q = QuizQuestion(
+        id="q1", knowledge_point="kp1",
+        question="Q1", options=["a", "b", "c", "d"], answer=0,
+    )
+    state = {
+        "questions": [q],
+        "answers": [1],  # wrong
+        "wrong_item_last_accuracy": {"kp1": 0.5},
+    }
+    out = _collect_extract_input(state, source_event="submit-quiz",
+                                  existing_notes=[])
+    assert out["wrong_items"][0]["kp"] == "kp1"
+    assert out["wrong_items"][0]["question_text"] == "Q1"
