@@ -289,3 +289,153 @@ def test_fetch_active_notes_timeout_reports_timeout_status() -> None:
         out = memory_client.fetch_active_notes("u1", "misconception")
     assert out == []
     assert log_calls and log_calls[0]["status"] == "timeout"
+
+
+# ----------------------------------------------------------------------
+# write_note
+# ----------------------------------------------------------------------
+def test_write_note_happy_path_returns_id() -> None:
+    from src import memory_client
+
+    with patch("src.memory_client._get_client") as mk:
+        client = MagicMock()
+        client.post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"note_id": 42, "active_count_in_category": 3},
+        )
+        mk.return_value = client
+        nid = memory_client.write_note(
+            "u1", "misconception", "误把 A 当 B",
+            "s1", "submit-quiz",
+        )
+    assert nid == 42
+    body = client.post.call_args[1]["json"]
+    assert body["user_id"] == "u1"
+    assert body["category"] == "misconception"
+    assert body["content"] == "误把 A 当 B"
+    assert body["source_session_id"] == "s1"
+    assert body["source_event"] == "submit-quiz"
+
+
+def test_write_note_409_duplicate_returns_none_no_op_error() -> None:
+    """409 = race-hash-conflict; server already wrote REJECT history.
+    Client returns None and does NOT additionally log an op_error."""
+    from src import memory_client
+
+    log_calls: list[dict] = []
+    with patch("src.memory_client._get_client") as mk, \
+         patch.object(memory_client, "log_error", side_effect=lambda **kw: log_calls.append(kw)):
+        client = MagicMock()
+        client.post.return_value = MagicMock(status_code=409, text="dup")
+        mk.return_value = client
+        out = memory_client.write_note(
+            "u1", "goal", "x", "s", "submit-quiz",
+        )
+    assert out is None
+    assert log_calls == []
+
+
+def test_write_note_422_returns_none_and_logs() -> None:
+    from src import memory_client
+
+    log_calls: list[dict] = []
+    with patch("src.memory_client._get_client") as mk, \
+         patch.object(memory_client, "log_error", side_effect=lambda **kw: log_calls.append(kw)):
+        client = MagicMock()
+        client.post.return_value = MagicMock(status_code=422, text="invalid")
+        mk.return_value = client
+        out = memory_client.write_note(
+            "u1", "goal", "x", "s", "submit-quiz",
+        )
+    assert out is None
+    assert log_calls and log_calls[0]["op"] == "write_note"
+
+
+def test_write_note_5xx_returns_none_and_logs() -> None:
+    from src import memory_client
+
+    log_calls: list[dict] = []
+    with patch("src.memory_client._get_client") as mk, \
+         patch.object(memory_client, "log_error", side_effect=lambda **kw: log_calls.append(kw)):
+        client = MagicMock()
+        client.post.side_effect = httpx.ReadTimeout("slow")
+        mk.return_value = client
+        assert memory_client.write_note(
+            "u1", "goal", "x", "s", "submit-quiz",
+        ) is None
+    assert log_calls and log_calls[0]["status"] in ("timeout", "http_5xx")
+
+
+# ----------------------------------------------------------------------
+# update_note
+# ----------------------------------------------------------------------
+def test_update_note_happy_path_returns_true() -> None:
+    from src import memory_client
+
+    with patch("src.memory_client._get_client") as mk:
+        client = MagicMock()
+        client.patch.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"id": 7, "category": "preference",
+                          "content": "v2", "content_hash": "h",
+                          "created_at": 1, "updated_at": 2},
+        )
+        mk.return_value = client
+        ok = memory_client.update_note(7, "v2")
+    assert ok is True
+    assert client.patch.call_args[0][0] == "/notes/by-id/7"
+
+
+def test_update_note_404_returns_false_no_log() -> None:
+    from src import memory_client
+
+    log_calls: list[dict] = []
+    with patch("src.memory_client._get_client") as mk, \
+         patch.object(memory_client, "log_error", side_effect=lambda **kw: log_calls.append(kw)):
+        client = MagicMock()
+        client.patch.return_value = MagicMock(status_code=404)
+        mk.return_value = client
+        ok = memory_client.update_note(7, "v2")
+    assert ok is False
+    assert log_calls == []
+
+
+def test_update_note_409_returns_false() -> None:
+    from src import memory_client
+
+    with patch("src.memory_client._get_client") as mk, \
+         patch.object(memory_client, "log_error"):
+        client = MagicMock()
+        client.patch.return_value = MagicMock(status_code=409, text="conflict")
+        mk.return_value = client
+        ok = memory_client.update_note(7, "v2")
+    assert ok is False
+
+
+# ----------------------------------------------------------------------
+# archive_note
+# ----------------------------------------------------------------------
+def test_archive_note_happy_path() -> None:
+    from src import memory_client
+
+    with patch("src.memory_client._get_client") as mk:
+        client = MagicMock()
+        client.delete.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"note_id": 7, "archived": True},
+        )
+        mk.return_value = client
+        ok = memory_client.archive_note(7)
+    assert ok is True
+    assert client.delete.call_args[0][0] == "/notes/by-id/7"
+
+
+def test_archive_note_404_returns_false() -> None:
+    from src import memory_client
+
+    with patch("src.memory_client._get_client") as mk, \
+         patch.object(memory_client, "log_error"):
+        client = MagicMock()
+        client.delete.return_value = MagicMock(status_code=404)
+        mk.return_value = client
+        assert memory_client.archive_note(7) is False

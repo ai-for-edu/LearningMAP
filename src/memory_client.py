@@ -577,3 +577,164 @@ def get_note(
             payload_excerpt=f"note_id={note_id}",
         )
         return None
+
+
+def write_note(
+    user_id: str,
+    category: str,
+    content: str,
+    source_session_id: str,
+    source_event: str,
+    *,
+    correlation_id: str | None = None,
+) -> int | None:
+    """Reviewer ADD action. Returns note_id on 200, None on any failure.
+
+    409 (race-hash-conflict) is handled silently — the server already
+    wrote a REJECT history row, no point in spamming op_errors with the
+    same event.
+    """
+    body = {
+        "user_id": user_id,
+        "category": category,
+        "content": content,
+        "source_session_id": source_session_id,
+        "source_event": source_event,
+    }
+    try:
+        resp = _get_client().post("/notes", json=body)
+        if resp.status_code == 200:
+            return resp.json().get("note_id")
+        if resp.status_code == 409:
+            # Server already audited it; not an op error.
+            return None
+        log_error(
+            source="main_app", user_id=user_id, session_id=source_session_id,
+            correlation_id=correlation_id,
+            op="write_note",
+            status=f"http_{resp.status_code // 100}xx",
+            error_class="HTTPError",
+            error_msg=getattr(resp, "text", "")[:500],
+            payload_excerpt=f"category={category}",
+        )
+        return None
+    except httpx.HTTPError as exc:
+        log_error(
+            source="main_app", user_id=user_id, session_id=source_session_id,
+            correlation_id=correlation_id,
+            op="write_note",
+            status="timeout" if isinstance(exc, httpx.TimeoutException) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"category={category}",
+        )
+        return None
+    except Exception as exc:
+        log_error(
+            source="main_app", user_id=user_id, session_id=source_session_id,
+            correlation_id=correlation_id,
+            op="write_note",
+            status="unexpected",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"category={category}",
+        )
+        return None
+
+
+def update_note(
+    note_id: int,
+    content: str,
+    *,
+    correlation_id: str | None = None,
+) -> bool:
+    """Reviewer UPDATE action. True iff PATCH returned 200.
+
+    404 / 409 are silent (note vanished, hash conflict — both expected
+    edge cases the reviewer can recover from)."""
+    try:
+        resp = _get_client().patch(
+            f"/notes/by-id/{note_id}", json={"content": content},
+        )
+        if resp.status_code == 200:
+            return True
+        if resp.status_code in (404, 409):
+            return False
+        log_error(
+            source="main_app", user_id=None, session_id=None,
+            correlation_id=correlation_id,
+            op="update_note",
+            status=f"http_{resp.status_code // 100}xx",
+            error_class="HTTPError",
+            error_msg=getattr(resp, "text", "")[:500],
+            payload_excerpt=f"note_id={note_id}",
+        )
+        return False
+    except httpx.HTTPError as exc:
+        log_error(
+            source="main_app", user_id=None, session_id=None,
+            correlation_id=correlation_id,
+            op="update_note",
+            status="timeout" if isinstance(exc, httpx.TimeoutException) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"note_id={note_id}",
+        )
+        return False
+    except Exception as exc:
+        log_error(
+            source="main_app", user_id=None, session_id=None,
+            correlation_id=correlation_id,
+            op="update_note",
+            status="unexpected",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"note_id={note_id}",
+        )
+        return False
+
+
+def archive_note(
+    note_id: int,
+    *,
+    correlation_id: str | None = None,
+) -> bool:
+    """Reviewer DELETE action — soft delete, archived=1."""
+    try:
+        resp = _get_client().delete(f"/notes/by-id/{note_id}")
+        if resp.status_code == 200:
+            return True
+        if resp.status_code == 404:
+            return False
+        log_error(
+            source="main_app", user_id=None, session_id=None,
+            correlation_id=correlation_id,
+            op="archive_note",
+            status=f"http_{resp.status_code // 100}xx",
+            error_class="HTTPError",
+            error_msg=getattr(resp, "text", "")[:500],
+            payload_excerpt=f"note_id={note_id}",
+        )
+        return False
+    except httpx.HTTPError as exc:
+        log_error(
+            source="main_app", user_id=None, session_id=None,
+            correlation_id=correlation_id,
+            op="archive_note",
+            status="timeout" if isinstance(exc, httpx.TimeoutException) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"note_id={note_id}",
+        )
+        return False
+    except Exception as exc:
+        log_error(
+            source="main_app", user_id=None, session_id=None,
+            correlation_id=correlation_id,
+            op="archive_note",
+            status="unexpected",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"note_id={note_id}",
+        )
+        return False
