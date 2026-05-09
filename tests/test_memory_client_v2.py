@@ -439,3 +439,35 @@ def test_archive_note_404_returns_false() -> None:
         client.delete.return_value = MagicMock(status_code=404)
         mk.return_value = client
         assert memory_client.archive_note(7) is False
+
+
+def test_update_note_400_logs_returns_false() -> None:
+    """A non-silent 4xx (e.g. 400 bad request) is logged and returns False."""
+    from src import memory_client
+
+    log_calls: list[dict] = []
+    with patch("src.memory_client._get_client") as mk, \
+         patch.object(memory_client, "log_error", side_effect=lambda **kw: log_calls.append(kw)):
+        client = MagicMock()
+        client.patch.return_value = MagicMock(status_code=400, text="bad")
+        mk.return_value = client
+        ok = memory_client.update_note(7, "v2")
+    assert ok is False
+    assert log_calls and log_calls[0]["op"] == "update_note"
+    assert log_calls[0]["status"] == "http_4xx"
+
+
+def test_archive_note_400_logs_returns_false() -> None:
+    """A non-silent 4xx (e.g. 400 bad request) is logged and returns False."""
+    from src import memory_client
+
+    log_calls: list[dict] = []
+    with patch("src.memory_client._get_client") as mk, \
+         patch.object(memory_client, "log_error", side_effect=lambda **kw: log_calls.append(kw)):
+        client = MagicMock()
+        client.delete.return_value = MagicMock(status_code=400, text="bad")
+        mk.return_value = client
+        ok = memory_client.archive_note(7)
+    assert ok is False
+    assert log_calls and log_calls[0]["op"] == "archive_note"
+    assert log_calls[0]["status"] == "http_4xx"
