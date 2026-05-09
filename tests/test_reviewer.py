@@ -540,3 +540,164 @@ def test_consolidate_renders_user_template_with_candidate_and_neighbors() -> Non
     assert "独特的候选" in user_content
     assert "邻居 A" in user_content
     assert "id=1" in user_content
+
+
+# ----------------------------------------------------------------------
+# _apply_decision (5 action dispatch)
+# ----------------------------------------------------------------------
+def _ctx() -> dict:
+    return {
+        "user_id": "u1",
+        "session_id": "s1",
+        "source_event": "submit-quiz",
+        "correlation_id": "corr-1",
+    }
+
+
+def test_apply_decision_add_writes_note_and_history() -> None:
+    from unittest.mock import patch
+
+    from src.llm.schemas import ConsolidationDecision, FactCandidate
+    from src import reviewer as rv
+
+    cand = FactCandidate(category="misconception", content="new misconception")
+    dec = ConsolidationDecision(action="ADD", new_content="new misconception", reason="r")
+
+    with patch.object(rv.memory_client, "write_note", return_value=99) as wn, \
+         patch.object(rv.memory_client, "write_history") as wh:
+        action = rv._apply_decision(dec, cand, **_ctx())
+
+    assert action == "ADD"
+    wn.assert_called_once()
+    wh.assert_called_once()
+    assert wh.call_args.kwargs["note_id"] == 99
+    assert wh.call_args.kwargs["event"] == "ADD"
+    assert wh.call_args.kwargs["new_content"] == "new misconception"
+
+
+def test_apply_decision_add_skips_history_when_write_note_returns_none() -> None:
+    """If POST /notes returned 422 / 409, server already wrote REJECT history.
+    Client must not double-record."""
+    from unittest.mock import patch
+
+    from src.llm.schemas import ConsolidationDecision, FactCandidate
+    from src import reviewer as rv
+
+    cand = FactCandidate(category="goal", content="x")
+    dec = ConsolidationDecision(action="ADD", new_content="x", reason="r")
+
+    with patch.object(rv.memory_client, "write_note", return_value=None) as wn, \
+         patch.object(rv.memory_client, "write_history") as wh:
+        action = rv._apply_decision(dec, cand, **_ctx())
+
+    assert action == "SKIP"
+    wn.assert_called_once()
+    wh.assert_not_called()
+
+
+def test_apply_decision_update_reads_old_then_patches_then_audits() -> None:
+    from unittest.mock import patch
+
+    from src.llm.schemas import ConsolidationDecision, FactCandidate
+    from src import reviewer as rv
+
+    cand = FactCandidate(category="misconception", content="cand")
+    dec = ConsolidationDecision(action="UPDATE", target_id=7,
+                                 new_content="v2", reason="r")
+    old = {"id": 7, "content": "v1"}
+
+    with patch.object(rv.memory_client, "get_note", return_value=old), \
+         patch.object(rv.memory_client, "update_note", return_value=True) as up, \
+         patch.object(rv.memory_client, "write_history") as wh:
+        action = rv._apply_decision(dec, cand, **_ctx())
+
+    assert action == "UPDATE"
+    up.assert_called_once_with(7, "v2", correlation_id="corr-1")
+    wh.assert_called_once()
+    assert wh.call_args.kwargs["event"] == "UPDATE"
+    assert wh.call_args.kwargs["old_content"] == "v1"
+    assert wh.call_args.kwargs["new_content"] == "v2"
+
+
+def test_apply_decision_update_skips_history_when_patch_fails() -> None:
+    from unittest.mock import patch
+
+    from src.llm.schemas import ConsolidationDecision, FactCandidate
+    from src import reviewer as rv
+
+    cand = FactCandidate(category="goal", content="x")
+    dec = ConsolidationDecision(action="UPDATE", target_id=7,
+                                 new_content="v2", reason="r")
+
+    with patch.object(rv.memory_client, "get_note", return_value={"id": 7, "content": "v1"}), \
+         patch.object(rv.memory_client, "update_note", return_value=False), \
+         patch.object(rv.memory_client, "write_history") as wh:
+        action = rv._apply_decision(dec, cand, **_ctx())
+
+    assert action == "SKIP"
+    wh.assert_not_called()
+
+
+def test_apply_decision_delete_reads_old_then_archives_then_audits() -> None:
+    from unittest.mock import patch
+
+    from src.llm.schemas import ConsolidationDecision, FactCandidate
+    from src import reviewer as rv
+
+    cand = FactCandidate(category="misconception", content="cand")
+    dec = ConsolidationDecision(action="DELETE", target_id=11, reason="r")
+
+    with patch.object(rv.memory_client, "get_note", return_value={"id": 11, "content": "old"}), \
+         patch.object(rv.memory_client, "archive_note", return_value=True) as ar, \
+         patch.object(rv.memory_client, "write_history") as wh:
+        action = rv._apply_decision(dec, cand, **_ctx())
+
+    assert action == "DELETE"
+    ar.assert_called_once_with(11, correlation_id="corr-1")
+    wh.assert_called_once()
+    assert wh.call_args.kwargs["event"] == "DELETE"
+    assert wh.call_args.kwargs["old_content"] == "old"
+
+
+def test_apply_decision_noop_writes_audit_only() -> None:
+    from unittest.mock import patch
+
+    from src.llm.schemas import ConsolidationDecision, FactCandidate
+    from src import reviewer as rv
+
+    cand = FactCandidate(category="goal", content="x")
+    dec = ConsolidationDecision(action="NOOP", target_id=5, reason="r")
+
+    with patch.object(rv.memory_client, "write_history") as wh, \
+         patch.object(rv.memory_client, "write_note") as wn, \
+         patch.object(rv.memory_client, "update_note") as up, \
+         patch.object(rv.memory_client, "archive_note") as ar:
+        action = rv._apply_decision(dec, cand, **_ctx())
+
+    assert action == "NOOP"
+    wn.assert_not_called()
+    up.assert_not_called()
+    ar.assert_not_called()
+    wh.assert_called_once()
+    assert wh.call_args.kwargs["event"] == "NOOP"
+    assert wh.call_args.kwargs["note_id"] == 5
+
+
+def test_apply_decision_reject_writes_audit_with_candidate_content() -> None:
+    from unittest.mock import patch
+
+    from src.llm.schemas import ConsolidationDecision, FactCandidate
+    from src import reviewer as rv
+
+    cand = FactCandidate(category="goal", content="rejected candidate")
+    dec = ConsolidationDecision(action="REJECT", reason="r")
+
+    with patch.object(rv.memory_client, "write_history") as wh:
+        action = rv._apply_decision(dec, cand, **_ctx())
+
+    assert action == "REJECT"
+    wh.assert_called_once()
+    kw = wh.call_args.kwargs
+    assert kw["event"] == "REJECT"
+    assert kw["new_content"] == "rejected candidate"
+    assert kw["note_id"] is None

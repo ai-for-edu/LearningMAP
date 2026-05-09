@@ -239,3 +239,87 @@ def _consolidate(
         return ConsolidationDecision(
             action="REJECT", reason="llm call B failed",
         )
+
+
+def _apply_decision(
+    decision: ConsolidationDecision,
+    candidate: FactCandidate,
+    *,
+    user_id: str,
+    session_id: str,
+    source_event: str,
+    correlation_id: str,
+) -> str:
+    """Dispatch a decision to memory_client; return the action name actually
+    persisted (or 'SKIP' if a write failed and audit was suppressed).
+
+    The 'SKIP' return covers the case where ``write_note`` returns None
+    (server already audited a 422/409) or ``update_note`` returns False
+    (note vanished or hash conflict). In those cases the server has the
+    REJECT/no-op record already; client-side double-audit would create
+    dupes.
+    """
+    if decision.action == "ADD":
+        note_id = memory_client.write_note(
+            user_id, candidate.category, decision.new_content or "",
+            session_id, source_event, correlation_id=correlation_id,
+        )
+        if note_id is None:
+            return "SKIP"
+        memory_client.write_history(
+            note_id=note_id, event="ADD",
+            new_content=decision.new_content, old_content=None,
+            reason=decision.reason,
+            source_session_id=session_id, source_event=source_event,
+            correlation_id=correlation_id,
+        )
+        return "ADD"
+
+    if decision.action == "UPDATE":
+        old = memory_client.get_note(decision.target_id, correlation_id=correlation_id) or {}
+        ok = memory_client.update_note(
+            decision.target_id, decision.new_content or "",
+            correlation_id=correlation_id,
+        )
+        if not ok:
+            return "SKIP"
+        memory_client.write_history(
+            note_id=decision.target_id, event="UPDATE",
+            old_content=old.get("content"), new_content=decision.new_content,
+            reason=decision.reason,
+            source_session_id=session_id, source_event=source_event,
+            correlation_id=correlation_id,
+        )
+        return "UPDATE"
+
+    if decision.action == "DELETE":
+        old = memory_client.get_note(decision.target_id, correlation_id=correlation_id) or {}
+        memory_client.archive_note(decision.target_id, correlation_id=correlation_id)
+        memory_client.write_history(
+            note_id=decision.target_id, event="DELETE",
+            old_content=old.get("content"), new_content=None,
+            reason=decision.reason,
+            source_session_id=session_id, source_event=source_event,
+            correlation_id=correlation_id,
+        )
+        return "DELETE"
+
+    if decision.action == "NOOP":
+        memory_client.write_history(
+            note_id=decision.target_id, event="NOOP",
+            old_content=None, new_content=None,
+            reason=decision.reason,
+            source_session_id=session_id, source_event=source_event,
+            correlation_id=correlation_id,
+        )
+        return "NOOP"
+
+    # REJECT
+    memory_client.write_history(
+        note_id=None, event="REJECT",
+        old_content=None, new_content=candidate.content,
+        reason=decision.reason,
+        source_session_id=session_id, source_event=source_event,
+        correlation_id=correlation_id,
+    )
+    return "REJECT"
