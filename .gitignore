@@ -11,3 +11,5 @@ XES3G5M
 .superpowers
 .env
 test.py
+.DS_Store
+**/.DS_Store
