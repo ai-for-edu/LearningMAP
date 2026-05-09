@@ -332,3 +332,55 @@ def ingest_review_session(
             logger.error(
                 "Unexpected error in ingest_review_session", exc_info=True
             )
+
+
+# ----------------------------------------------------------------------
+# PR-2: hybrid agent memory client surface
+# ----------------------------------------------------------------------
+_FIELD_MAX = 500
+
+
+def _truncate(s: str | None, n: int = _FIELD_MAX) -> str | None:
+    if s is None:
+        return None
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+
+def log_error(
+    source: str,
+    user_id: str | None,
+    session_id: str | None,
+    correlation_id: str | None,
+    op: str,
+    status: str,
+    error_class: str | None,
+    error_msg: str | None,
+    payload_excerpt: str = "",
+) -> None:
+    """Fire-and-forget error sink. Self-protected against cascade.
+
+    All other PR-2 client functions call this on their silent-fallback
+    paths so every degraded read/write surfaces as a row in op_errors.
+    """
+    body = {
+        "source": source,
+        "user_id": user_id,
+        "session_id": session_id,
+        "correlation_id": correlation_id,
+        "op": op,
+        "status": status,
+        "error_class": error_class,
+        "error_msg": _truncate(error_msg),
+        "payload_excerpt": _truncate(payload_excerpt),
+    }
+    try:
+        _get_client().post("/errors/log", json=body, timeout=2)
+    except Exception:
+        # Cascade protection: log_error itself failing must not propagate.
+        try:
+            logger.error(
+                "memory_client.log_error failed: op=%s err_class=%s",
+                op, error_class,
+            )
+        except Exception:
+            pass  # truly nothing we can do
