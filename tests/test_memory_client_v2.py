@@ -89,3 +89,26 @@ def test_log_error_truncates_oversize_fields() -> None:
         )
     assert len(captured["body"]["error_msg"]) <= 500
     assert len(captured["body"]["payload_excerpt"]) <= 500
+
+
+def test_log_error_swallows_logger_failure() -> None:
+    """Inner try/except must catch logger.error itself raising.
+
+    Cascade protection: even if logger blows up while reporting a failed
+    POST, log_error still must not propagate.
+    """
+    from src import memory_client
+
+    with patch("src.memory_client._get_client") as mk_client, \
+         patch("src.memory_client.logger") as mk_logger:
+        client = MagicMock()
+        client.post.side_effect = RuntimeError("network")
+        mk_client.return_value = client
+        mk_logger.error.side_effect = RuntimeError("logger broken")
+
+        # Must not raise despite BOTH failures
+        memory_client.log_error(
+            source="main_app", user_id=None, session_id=None,
+            correlation_id=None, op="x", status="x",
+            error_class="X", error_msg="y",
+        )
