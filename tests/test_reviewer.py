@@ -76,6 +76,9 @@ def test_consolidation_decision_delete_needs_target_only() -> None:
     ConsolidationDecision(action="DELETE", target_id=7, reason="r")
     with pytest.raises(ValidationError):
         ConsolidationDecision(action="DELETE", reason="r")
+    # DELETE must NOT carry new_content (spec §6.5 implies, now enforced)
+    with pytest.raises(ValidationError):
+        ConsolidationDecision(action="DELETE", target_id=7, new_content="x", reason="r")
 
 
 def test_consolidation_decision_noop_needs_target() -> None:
@@ -84,6 +87,9 @@ def test_consolidation_decision_noop_needs_target() -> None:
     ConsolidationDecision(action="NOOP", target_id=7, reason="r")
     with pytest.raises(ValidationError):
         ConsolidationDecision(action="NOOP", reason="r")
+    # NOOP must NOT carry new_content
+    with pytest.raises(ValidationError):
+        ConsolidationDecision(action="NOOP", target_id=7, new_content="x", reason="r")
 
 
 def test_consolidation_decision_reject_no_target() -> None:
@@ -92,6 +98,9 @@ def test_consolidation_decision_reject_no_target() -> None:
     ConsolidationDecision(action="REJECT", reason="r")
     with pytest.raises(ValidationError):
         ConsolidationDecision(action="REJECT", target_id=7, reason="r")
+    # REJECT must NOT carry new_content
+    with pytest.raises(ValidationError):
+        ConsolidationDecision(action="REJECT", new_content="x", reason="r")
 
 
 def test_mastery_sample_score_range_and_source_literal() -> None:

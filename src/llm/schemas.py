@@ -153,6 +153,12 @@ class ConsolidationDecision(BaseModel):
             raise ValueError("NOOP requires target_id")
         if a == "REJECT" and t is not None:
             raise ValueError("REJECT must have target_id=None")
+        # Spec §6.5: new_content "ADD/UPDATE 时填" — implied None for the rest.
+        # Without this rule, a malformed LLM emitting DELETE with new_content
+        # would slip past validation and pollute the audit trail with stray
+        # content under a non-writing event.
+        if a in {"DELETE", "NOOP", "REJECT"} and n is not None:
+            raise ValueError(f"{a} requires new_content=None")
         return self
 
 
