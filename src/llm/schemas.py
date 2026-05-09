@@ -137,7 +137,7 @@ class ConsolidationDecision(BaseModel):
 
     action: ConsolidationAction
     target_id: int | None = None
-    new_content: str | None = Field(default=None, max_length=200)
+    new_content: str | None = Field(default=None, min_length=1, max_length=200)
     reason: str = Field(..., min_length=1, max_length=200)
 
     @model_validator(mode="after")

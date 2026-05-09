@@ -52,6 +52,9 @@ def test_consolidation_decision_add_must_have_new_content_no_target() -> None:
         ConsolidationDecision(action="ADD", target_id=1, new_content="x", reason="r")
     with pytest.raises(ValidationError):
         ConsolidationDecision(action="ADD", reason="r")  # missing new_content
+    # new_content="" is treated like missing — Pydantic min_length=1 rejects
+    with pytest.raises(ValidationError):
+        ConsolidationDecision(action="ADD", new_content="", reason="r")
 
 
 def test_consolidation_decision_update_needs_target_and_new_content() -> None:
@@ -62,6 +65,9 @@ def test_consolidation_decision_update_needs_target_and_new_content() -> None:
         ConsolidationDecision(action="UPDATE", new_content="x", reason="r")
     with pytest.raises(ValidationError):
         ConsolidationDecision(action="UPDATE", target_id=7, reason="r")
+    # new_content="" is rejected by the field-level min_length=1 constraint
+    with pytest.raises(ValidationError):
+        ConsolidationDecision(action="UPDATE", target_id=7, new_content="", reason="r")
 
 
 def test_consolidation_decision_delete_needs_target_only() -> None:
