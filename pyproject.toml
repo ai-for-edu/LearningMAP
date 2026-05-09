@@ -33,6 +33,10 @@ dev = [
     "ruff>=0.8.0",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["tests/manual", ".git", ".venv", "__pycache__"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*", "run*"]
