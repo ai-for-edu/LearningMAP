@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 MasteryStatus = Literal["mastered", "weak", "forgotten", "unseen"]
@@ -109,3 +109,56 @@ class ReviewResult(BaseModel):
     strong_kps: list[str]
     score: float = Field(..., ge=0.0, le=1.0)
     focus_directive: str
+
+
+# ----------------------------------------------------------------------
+# Hybrid agent memory (PR-2): reviewer & progress aggregator schemas
+# ----------------------------------------------------------------------
+NoteCategory = Literal["misconception", "preference", "style", "goal"]
+ConsolidationAction = Literal["ADD", "UPDATE", "DELETE", "NOOP", "REJECT"]
+MasterySource = Literal["quiz", "review", "lesson_completion"]
+
+
+class FactCandidate(BaseModel):
+    """One fact extracted from a learning session by LLM call A."""
+
+    category: NoteCategory
+    content: str = Field(..., min_length=1, max_length=200)
+
+
+class ExtractResult(BaseModel):
+    """Output schema for LLM call A. Hard cap of 5 — also enforced by prompt."""
+
+    candidates: list[FactCandidate] = Field(default_factory=list, max_length=5)
+
+
+class ConsolidationDecision(BaseModel):
+    """Output schema for LLM call B. Field combinations validated below."""
+
+    action: ConsolidationAction
+    target_id: int | None = None
+    new_content: str | None = Field(default=None, max_length=200)
+    reason: str = Field(..., min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def _check_action_fields(self) -> "ConsolidationDecision":
+        a, t, n = self.action, self.target_id, self.new_content
+        if a == "ADD" and (t is not None or n is None):
+            raise ValueError("ADD requires target_id=None and new_content not None")
+        if a == "UPDATE" and (t is None or n is None):
+            raise ValueError("UPDATE requires both target_id and new_content")
+        if a == "DELETE" and t is None:
+            raise ValueError("DELETE requires target_id")
+        if a == "NOOP" and t is None:
+            raise ValueError("NOOP requires target_id")
+        if a == "REJECT" and t is not None:
+            raise ValueError("REJECT must have target_id=None")
+        return self
+
+
+class MasterySample(BaseModel):
+    """One KP-level mastery measurement, written via /progress."""
+
+    kp: str = Field(..., min_length=1, max_length=200)
+    score: float = Field(..., ge=0.0, le=1.0)
+    source: MasterySource
