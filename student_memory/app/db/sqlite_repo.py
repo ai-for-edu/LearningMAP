@@ -459,6 +459,27 @@ class SqliteRepo:
             )
             return cur.rowcount == 1
 
+    def count_active_notes(self) -> int:
+        """Total active (non-archived) notes across all users/categories.
+
+        Used by startup recovery to decide whether the notes hnsw index
+        needs to be rebuilt from SQLite.
+        """
+        cur = self._conn.execute("SELECT COUNT(*) FROM notes WHERE archived = 0")
+        return int(cur.fetchone()[0])
+
+    def iter_active_notes(self) -> Iterator[tuple[int, str]]:
+        """Stream (id, content) of all active notes, ordered by id ASC.
+
+        Streaming (cursor-by-cursor) so a million-row notes table does not
+        blow up memory during a rebuild.
+        """
+        cur = self._conn.execute(
+            "SELECT id, content FROM notes WHERE archived = 0 ORDER BY id ASC"
+        )
+        for row in cur:
+            yield int(row["id"]), row["content"]
+
     def hash_exists_active(self, user_id: str, content_hash: str) -> bool:
         cur = self._conn.execute(
             "SELECT 1 FROM notes "
@@ -634,23 +655,26 @@ class SqliteRepo:
         user_id: str,
         threshold: float,
     ) -> list[MasteryRecord]:
-        """返回每个 (topic, KP) 的最新采样, 且 score < threshold."""
+        """返回每个 (topic, KP) 的最新采样, 且 score < threshold.
+
+        Tie-break by id when two samples for the same KP share a ts
+        (timestamps are second-precision, so collisions are realistic).
+        """
         cur = self._conn.execute(
             """
-            SELECT mc.*
-            FROM mastery_curve mc
-            JOIN (
-                SELECT user_id, topic, knowledge_point, MAX(ts) AS max_ts
-                FROM mastery_curve
+            WITH ranked AS (
+                SELECT mc.*,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY user_id, topic, knowledge_point
+                           ORDER BY ts DESC, id DESC
+                       ) AS rn
+                FROM mastery_curve mc
                 WHERE user_id = ?
-                GROUP BY user_id, topic, knowledge_point
-            ) latest
-              ON mc.user_id = latest.user_id
-             AND mc.topic = latest.topic
-             AND mc.knowledge_point = latest.knowledge_point
-             AND mc.ts = latest.max_ts
-            WHERE mc.score < ?
-            ORDER BY mc.score ASC
+            )
+            SELECT user_id, topic, knowledge_point, score, ts, source
+            FROM ranked
+            WHERE rn = 1 AND score < ?
+            ORDER BY score ASC
             """,
             (user_id, threshold),
         )
@@ -705,13 +729,24 @@ class SqliteRepo:
         self,
         user_id: str,
         *,
+        op: str | None = None,
+        since: int | None = None,
         limit: int = 100,
     ) -> list[ErrorRecord]:
-        cur = self._conn.execute(
-            "SELECT * FROM op_errors WHERE user_id = ? "
-            "ORDER BY ts DESC, id DESC LIMIT ?",
-            (user_id, limit),
-        )
+        """Filter pushed into SQL so older matching rows aren't lost when
+        the latest ``limit`` rows are unrelated to the requested op/since.
+        """
+        sql = "SELECT * FROM op_errors WHERE user_id = ?"
+        params: list = [user_id]
+        if op is not None:
+            sql += " AND op = ?"
+            params.append(op)
+        if since is not None:
+            sql += " AND ts >= ?"
+            params.append(since)
+        sql += " ORDER BY ts DESC, id DESC LIMIT ?"
+        params.append(limit)
+        cur = self._conn.execute(sql, params)
         return [_row_to_error(r) for r in cur.fetchall()]
 
     def list_errors_for_correlation(

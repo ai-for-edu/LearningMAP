@@ -91,6 +91,11 @@ CREATE INDEX IF NOT EXISTS idx_notes_user_active
     ON notes(user_id, category, created_at DESC) WHERE archived = 0;
 CREATE INDEX IF NOT EXISTS idx_notes_user_hash
     ON notes(user_id, content_hash) WHERE archived = 0;
+-- Race-free hash dedup: two concurrent POST /notes for the same
+-- (user, content) cannot both commit. The application catches the
+-- IntegrityError and returns 409 + REJECT history.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_user_hash_active_unique
+    ON notes(user_id, content_hash) WHERE archived = 0;
 
 -- 审计: 每个 reviewer 决策 (含 NOOP/REJECT) 都留痕 -----------------------
 CREATE TABLE IF NOT EXISTS notes_history (
@@ -158,6 +163,8 @@ CREATE INDEX IF NOT EXISTS idx_op_errors_corr
     ON op_errors(correlation_id);
 CREATE INDEX IF NOT EXISTS idx_op_errors_op_ts
     ON op_errors(op, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_op_errors_user_op_ts
+    ON op_errors(user_id, op, ts DESC);
 """
 
 

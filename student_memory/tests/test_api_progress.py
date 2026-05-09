@@ -96,3 +96,67 @@ def test_post_progress_repeated_keeps_started_at(client: TestClient) -> None:
     )
     assert r1.status_code == 200
     assert r2.status_code == 200
+
+
+def test_post_progress_abandons_after_31_days(client: TestClient) -> None:
+    """A topic with last_seen_at > 30 days ago and non-mastered curr
+    transitions to 'abandoned' on the next /progress upsert.
+
+    Seeds the row directly (last_seen_at = now - 31 days) because we
+    cannot rewind ``time.time()`` from the route layer.
+    """
+    import time
+
+    repo = client.app.state.repo
+    now = int(time.time())
+    repo.upsert_progress(
+        user_id="u_abn",
+        topic="topic_abn",
+        status="in_progress",
+        started_at=now - 60 * 86400,
+        last_seen_at=now - 31 * 86400,
+        mastery_overall=0.4,
+        last_session_id="s_old",
+    )
+
+    r = client.post(
+        "/progress",
+        json={
+            "user_id": "u_abn",
+            "topic": "topic_abn",
+            "mastery_overall": 0.4,
+            "last_session_id": "s_new",
+            "kp_samples": [],
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["new_status"] == "abandoned"
+
+
+def test_post_progress_recent_topic_is_not_abandoned(client: TestClient) -> None:
+    """Sanity: a fresh row with a recent last_seen_at must NOT be abandoned."""
+    import time
+
+    repo = client.app.state.repo
+    now = int(time.time())
+    repo.upsert_progress(
+        user_id="u_keep",
+        topic="topic_keep",
+        status="in_progress",
+        started_at=now - 5 * 86400,
+        last_seen_at=now - 5 * 86400,
+        mastery_overall=0.4,
+        last_session_id="s_recent",
+    )
+    r = client.post(
+        "/progress",
+        json={
+            "user_id": "u_keep",
+            "topic": "topic_keep",
+            "mastery_overall": 0.4,
+            "last_session_id": "s_next",
+            "kp_samples": [],
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["new_status"] == "in_progress"

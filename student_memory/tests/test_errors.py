@@ -212,6 +212,77 @@ def test_get_errors_for_user(client: TestClient) -> None:
     assert errors[0]["op"] == "x"
 
 
+def test_get_errors_for_user_op_filter_finds_matches_past_limit_window(
+    repo: SqliteRepo,
+) -> None:
+    """老 op=A 行 + 一堆新 op=B 行: 用 limit=5 + op=A 应仍能取回老的那行.
+
+    旧实现先取 latest limit=5 行 (全是 B), 再 Python 过滤 → 漏掉 A.
+    """
+    repo.log_op_error(
+        ts=1000,
+        source="main_app",
+        user_id="u1",
+        session_id="s",
+        correlation_id="cA",
+        op="A",
+        status="x",
+        error_class=None,
+        error_msg=None,
+        payload_excerpt=None,
+    )
+    for i in range(10):
+        repo.log_op_error(
+            ts=2000 + i,
+            source="main_app",
+            user_id="u1",
+            session_id="s",
+            correlation_id=f"cB{i}",
+            op="B",
+            status="x",
+            error_class=None,
+            error_msg=None,
+            payload_excerpt=None,
+        )
+    rows = repo.list_errors_for_user("u1", op="A", limit=5)
+    assert len(rows) == 1
+    assert rows[0].op == "A"
+
+
+def test_get_errors_for_user_since_filter(repo: SqliteRepo) -> None:
+    repo.log_op_error(
+        ts=1000,
+        source="main_app",
+        user_id="u1",
+        session_id="s",
+        correlation_id="old",
+        op="x",
+        status="x",
+        error_class=None,
+        error_msg=None,
+        payload_excerpt=None,
+    )
+    repo.log_op_error(
+        ts=5000,
+        source="main_app",
+        user_id="u1",
+        session_id="s",
+        correlation_id="new",
+        op="x",
+        status="x",
+        error_class=None,
+        error_msg=None,
+        payload_excerpt=None,
+    )
+    rows = repo.list_errors_for_user("u1", since=4000)
+    assert {r.correlation_id for r in rows} == {"new"}
+
+
+def test_get_errors_for_user_invalid_limit_returns_422(client: TestClient) -> None:
+    assert client.get("/errors/u1", params={"limit": 0}).status_code == 422
+    assert client.get("/errors/u1", params={"limit": 1001}).status_code == 422
+
+
 def test_get_errors_correlation_chain(client: TestClient) -> None:
     for op in ("a", "b", "c"):
         client.post(

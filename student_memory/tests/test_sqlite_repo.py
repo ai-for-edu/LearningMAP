@@ -467,3 +467,35 @@ def test_notes_category_check_constraint(tmp_sqlite_path: Path) -> None:
             )
     finally:
         repo.close()
+
+
+def test_list_weak_mastery_tiebreaks_by_id_when_ts_collides(
+    tmp_sqlite_path: Path,
+) -> None:
+    """两条同 ts 的样本: 高 id (后写入) 赢, 即使 score 不同."""
+    repo = SqliteRepo(tmp_sqlite_path)
+    try:
+        # 同一 (user, topic, kp) 在同一秒内两次写入
+        repo.add_mastery_sample(
+            user_id="u1",
+            topic="t1",
+            knowledge_point="kp1",
+            score=0.2,
+            ts=1000,
+            source="quiz",
+        )
+        repo.add_mastery_sample(
+            user_id="u1",
+            topic="t1",
+            knowledge_point="kp1",
+            score=0.4,
+            ts=1000,
+            source="quiz",
+        )
+        rows = repo.list_weak_mastery(user_id="u1", threshold=0.5)
+        # 阈值 0.5: 两条都低于阈值, 但 list_weak_mastery 应只返回最新一条
+        assert len(rows) == 1
+        # 后写入(高 id)是 score=0.4
+        assert rows[0].score == 0.4
+    finally:
+        repo.close()

@@ -36,6 +36,34 @@ def test_post_notes_creates_and_returns_id(client: TestClient) -> None:
     assert body["active_count_in_category"] == 1
 
 
+def test_post_notes_rejects_whitespace_only_content(client: TestClient) -> None:
+    r = client.post(
+        "/notes",
+        json={
+            "user_id": "u1",
+            "category": "misconception",
+            "content": "   ",
+            "source_event": "submit-quiz",
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_patch_note_rejects_whitespace_only_content(client: TestClient) -> None:
+    r = client.post(
+        "/notes",
+        json={
+            "user_id": "u1",
+            "category": "misconception",
+            "content": "real content",
+            "source_event": "submit-quiz",
+        },
+    )
+    note_id = r.json()["note_id"]
+    r2 = client.patch(f"/notes/by-id/{note_id}", json={"content": "   "})
+    assert r2.status_code == 422
+
+
 def test_post_notes_rejects_too_long_content(client: TestClient) -> None:
     r = client.post(
         "/notes",
@@ -98,6 +126,57 @@ def test_post_notes_rejects_duplicate_hash(client: TestClient) -> None:
     assert r2.status_code == 409
 
 
+def test_post_notes_duplicate_writes_reject_history(client: TestClient) -> None:
+    """Race / sequential dup is caught by the unique partial index and
+    audited as a REJECT history row with reason='race-hash-conflict'."""
+    body = {
+        "user_id": "u_race",
+        "category": "misconception",
+        "content": "race condition test content",
+        "source_session_id": "sess-race",
+        "source_event": "submit-quiz",
+    }
+    assert client.post("/notes", json=body).status_code == 200
+    assert client.post("/notes", json=body).status_code == 409
+
+    rows = client.get("/history", params={"event": "REJECT"}).json()["history"]
+    matching = [r for r in rows if r["reason"] == "race-hash-conflict"]
+    assert len(matching) >= 1
+    assert matching[0]["new_content"] == body["content"]
+
+
+def test_unique_index_enforces_hash_dedup_at_db_layer(tmp_path) -> None:
+    """Even bypassing the route's pre-check, a duplicate active hash
+    cannot land in SQLite — the unique partial index rejects it."""
+    import sqlite3 as _sqlite3
+
+    from app.db.sqlite_repo import SqliteRepo
+
+    repo = SqliteRepo(tmp_path / "race.db")
+    try:
+        repo.add_note(
+            user_id="u",
+            category="misconception",
+            content="x",
+            content_hash="h",
+            source_session_id=None,
+            source_event="submit-quiz",
+            now_ts=1,
+        )
+        with pytest.raises(_sqlite3.IntegrityError):
+            repo.add_note(
+                user_id="u",
+                category="misconception",
+                content="x",
+                content_hash="h",
+                source_session_id=None,
+                source_event="submit-quiz",
+                now_ts=2,
+            )
+    finally:
+        repo.close()
+
+
 def test_get_notes_returns_active_only_with_hash(client: TestClient) -> None:
     r1 = client.post(
         "/notes",
@@ -125,6 +204,7 @@ def test_get_note_by_id(client: TestClient) -> None:
             "user_id": "u1",
             "category": "style",
             "content": "visual learner",
+            "source_session_id": "sess-42",
             "source_event": "submit-quiz",
         },
     )
@@ -132,7 +212,31 @@ def test_get_note_by_id(client: TestClient) -> None:
 
     r2 = client.get(f"/notes/by-id/{note_id}")
     assert r2.status_code == 200
-    assert r2.json()["content"] == "visual learner"
+    body = r2.json()
+    assert body["content"] == "visual learner"
+    # Detail endpoint contract per spec §5.7
+    assert body["user_id"] == "u1"
+    assert body["archived"] is False
+    assert body["source_session_id"] == "sess-42"
+    assert body["source_event"] == "submit-quiz"
+
+
+def test_get_note_by_id_returns_archived_flag_after_delete(client: TestClient) -> None:
+    r = client.post(
+        "/notes",
+        json={
+            "user_id": "u1",
+            "category": "style",
+            "content": "visual learner",
+            "source_event": "submit-quiz",
+        },
+    )
+    note_id = r.json()["note_id"]
+    assert client.delete(f"/notes/by-id/{note_id}").status_code == 200
+
+    r2 = client.get(f"/notes/by-id/{note_id}")
+    assert r2.status_code == 200
+    assert r2.json()["archived"] is True
 
 
 def test_patch_note_updates_content_and_hash(client: TestClient) -> None:
@@ -255,6 +359,58 @@ def test_get_history_returns_recent_first(client: TestClient) -> None:
     assert len(rows) >= 2
     events_in_order = [row["event"] for row in rows[:2]]
     assert events_in_order == ["UPDATE", "ADD"]
+
+
+def test_post_history_writes_row(client: TestClient) -> None:
+    """POST /history persists a row that GET /history can read back."""
+    r = client.post(
+        "/history",
+        json={
+            "note_id": None,
+            "event": "REJECT",
+            "old_content": None,
+            "new_content": "candidate that was rejected",
+            "reason": "[corr=abc] hash conflict",
+            "source_session_id": "sess-x",
+            "source_event": "submit-review",
+        },
+    )
+    assert r.status_code == 204
+    assert r.text == ""
+
+    rows = client.get("/history", params={"event": "REJECT"}).json()["history"]
+    matching = [
+        h
+        for h in rows
+        if h["new_content"] == "candidate that was rejected"
+        and h["reason"] == "[corr=abc] hash conflict"
+    ]
+    assert len(matching) == 1
+
+
+def test_post_history_minimal_body(client: TestClient) -> None:
+    """note_id, old_content, new_content, source_* are all optional."""
+    r = client.post(
+        "/history",
+        json={"event": "NOOP", "reason": "no candidates extracted"},
+    )
+    assert r.status_code == 204
+
+
+def test_post_history_rejects_invalid_event(client: TestClient) -> None:
+    r = client.post(
+        "/history",
+        json={"event": "BOGUS", "reason": "x"},
+    )
+    assert r.status_code == 422
+
+
+def test_post_history_rejects_blank_reason(client: TestClient) -> None:
+    r = client.post(
+        "/history",
+        json={"event": "NOOP", "reason": ""},
+    )
+    assert r.status_code == 422
 
 
 def test_get_history_filter_by_event(client: TestClient) -> None:

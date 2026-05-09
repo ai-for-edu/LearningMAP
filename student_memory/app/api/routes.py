@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import sqlite3
 import time
 from typing import Literal
 
@@ -25,6 +26,7 @@ from app.api.schemas import (
     ErrorOut,
     ErrorsListResponse,
     HealthResponse,
+    HistoryCreate,
     HistoryListResponse,
     HistoryOut,
     IngestRequest,
@@ -34,6 +36,7 @@ from app.api.schemas import (
     NeighborOut,
     NeighborsResponse,
     NoteCreate,
+    NoteDetailOut,
     NoteOut,
     NotePatch,
     NotesListResponse,
@@ -285,7 +288,38 @@ def wire_app(app: FastAPI, settings: Settings) -> None:
             dimension=settings.embedding_dim,
             max_elements=10000,
         )
-        notes_index.load()
+        notes_index.load()  # graceful: corruption / missing → empty
+        # Recovery: SQLite is canonical for notes. If active notes exist
+        # but the index is empty (file was missing, corrupt, or built with
+        # a different embedding model), rebuild from SQLite.
+        active_count = app.state.repo.count_active_notes()
+        stored_notes_model = app.state.repo.get_meta("notes_embedding_model")
+        model_changed = (
+            stored_notes_model is not None
+            and stored_notes_model != settings.embedding_model
+        )
+        if active_count > 0 and (notes_index.count == 0 or model_changed):
+            if model_changed:
+                logger.warning(
+                    "notes embedding model changed from %s to %s — rebuilding "
+                    "notes hnsw index",
+                    stored_notes_model,
+                    settings.embedding_model,
+                )
+            else:
+                logger.info(
+                    "notes hnsw index empty but SQLite has %d active notes — "
+                    "rebuilding",
+                    active_count,
+                )
+            notes_index.rebuild_from(app.state.repo.iter_active_notes())
+            notes_index.save()
+        if active_count > 0 and stored_notes_model is None:
+            # First time we've populated the notes index — record the
+            # embedding model so future fingerprint checks have a baseline.
+            app.state.repo.set_meta("notes_embedding_model", settings.embedding_model)
+        elif model_changed:
+            app.state.repo.set_meta("notes_embedding_model", settings.embedding_model)
         app.state.notes_index = notes_index
 
 
@@ -305,22 +339,36 @@ def create_note(
         )
 
     chash = _content_hash(payload.content)
-    if repo.hash_exists_active(payload.user_id, chash):
+    now_ts = _now_ts()
+    try:
+        note_id = repo.add_note(
+            user_id=payload.user_id,
+            category=payload.category,
+            content=payload.content,
+            content_hash=chash,
+            source_session_id=payload.source_session_id,
+            source_event=payload.source_event,
+            now_ts=now_ts,
+        )
+    except sqlite3.IntegrityError:
+        # Unique partial index on (user_id, content_hash) WHERE archived=0
+        # caught the duplicate at commit time. Two concurrent inserts for
+        # the same content can both pass an in-Python check but only one
+        # wins here. Audit the rejected attempt and return 409.
+        repo.add_history(
+            note_id=None,
+            event="REJECT",
+            old_content=None,
+            new_content=payload.content,
+            reason="race-hash-conflict",
+            source_session_id=payload.source_session_id,
+            source_event=payload.source_event,
+            now_ts=now_ts,
+        )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="duplicate content_hash for active note",
-        )
-
-    now_ts = _now_ts()
-    note_id = repo.add_note(
-        user_id=payload.user_id,
-        category=payload.category,
-        content=payload.content,
-        content_hash=chash,
-        source_session_id=payload.source_session_id,
-        source_event=payload.source_event,
-        now_ts=now_ts,
-    )
+        ) from None
     notes_index.add(note_id=note_id, text=payload.content)
 
     active = repo.list_active_notes(
@@ -330,21 +378,25 @@ def create_note(
     return NoteWriteResult(note_id=note_id, active_count_in_category=len(active))
 
 
-@router.get("/notes/by-id/{note_id}", response_model=NoteOut)
+@router.get("/notes/by-id/{note_id}", response_model=NoteDetailOut)
 def get_note_by_id(
     note_id: int,
     repo: SqliteRepo = Depends(get_repo),
-) -> NoteOut:
+) -> NoteDetailOut:
     note = repo.get_note(note_id)
     if note is None:
         raise HTTPException(status_code=404, detail="note not found")
-    return NoteOut(
+    return NoteDetailOut(
         id=note.id,
+        user_id=note.user_id,
         category=note.category,
         content=note.content,
         content_hash=note.content_hash,
         created_at=note.created_at,
         updated_at=note.updated_at,
+        archived=bool(note.archived),
+        source_session_id=note.source_session_id,
+        source_event=note.source_event,
     )
 
 
@@ -493,10 +545,15 @@ def upsert_progress(
     now = _now_ts()
     existing = repo.get_progress(payload.user_id, payload.topic)
     started_at = existing.started_at if existing else now
+    # Pass the previous row's last_seen_at, NOT now: age_days is meant to
+    # reflect how long it has been since the topic was actually touched.
+    # Using `now` would peg age_days at 0 and make the abandoned branch
+    # in _next_status unreachable.
+    previous_seen = existing.last_seen_at if existing else now
     new_status = _next_status(
         curr=existing.status if existing else None,
         mastery=payload.mastery_overall,
-        last_seen_at=now,
+        last_seen_at=previous_seen,
         now=now,
     )
 
@@ -603,11 +660,12 @@ def errors_for_user(
     limit: int = 100,
     repo: SqliteRepo = Depends(get_repo),
 ) -> ErrorsListResponse:
-    rows = repo.list_errors_for_user(user_id, limit=limit)
-    if op:
-        rows = [r for r in rows if r.op == op]
-    if since:
-        rows = [r for r in rows if r.ts >= since]
+    if limit < 1 or limit > 1000:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="limit must be between 1 and 1000",
+        )
+    rows = repo.list_errors_for_user(user_id, op=op, since=since, limit=limit)
     return ErrorsListResponse(
         errors=[
             ErrorOut(
@@ -631,6 +689,26 @@ def errors_for_user(
 # ----------------------------------------------------------------------
 # /history
 # ----------------------------------------------------------------------
+@router.post("/history", status_code=204)
+def write_history(
+    payload: HistoryCreate,
+    repo: SqliteRepo = Depends(get_repo),
+) -> None:
+    """Reviewer-driven write of an audit row. Mirrors ``repo.add_history``
+    but exposes it over HTTP so ``memory_client.write_history(...)`` can
+    record every ADD/UPDATE/DELETE/NOOP/REJECT decision."""
+    repo.add_history(
+        note_id=payload.note_id,
+        event=payload.event,
+        old_content=payload.old_content,
+        new_content=payload.new_content,
+        reason=payload.reason,
+        source_session_id=payload.source_session_id,
+        source_event=payload.source_event,
+        now_ts=_now_ts(),
+    )
+
+
 @router.get("/history", response_model=HistoryListResponse)
 def list_history(
     event: Literal["ADD", "UPDATE", "DELETE", "NOOP", "REJECT"] | None = None,

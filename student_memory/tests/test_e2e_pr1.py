@@ -85,18 +85,23 @@ def test_full_flow_quiz_then_snapshot_then_review_decision(client: TestClient) -
     del_resp = client.delete(f"/notes/by-id/{note_a_id}")
     assert del_resp.status_code == 200
 
-    # 5. 写一条 history 记录 reviewer 的 DELETE 决策
-    repo = client.app.state.repo
-    repo.add_history(
-        note_id=note_a_id,
-        event="DELETE",
-        old_content=candidate_text,
-        new_content=None,
-        reason="[corr=test-corr-1] student corrected this misconception",
-        source_session_id="s_002",
-        source_event="submit-review",
-        now_ts=2000,
+    # 5. 写一条 history 记录 reviewer 的 DELETE 决策 — 通过 HTTP endpoint
+    hist_resp = client.post(
+        "/history",
+        json={
+            "note_id": note_a_id,
+            "event": "DELETE",
+            "old_content": candidate_text,
+            "new_content": None,
+            "reason": "[corr=test-corr-1] student corrected this misconception",
+            "source_session_id": "s_002",
+            "source_event": "submit-review",
+        },
     )
+    assert hist_resp.status_code == 204
+    # Verify it's actually persisted via the read endpoint
+    rows = client.get("/history", params={"event": "DELETE"}).json()["history"]
+    assert any(r["note_id"] == note_a_id and "test-corr-1" in r["reason"] for r in rows)
 
     # 6. 错误日志 endpoint 永远 200
     err = client.post(

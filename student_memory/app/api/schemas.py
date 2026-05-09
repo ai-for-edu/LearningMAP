@@ -8,7 +8,13 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _reject_blank_content(value: str) -> str:
+    if not value.strip():
+        raise ValueError("content must not be blank")
+    return value
 
 
 class HealthResponse(BaseModel):
@@ -118,6 +124,8 @@ class NoteCreate(BaseModel):
     source_session_id: str | None = None
     source_event: SourceEvent
 
+    _reject_blank = field_validator("content")(_reject_blank_content)
+
 
 class NoteOut(BaseModel):
     id: int
@@ -128,12 +136,28 @@ class NoteOut(BaseModel):
     updated_at: int
 
 
+class NoteDetailOut(NoteOut):
+    """`GET /notes/by-id/{note_id}` shape per spec §5.7.
+
+    Reviewer needs ``user_id`` (audit) and ``archived`` (so DELETE/UPDATE
+    callers can reason about soft-deleted notes), plus the source fields
+    that are present in the table but not in the list view.
+    """
+
+    user_id: str
+    archived: bool
+    source_session_id: str | None = None
+    source_event: str
+
+
 class NotesListResponse(BaseModel):
     notes: list[NoteOut]
 
 
 class NotePatch(BaseModel):
     content: str = Field(..., min_length=1, max_length=200)
+
+    _reject_blank = field_validator("content")(_reject_blank_content)
 
 
 class NoteWriteResult(BaseModel):
@@ -166,6 +190,22 @@ class HistoryOut(BaseModel):
 
 class HistoryListResponse(BaseModel):
     history: list[HistoryOut]
+
+
+class HistoryCreate(BaseModel):
+    """Reviewer writes history rows over HTTP for ADD/UPDATE/DELETE/NOOP/REJECT.
+
+    ``note_id`` is null for REJECT/NOOP events that don't correspond to a
+    persisted note (the candidate was rejected before any row was created).
+    """
+
+    note_id: int | None = None
+    event: Literal["ADD", "UPDATE", "DELETE", "NOOP", "REJECT"]
+    old_content: str | None = None
+    new_content: str | None = None
+    reason: str = Field(..., min_length=1, max_length=200)
+    source_session_id: str | None = None
+    source_event: SourceEvent | None = None
 
 
 # ----------------------------------------------------------------------
