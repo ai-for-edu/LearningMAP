@@ -296,21 +296,40 @@ def _apply_decision(
     correlation_id: str,
 ) -> str:
     """Dispatch a decision to memory_client; return the action name actually
-    persisted (or 'SKIP' if a write failed and audit was suppressed).
+    persisted (or 'SKIP' for the one server-audited race case).
 
-    The 'SKIP' return covers the case where ``write_note`` returns None
-    (server already audited a 422/409) or ``update_note`` returns False
-    (note vanished or hash conflict). In those cases the server has the
-    REJECT/no-op record already; client-side double-audit would create
-    dupes.
+    Per docs/reviews/2026-05-09-hybrid-memory-pr2.md fixes #5b/#5c/#5d, we
+    align with spec §12.4 ("5 actions all in notes_history") rather than
+    §6.6's per-branch sample (which silently dropped failed UPDATEs).
+    Concretely:
+
+    - ADD / write_note returns ("race_audited", None) → SKIP (server's
+      UNIQUE-index IntegrityError already wrote a REJECT row, no
+      double-audit).
+    - ADD / write_note returns ("failed", None) → write client-side REJECT
+      history (422 / 5xx / network — server has nothing).
+    - UPDATE / update_note returns False → write client-side REJECT history.
+    - DELETE → ALWAYS write history regardless of archive_note's return
+      (404 still records "intent to delete" for audit; spec §6.6's DELETE
+      sample has no if-gate).
     """
     if decision.action == "ADD":
-        note_id = memory_client.write_note(
+        status, note_id = memory_client.write_note(
             user_id, candidate.category, decision.new_content or "",
             session_id, source_event, correlation_id=correlation_id,
         )
-        if note_id is None:
+        if status == "race_audited":
             return "SKIP"
+        if status == "failed":
+            memory_client.write_history(
+                note_id=None, event="REJECT",
+                old_content=None, new_content=candidate.content,
+                reason=f"ADD write failed: {decision.reason}",
+                source_session_id=session_id, source_event=source_event,
+                correlation_id=correlation_id,
+            )
+            return "REJECT"
+        # status == "ok"
         memory_client.write_history(
             note_id=note_id, event="ADD",
             new_content=decision.new_content, old_content=None,
@@ -327,7 +346,15 @@ def _apply_decision(
             correlation_id=correlation_id,
         )
         if not ok:
-            return "SKIP"
+            # Spec §12.4 wins over §6.6's "if ok": every action audited.
+            memory_client.write_history(
+                note_id=None, event="REJECT",
+                old_content=old.get("content"), new_content=candidate.content,
+                reason=f"UPDATE write failed: {decision.reason}",
+                source_session_id=session_id, source_event=source_event,
+                correlation_id=correlation_id,
+            )
+            return "REJECT"
         memory_client.write_history(
             note_id=decision.target_id, event="UPDATE",
             old_content=old.get("content"), new_content=decision.new_content,
@@ -338,10 +365,11 @@ def _apply_decision(
         return "UPDATE"
 
     if decision.action == "DELETE":
+        # Spec §6.6: DELETE always writes history, even when archive_note
+        # returns False (note already archived). The audit row records
+        # the reviewer's intent to delete regardless.
         old = memory_client.get_note(decision.target_id, correlation_id=correlation_id) or {}
-        ok = memory_client.archive_note(decision.target_id, correlation_id=correlation_id)
-        if not ok:
-            return "SKIP"
+        memory_client.archive_note(decision.target_id, correlation_id=correlation_id)
         memory_client.write_history(
             note_id=decision.target_id, event="DELETE",
             old_content=old.get("content"), new_content=None,

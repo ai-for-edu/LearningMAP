@@ -294,7 +294,7 @@ def test_fetch_active_notes_timeout_reports_timeout_status() -> None:
 # ----------------------------------------------------------------------
 # write_note
 # ----------------------------------------------------------------------
-def test_write_note_happy_path_returns_id() -> None:
+def test_write_note_happy_path_returns_ok_and_id() -> None:
     from src import memory_client
 
     with patch("src.memory_client._get_client") as mk:
@@ -304,11 +304,11 @@ def test_write_note_happy_path_returns_id() -> None:
             json=lambda: {"note_id": 42, "active_count_in_category": 3},
         )
         mk.return_value = client
-        nid = memory_client.write_note(
+        result = memory_client.write_note(
             "u1", "misconception", "误把 A 当 B",
             "s1", "submit-quiz",
         )
-    assert nid == 42
+    assert result == ("ok", 42)
     body = client.post.call_args[1]["json"]
     assert body["user_id"] == "u1"
     assert body["category"] == "misconception"
@@ -317,9 +317,10 @@ def test_write_note_happy_path_returns_id() -> None:
     assert body["source_event"] == "submit-quiz"
 
 
-def test_write_note_409_duplicate_returns_none_no_op_error() -> None:
+def test_write_note_409_returns_race_audited_no_op_error() -> None:
     """409 = race-hash-conflict; server already wrote REJECT history.
-    Client returns None and does NOT additionally log an op_error."""
+    Discriminated as ('race_audited', None) so the reviewer can SKIP
+    without writing a duplicate client-side audit row."""
     from src import memory_client
 
     log_calls: list[dict] = []
@@ -328,14 +329,16 @@ def test_write_note_409_duplicate_returns_none_no_op_error() -> None:
         client = MagicMock()
         client.post.return_value = MagicMock(status_code=409, text="dup")
         mk.return_value = client
-        out = memory_client.write_note(
+        result = memory_client.write_note(
             "u1", "goal", "x", "s", "submit-quiz",
         )
-    assert out is None
+    assert result == ("race_audited", None)
     assert log_calls == []
 
 
-def test_write_note_422_returns_none_and_logs() -> None:
+def test_write_note_422_returns_failed_and_logs() -> None:
+    """422 is NOT server-audited (PR-1 only audits 409). Discriminated as
+    'failed' so the reviewer writes its own REJECT history per spec §12.4."""
     from src import memory_client
 
     log_calls: list[dict] = []
@@ -344,14 +347,14 @@ def test_write_note_422_returns_none_and_logs() -> None:
         client = MagicMock()
         client.post.return_value = MagicMock(status_code=422, text="invalid")
         mk.return_value = client
-        out = memory_client.write_note(
+        result = memory_client.write_note(
             "u1", "goal", "x", "s", "submit-quiz",
         )
-    assert out is None
+    assert result == ("failed", None)
     assert log_calls and log_calls[0]["op"] == "write_note"
 
 
-def test_write_note_5xx_returns_none_and_logs() -> None:
+def test_write_note_5xx_returns_failed_and_logs() -> None:
     from src import memory_client
 
     log_calls: list[dict] = []
@@ -360,9 +363,10 @@ def test_write_note_5xx_returns_none_and_logs() -> None:
         client = MagicMock()
         client.post.side_effect = httpx.ReadTimeout("slow")
         mk.return_value = client
-        assert memory_client.write_note(
+        result = memory_client.write_note(
             "u1", "goal", "x", "s", "submit-quiz",
-        ) is None
+        )
+    assert result == ("failed", None)
     assert log_calls and log_calls[0]["status"] in ("timeout", "http_5xx")
 
 

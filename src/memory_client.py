@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -579,6 +579,15 @@ def get_note(
         return None
 
 
+WriteStatus = Literal["ok", "race_audited", "failed"]
+"""Discriminated return for write_note so the reviewer can distinguish
+'server already wrote a REJECT history row' (409 race-hash-conflict, no
+client audit needed) from 'write actually failed' (422 / 5xx / network,
+client must write its own REJECT history per spec §12.4). The original
+``int | None`` shape conflated these and let decisions disappear from
+notes_history when 422 hit."""
+
+
 def write_note(
     user_id: str,
     category: str,
@@ -587,12 +596,17 @@ def write_note(
     source_event: str,
     *,
     correlation_id: str | None = None,
-) -> int | None:
-    """Reviewer ADD action. Returns note_id on 200, None on any failure.
+) -> tuple[WriteStatus, int | None]:
+    """Reviewer ADD action.
 
-    409 (race-hash-conflict) is handled silently — the server already
-    wrote a REJECT history row, no point in spamming op_errors with the
-    same event.
+    Returns:
+        ("ok", note_id)        — 200, server inserted the row
+        ("race_audited", None) — 409, server's UNIQUE partial index +
+            IntegrityError catch already wrote a REJECT history row
+            (PR-1 fix #1). Caller skips the redundant audit.
+        ("failed", None)       — anything else (422 validation,
+            5xx, timeout, unexpected). Caller must write its own
+            REJECT history so the decision survives in notes_history.
     """
     body = {
         "user_id": user_id,
@@ -604,10 +618,10 @@ def write_note(
     try:
         resp = _get_client().post("/notes", json=body)
         if resp.status_code == 200:
-            return resp.json().get("note_id")
+            return ("ok", resp.json().get("note_id"))
         if resp.status_code == 409:
             # Server already audited it; not an op error.
-            return None
+            return ("race_audited", None)
         log_error(
             source="main_app", user_id=user_id, session_id=source_session_id,
             correlation_id=correlation_id,
@@ -617,7 +631,7 @@ def write_note(
             error_msg=getattr(resp, "text", "")[:500],
             payload_excerpt=f"category={category}",
         )
-        return None
+        return ("failed", None)
     except httpx.HTTPError as exc:
         log_error(
             source="main_app", user_id=user_id, session_id=source_session_id,
@@ -628,7 +642,7 @@ def write_note(
             error_msg=str(exc)[:500],
             payload_excerpt=f"category={category}",
         )
-        return None
+        return ("failed", None)
     except Exception as exc:
         log_error(
             source="main_app", user_id=user_id, session_id=source_session_id,
@@ -639,7 +653,7 @@ def write_note(
             error_msg=str(exc)[:500],
             payload_excerpt=f"category={category}",
         )
-        return None
+        return ("failed", None)
 
 
 def update_note(

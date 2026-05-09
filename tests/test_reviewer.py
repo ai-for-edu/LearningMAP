@@ -572,7 +572,7 @@ def test_apply_decision_add_writes_note_and_history() -> None:
     cand = FactCandidate(category="misconception", content="new misconception")
     dec = ConsolidationDecision(action="ADD", new_content="new misconception", reason="r")
 
-    with patch.object(rv.memory_client, "write_note", return_value=99) as wn, \
+    with patch.object(rv.memory_client, "write_note", return_value=("ok", 99)) as wn, \
          patch.object(rv.memory_client, "write_history") as wh:
         action = rv._apply_decision(dec, cand, **_ctx())
 
@@ -584,9 +584,10 @@ def test_apply_decision_add_writes_note_and_history() -> None:
     assert wh.call_args.kwargs["new_content"] == "new misconception"
 
 
-def test_apply_decision_add_skips_history_when_write_note_returns_none() -> None:
-    """If POST /notes returned 422 / 409, server already wrote REJECT history.
-    Client must not double-record."""
+def test_apply_decision_add_skips_history_on_race_audited() -> None:
+    """('race_audited', None) means the server's UNIQUE-index IntegrityError
+    already wrote a REJECT history row (PR-1 fix #1). Client must not
+    double-record."""
     from unittest.mock import patch
 
     from src.llm.schemas import ConsolidationDecision, FactCandidate
@@ -595,13 +596,41 @@ def test_apply_decision_add_skips_history_when_write_note_returns_none() -> None
     cand = FactCandidate(category="goal", content="x")
     dec = ConsolidationDecision(action="ADD", new_content="x", reason="r")
 
-    with patch.object(rv.memory_client, "write_note", return_value=None) as wn, \
+    with patch.object(rv.memory_client, "write_note",
+                      return_value=("race_audited", None)) as wn, \
          patch.object(rv.memory_client, "write_history") as wh:
         action = rv._apply_decision(dec, cand, **_ctx())
 
     assert action == "SKIP"
     wn.assert_called_once()
     wh.assert_not_called()
+
+
+def test_apply_decision_add_writes_reject_history_on_failed() -> None:
+    """('failed', None) is 422 / 5xx / network — server has NO history row.
+    Per spec §12.4 every action must be audited; the reviewer must write
+    a client-side REJECT history so the decision survives in notes_history."""
+    from unittest.mock import patch
+
+    from src.llm.schemas import ConsolidationDecision, FactCandidate
+    from src import reviewer as rv
+
+    cand = FactCandidate(category="goal", content="rejected by server")
+    dec = ConsolidationDecision(action="ADD", new_content="x", reason="r")
+
+    with patch.object(rv.memory_client, "write_note",
+                      return_value=("failed", None)) as wn, \
+         patch.object(rv.memory_client, "write_history") as wh:
+        action = rv._apply_decision(dec, cand, **_ctx())
+
+    assert action == "REJECT"
+    wn.assert_called_once()
+    wh.assert_called_once()
+    kw = wh.call_args.kwargs
+    assert kw["event"] == "REJECT"
+    assert kw["note_id"] is None
+    assert kw["new_content"] == "rejected by server"  # candidate.content
+    assert "ADD write failed" in kw["reason"]
 
 
 def test_apply_decision_update_reads_old_then_patches_then_audits() -> None:
@@ -628,13 +657,16 @@ def test_apply_decision_update_reads_old_then_patches_then_audits() -> None:
     assert wh.call_args.kwargs["new_content"] == "v2"
 
 
-def test_apply_decision_update_skips_history_when_patch_fails() -> None:
+def test_apply_decision_update_writes_reject_history_when_patch_fails() -> None:
+    """Spec §12.4 wins over §6.6: when update_note returns False (404 / 409
+    / 5xx — none server-audited), the reviewer must write a REJECT history
+    so the decision survives in notes_history."""
     from unittest.mock import patch
 
     from src.llm.schemas import ConsolidationDecision, FactCandidate
     from src import reviewer as rv
 
-    cand = FactCandidate(category="goal", content="x")
+    cand = FactCandidate(category="goal", content="cand body")
     dec = ConsolidationDecision(action="UPDATE", target_id=7,
                                  new_content="v2", reason="r")
 
@@ -643,8 +675,14 @@ def test_apply_decision_update_skips_history_when_patch_fails() -> None:
          patch.object(rv.memory_client, "write_history") as wh:
         action = rv._apply_decision(dec, cand, **_ctx())
 
-    assert action == "SKIP"
-    wh.assert_not_called()
+    assert action == "REJECT"
+    wh.assert_called_once()
+    kw = wh.call_args.kwargs
+    assert kw["event"] == "REJECT"
+    assert kw["note_id"] is None
+    assert kw["old_content"] == "v1"  # captured for audit even on failure
+    assert kw["new_content"] == "cand body"  # candidate content
+    assert "UPDATE write failed" in kw["reason"]
 
 
 def test_apply_decision_delete_reads_old_then_archives_then_audits() -> None:
@@ -763,7 +801,7 @@ def test_run_memory_review_full_path_one_add(review_state) -> None:
          patch.object(rv, "_get_llm_client", return_value=fake_llm), \
          patch.object(rv.memory_client, "fetch_active_notes", return_value=[]) as fa, \
          patch.object(rv.memory_client, "fetch_neighbors", return_value=[]), \
-         patch.object(rv.memory_client, "write_note", return_value=99) as wn, \
+         patch.object(rv.memory_client, "write_note", return_value=("ok", 99)) as wn, \
          patch.object(rv.memory_client, "write_history") as wh:
         rv.run_memory_review("u1", "s1", review_state, "submit-quiz")
 
@@ -855,7 +893,7 @@ def test_run_memory_review_within_batch_dedup(review_state) -> None:
          patch.object(rv, "_get_llm_client", return_value=fake_llm), \
          patch.object(rv.memory_client, "fetch_active_notes", return_value=[]), \
          patch.object(rv.memory_client, "fetch_neighbors", return_value=[]), \
-         patch.object(rv.memory_client, "write_note", return_value=99), \
+         patch.object(rv.memory_client, "write_note", return_value=("ok", 99)), \
          patch.object(rv.memory_client, "write_history") as wh:
         rv.run_memory_review("u1", "s1", review_state, "submit-quiz")
 
@@ -947,17 +985,57 @@ def test_run_memory_review_skip_path_does_not_write_history(review_state) -> Non
          patch.object(rv, "_get_llm_client", return_value=fake_llm), \
          patch.object(rv.memory_client, "fetch_active_notes", return_value=[]), \
          patch.object(rv.memory_client, "fetch_neighbors", return_value=[]), \
-         patch.object(rv.memory_client, "write_note", return_value=None), \
+         patch.object(rv.memory_client, "write_note",
+                      return_value=("race_audited", None)), \
          patch.object(rv.memory_client, "write_history") as wh:
         rv.run_memory_review("u1", "s1", review_state, "submit-quiz")
 
-    # write_note returned None ⇒ _apply_decision returned SKIP, no client-side history
+    # write_note signaled the server-audited race ⇒ _apply_decision SKIP,
+    # no client-side history (server's REJECT row is the audit trail).
     wh.assert_not_called()
 
 
-def test_apply_decision_delete_skips_history_when_archive_fails() -> None:
-    """If archive_note returns False (404 / already-archived), skip the
-    client-side history write and return SKIP — mirrors UPDATE's parity."""
+def test_run_memory_review_failed_write_writes_reject_history(review_state) -> None:
+    """write_note ('failed', None) — 422 / 5xx / network — must produce
+    a client-side REJECT history per spec §12.4 (every action audited)."""
+    from unittest.mock import MagicMock, patch
+
+    from src.llm.schemas import (
+        ConsolidationDecision, ExtractResult, FactCandidate,
+    )
+    from src import reviewer as rv
+
+    extract = ExtractResult(candidates=[
+        FactCandidate(category="misconception", content="server-rejected candidate"),
+    ])
+    dec = ConsolidationDecision(action="ADD", new_content="x", reason="r")
+    fake_llm = MagicMock()
+    fake_llm.chat.completions.create.side_effect = [extract, dec]
+
+    with _patch_env_on(), \
+         patch.object(rv, "_get_llm_client", return_value=fake_llm), \
+         patch.object(rv.memory_client, "fetch_active_notes", return_value=[]), \
+         patch.object(rv.memory_client, "fetch_neighbors", return_value=[]), \
+         patch.object(rv.memory_client, "write_note",
+                      return_value=("failed", None)), \
+         patch.object(rv.memory_client, "write_history") as wh:
+        rv.run_memory_review("u1", "s1", review_state, "submit-quiz")
+
+    wh.assert_called_once()
+    kw = wh.call_args.kwargs
+    assert kw["event"] == "REJECT"
+    assert kw["new_content"] == "server-rejected candidate"
+    assert "ADD write failed" in kw["reason"]
+
+
+def test_apply_decision_delete_always_writes_history_even_on_archive_failure() -> None:
+    """Spec §6.6 explicitly always-audits DELETE — no if-gate. The earlier
+    'DELETE/SKIP parity with UPDATE' fix at commit 0bdb0a1 was a deviation
+    we've reverted: when archive_note returns False (note already
+    archived), the reviewer's intent-to-delete is still recorded so the
+    audit trail captures the decision. Asymmetry with UPDATE is deliberate
+    — UPDATE failures may legitimately mean 'we didn't write anything new'
+    while DELETE failures are always 'already gone'."""
     from unittest.mock import patch
 
     from src.llm.schemas import ConsolidationDecision, FactCandidate
@@ -971,8 +1049,11 @@ def test_apply_decision_delete_skips_history_when_archive_fails() -> None:
          patch.object(rv.memory_client, "write_history") as wh:
         action = rv._apply_decision(dec, cand, **_ctx())
 
-    assert action == "SKIP"
-    wh.assert_not_called()
+    assert action == "DELETE"
+    wh.assert_called_once()
+    kw = wh.call_args.kwargs
+    assert kw["event"] == "DELETE"
+    assert kw["old_content"] == "old"
 
 
 # ----------------------------------------------------------------------
