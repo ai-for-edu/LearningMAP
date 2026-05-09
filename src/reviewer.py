@@ -18,6 +18,9 @@ import logging
 import re
 from typing import Any
 
+from src.llm.schemas import ExtractResult
+from src.prompts.loader import render_prompt
+
 logger = logging.getLogger(__name__)
 
 
@@ -117,3 +120,34 @@ def _wrong_items_top4(state: dict[str, Any]) -> list[dict[str, Any]]:
 
     wrongs.sort(key=lambda t: (t[0], t[1]))
     return [w[2] for w in wrongs[:4]]
+
+
+# ----------------------------------------------------------------------
+# LLM call A: _extract_candidates
+# ----------------------------------------------------------------------
+def _extract_candidates(
+    client: Any,
+    extract_input: dict[str, Any],
+    *,
+    model: str,
+) -> ExtractResult:
+    """LLM call A. Returns empty ExtractResult on any failure (graceful degradation).
+
+    The instructor-wrapped client must support response_model kwarg; the
+    caller (Task 15) passes `get_llm_client()`. We accept the client by
+    parameter so tests can swap in a MagicMock without monkey-patching.
+    """
+    system = render_prompt("memory_extract_system")
+    user = render_prompt("memory_extract_user", **extract_input)
+    try:
+        return client.chat.completions.create(
+            model=model,
+            response_model=ExtractResult,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        )
+    except Exception:
+        logger.exception("LLM call A (extract) failed")
+        return ExtractResult(candidates=[])

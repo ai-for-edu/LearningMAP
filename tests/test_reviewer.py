@@ -379,3 +379,56 @@ def test_collect_extract_input_handles_pydantic_question_objects() -> None:
                                   existing_notes=[])
     assert out["wrong_items"][0]["kp"] == "kp1"
     assert out["wrong_items"][0]["question_text"] == "Q1"
+
+
+# ----------------------------------------------------------------------
+# _extract_candidates (LLM call A, mocked)
+# ----------------------------------------------------------------------
+def test_extract_candidates_calls_llm_with_two_messages() -> None:
+    from unittest.mock import MagicMock
+
+    from src.llm.schemas import ExtractResult, FactCandidate
+    from src.reviewer import _extract_candidates
+
+    extract_input = {
+        "source_event": "submit-quiz",
+        "wrong_items": [],
+        "dialogue_tail": [],
+        "existing": [],
+    }
+    expected = ExtractResult(candidates=[
+        FactCandidate(category="goal", content="学完二次方程"),
+    ])
+
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.return_value = expected
+
+    out = _extract_candidates(fake_client, extract_input, model="m1")
+    assert out is expected
+    # Must pass system + user messages
+    kwargs = fake_client.chat.completions.create.call_args.kwargs
+    assert kwargs["model"] == "m1"
+    assert kwargs["response_model"] is ExtractResult
+    msgs = kwargs["messages"]
+    assert msgs[0]["role"] == "system"
+    assert msgs[1]["role"] == "user"
+    assert "submit-quiz" in msgs[1]["content"]
+
+
+def test_extract_candidates_failure_returns_empty_result() -> None:
+    """LLM call A failure must NOT propagate; return empty candidates."""
+    from unittest.mock import MagicMock
+
+    from src.llm.schemas import ExtractResult
+    from src.reviewer import _extract_candidates
+
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.side_effect = RuntimeError("LLM down")
+
+    extract_input = {
+        "source_event": "submit-quiz",
+        "wrong_items": [], "dialogue_tail": [], "existing": [],
+    }
+    out = _extract_candidates(fake_client, extract_input, model="m1")
+    assert isinstance(out, ExtractResult)
+    assert out.candidates == []
