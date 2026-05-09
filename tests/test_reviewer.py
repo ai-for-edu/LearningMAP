@@ -964,3 +964,98 @@ def test_apply_decision_delete_skips_history_when_archive_fails() -> None:
 
     assert action == "SKIP"
     wh.assert_not_called()
+
+
+# ----------------------------------------------------------------------
+# _collect_extract_input — LangChain message normalization (Fix #1)
+# ----------------------------------------------------------------------
+def test_collect_extract_input_handles_langchain_message_objects() -> None:
+    """LearningState.messages carry real langchain_core BaseMessage subclasses
+    that have .type / .content but NOT .role. Without normalization the
+    reviewer's first call would AttributeError."""
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    from src.reviewer import _collect_extract_input
+
+    state = {
+        "messages": [
+            HumanMessage(content="我不会做"),
+            AIMessage(content="我们来分步看"),
+        ],
+    }
+    out = _collect_extract_input(
+        state, source_event="submit-quiz", existing_notes=[],
+    )
+    assert out["dialogue_tail"] == [
+        {"role": "user", "content": "我不会做"},
+        {"role": "assistant", "content": "我们来分步看"},
+    ]
+
+
+def test_collect_extract_input_handles_dict_with_type_key() -> None:
+    """JSON-rebuilt state may carry messages as dicts with 'type' instead
+    of 'role'. We map type='ai' → role='assistant', else 'user'."""
+    from src.reviewer import _collect_extract_input
+
+    state = {
+        "messages": [
+            {"type": "human", "content": "h"},
+            {"type": "ai", "content": "a"},
+        ],
+    }
+    out = _collect_extract_input(
+        state, source_event="submit-quiz", existing_notes=[],
+    )
+    assert [m["role"] for m in out["dialogue_tail"]] == ["user", "assistant"]
+
+
+# ----------------------------------------------------------------------
+# _collect_extract_input — source_event-aware wrong items (Fix #2)
+# ----------------------------------------------------------------------
+def test_collect_extract_input_submit_review_reads_review_questions() -> None:
+    """source_event='submit-review' must pull from review_questions/answers,
+    not from the original diagnostic quiz."""
+    from src.reviewer import _collect_extract_input
+
+    state = {
+        # Stale quiz fields (should be IGNORED when source_event=submit-review)
+        "questions": [
+            {"id": "q-quiz", "knowledge_point": "stale_kp",
+             "question": "stale question", "options": ["a", "b", "c", "d"],
+             "answer": 0},
+        ],
+        "answers": [1],  # wrong, but should be ignored
+        # Live review fields (should be used)
+        "review_questions": [
+            {"id": "rq1", "knowledge_point": "review_kp",
+             "question": "review question", "options": ["a", "b", "c", "d"],
+             "answer": 0},
+        ],
+        "review_answers": [2],  # wrong on the review
+    }
+    out = _collect_extract_input(
+        state, source_event="submit-review", existing_notes=[],
+    )
+    kps = [w["kp"] for w in out["wrong_items"]]
+    assert "review_kp" in kps
+    assert "stale_kp" not in kps
+
+
+def test_collect_extract_input_submit_quiz_still_reads_questions() -> None:
+    """Default (non-review) path remains unchanged: questions/answers."""
+    from src.reviewer import _collect_extract_input
+
+    state = {
+        "questions": [
+            {"id": "q1", "knowledge_point": "quiz_kp",
+             "question": "Q", "options": ["a", "b", "c", "d"],
+             "answer": 0},
+        ],
+        "answers": [1],  # wrong
+        "review_questions": [],  # empty — would yield nothing if accidentally used
+        "review_answers": [],
+    }
+    out = _collect_extract_input(
+        state, source_event="submit-quiz", existing_notes=[],
+    )
+    assert [w["kp"] for w in out["wrong_items"]] == ["quiz_kp"]

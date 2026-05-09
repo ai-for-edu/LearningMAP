@@ -72,6 +72,27 @@ def _is_injection(content: str) -> bool:
     return any(p.search(content) for p in _INJECTION_PATTERNS)
 
 
+def _message_row(m: Any) -> dict[str, str]:
+    """Normalize a state message to ``{role, content}`` regardless of shape.
+
+    LearningState extends ``langgraph.graph.MessagesState`` whose ``messages``
+    are real ``langchain_core.messages.BaseMessage`` subclasses (HumanMessage /
+    AIMessage). They expose ``.type`` (``"human"`` / ``"ai"``) and ``.content``
+    but **no** ``.role`` attribute, so a naive ``m.role`` would AttributeError
+    on the live chat path. Tests use plain ``{"role", "content"}`` dicts. Both
+    shapes (plus a dict carrying ``"type"`` from JSON-rebuilt state) are
+    handled here.
+    """
+    if isinstance(m, dict):
+        role = m.get("role") or ("assistant" if m.get("type") == "ai" else "user")
+        content = m.get("content", "")
+    else:
+        msg_type = getattr(m, "type", None)
+        role = "assistant" if msg_type == "ai" else "user"
+        content = getattr(m, "content", "")
+    return {"role": role, "content": str(content)[:300]}
+
+
 def _collect_extract_input(
     state: dict[str, Any],
     *,
@@ -85,15 +106,16 @@ def _collect_extract_input(
       - wrong_items: top 4 wrong questions sorted by (last_accuracy ASC,
         index ASC); each question_text truncated to 400 chars
       - existing: passed through (server already caps at ~120 rows)
+
+    For ``source_event="submit-review"`` the wrong-item source is
+    ``state["review_questions"]`` / ``state["review_answers"]`` (set by the
+    review-flow grading node), NOT the original diagnostic quiz — otherwise
+    the reviewer would re-extract from stale quiz data instead of the just-
+    graded review attempt.
     """
     msgs = state.get("messages") or []
-    dialogue_tail = [
-        {"role": (m["role"] if isinstance(m, dict) else m.role),
-         "content": (m["content"] if isinstance(m, dict) else m.content)[:300]}
-        for m in msgs[-10:]
-    ]
-
-    wrong_items = _wrong_items_top4(state)
+    dialogue_tail = [_message_row(m) for m in msgs[-10:]]
+    wrong_items = _wrong_items_top4(state, source_event=source_event)
 
     return {
         "source_event": source_event,
@@ -103,15 +125,21 @@ def _collect_extract_input(
     }
 
 
-def _wrong_items_top4(state: dict[str, Any]) -> list[dict[str, Any]]:
+def _wrong_items_top4(
+    state: dict[str, Any], *, source_event: str,
+) -> list[dict[str, Any]]:
     """Pick at most 4 wrong questions sorted by (last_accuracy ASC, index ASC).
 
     Tolerates both dict-shape and Pydantic-shape questions.
     Pads options to length 4 so the template can unconditionally index 0..3.
     Unknown KPs default to last_accuracy=1.0 so they sort LAST.
     """
-    questions = state.get("questions") or []
-    answers = state.get("answers") or []
+    if source_event == "submit-review":
+        questions = state.get("review_questions") or []
+        answers = state.get("review_answers") or []
+    else:
+        questions = state.get("questions") or []
+        answers = state.get("answers") or []
     last_acc_by_kp = state.get("wrong_item_last_accuracy") or {}
 
     wrongs: list[tuple[float, int, dict[str, Any]]] = []
