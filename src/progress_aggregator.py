@@ -10,8 +10,11 @@ import would be a smell. Keep it that way.
 from __future__ import annotations
 
 import logging
+import os
+import uuid
 from typing import Any
 
+from src import memory_client
 from src.llm.schemas import MasterySample
 
 logger = logging.getLogger(__name__)
@@ -95,3 +98,52 @@ def _extract_kp_samples(state: dict[str, Any]) -> list[MasterySample]:
         samples.append(MasterySample(kp=kp, score=acc, source="review"))
 
     return samples
+
+
+def _enabled() -> bool:
+    return os.getenv("ENABLE_MEMORY_REVIEW", "false").lower() == "true"
+
+
+def refresh_progress(user_id: str, session_id: str, state: dict[str, Any]) -> None:
+    """Side-band structured derivation of progress + mastery rows.
+
+    Caller (PR-3 chat.py) wraps this in `asyncio.to_thread`. Top-level
+    try/except catches anything and writes one op_error row so the bug
+    is greppable by correlation_id.
+    """
+    if not _enabled():
+        return
+
+    correlation_id = uuid.uuid4().hex
+    try:
+        topic = state.get("topic")
+        if not topic:
+            return
+
+        kp_samples = _extract_kp_samples(state)
+        if not kp_samples:
+            return
+
+        mastery_overall = sum(s.score for s in kp_samples) / len(kp_samples)
+
+        memory_client.upsert_progress(
+            user_id=user_id,
+            topic=topic,
+            mastery_overall=mastery_overall,
+            last_session_id=session_id,
+            kp_samples=[s.model_dump() for s in kp_samples],
+            correlation_id=correlation_id,
+        )
+    except Exception as exc:
+        logger.exception("refresh_progress failed")
+        memory_client.log_error(
+            source="main_app",
+            user_id=user_id,
+            session_id=session_id,
+            correlation_id=correlation_id,
+            op="refresh_progress",
+            status="unexpected",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"topic={state.get('topic')}",
+        )
