@@ -874,3 +874,73 @@ def test_run_memory_review_top_level_exception_writes_op_error(review_state) -> 
     assert kw["op"] == "run_memory_review"
     assert kw["error_class"] == "RuntimeError"
     assert kw["correlation_id"]
+
+
+def test_run_memory_review_logs_structured_line_even_on_mid_loop_exception(
+    review_state, caplog,
+) -> None:
+    """Spec §6.8: every triggered run emits one structured log line.
+
+    If a per-candidate failure propagates (e.g. memory_client.fetch_neighbors
+    raises), the finally block must still emit the line with partial counters.
+    """
+    import logging
+    from unittest.mock import MagicMock, patch
+
+    from src.llm.schemas import ExtractResult, FactCandidate
+    from src import reviewer as rv
+
+    extract = ExtractResult(candidates=[
+        FactCandidate(category="misconception", content="ok candidate"),
+    ])
+    fake_llm = MagicMock()
+    fake_llm.chat.completions.create.return_value = extract
+
+    with _patch_env_on(), \
+         patch.object(rv, "_get_llm_client", return_value=fake_llm), \
+         patch.object(rv.memory_client, "fetch_active_notes", return_value=[]), \
+         patch.object(rv.memory_client, "fetch_neighbors",
+                      side_effect=RuntimeError("network blew up")), \
+         patch.object(rv.memory_client, "log_error"), \
+         caplog.at_level(logging.INFO, logger="src.reviewer"):
+        rv.run_memory_review("u1", "s1", review_state, "submit-quiz")
+
+    # The structured log line must appear despite the mid-loop exception
+    matching = [
+        r for r in caplog.records
+        if "memory_review corr=" in r.getMessage()
+    ]
+    assert matching, "expected one 'memory_review corr=' INFO line"
+    msg = matching[0].getMessage()
+    # Partial counters: extract=1, no rejects/adds, but the line MUST still fire
+    assert "extract=1" in msg
+    assert "skip=" in msg
+
+
+def test_run_memory_review_skip_path_does_not_write_history(review_state) -> None:
+    """SKIP from _apply_decision (e.g. write_note returned None) means
+    server-side already audited; orchestrator must not double-write history."""
+    from unittest.mock import MagicMock, patch
+
+    from src.llm.schemas import (
+        ConsolidationDecision, ExtractResult, FactCandidate,
+    )
+    from src import reviewer as rv
+
+    extract = ExtractResult(candidates=[
+        FactCandidate(category="misconception", content="conflict candidate"),
+    ])
+    dec = ConsolidationDecision(action="ADD", new_content="conflict candidate", reason="r")
+    fake_llm = MagicMock()
+    fake_llm.chat.completions.create.side_effect = [extract, dec]
+
+    with _patch_env_on(), \
+         patch.object(rv, "_get_llm_client", return_value=fake_llm), \
+         patch.object(rv.memory_client, "fetch_active_notes", return_value=[]), \
+         patch.object(rv.memory_client, "fetch_neighbors", return_value=[]), \
+         patch.object(rv.memory_client, "write_note", return_value=None), \
+         patch.object(rv.memory_client, "write_history") as wh:
+        rv.run_memory_review("u1", "s1", review_state, "submit-quiz")
+
+    # write_note returned None ⇒ _apply_decision returned SKIP, no client-side history
+    wh.assert_not_called()

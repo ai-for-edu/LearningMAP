@@ -383,86 +383,100 @@ def _do_review(
     correlation_id: str,
     started_at: float,
 ) -> None:
-    client = _get_llm_client()
-    model = get_reviewer_model_name()
+    counters = {
+        "hash_reject": 0,
+        "inj_reject": 0,
+        "ADD": 0,
+        "UPDATE": 0,
+        "DELETE": 0,
+        "NOOP": 0,
+        "REJECT": 0,
+        "SKIP": 0,
+    }
+    candidates_seen = 0
 
-    # Seed hash-dedup set: pull all 4 categories' active notes (≤ 120 rows total)
-    existing_by_cat: dict[NoteCategory, list[dict[str, Any]]] = {}
-    existing_hashes: set[str] = set()
-    for cat in _CATEGORIES:
-        rows = memory_client.fetch_active_notes(user_id, cat, correlation_id=correlation_id)
-        existing_by_cat[cat] = rows
-        for r in rows:
-            h = r.get("content_hash")
-            if h:
-                existing_hashes.add(h)
+    try:
+        client = _get_llm_client()
+        model = get_reviewer_model_name()
 
-    flat_existing = [
-        {"category": cat, "content": r["content"]}
-        for cat, rows in existing_by_cat.items()
-        for r in rows
-    ]
-    extract_input = _collect_extract_input(
-        state, source_event=source_event, existing_notes=flat_existing,
-    )
-    extract = _extract_candidates(
-        client, extract_input, model=model,
-        user_id=user_id, session_id=session_id, correlation_id=correlation_id,
-    )
-
-    counters = {"hash_reject": 0, "inj_reject": 0,
-                "ADD": 0, "UPDATE": 0, "DELETE": 0, "NOOP": 0, "REJECT": 0,
-                "SKIP": 0}
-
-    for candidate in extract.candidates:
-        h = _hash(candidate.content)
-        if h in existing_hashes:
-            memory_client.write_history(
-                note_id=None, event="REJECT",
-                new_content=candidate.content, old_content=None,
-                reason="hash duplicate",
-                source_session_id=session_id, source_event=source_event,
-                correlation_id=correlation_id,
+        # Seed hash-dedup set: pull all 4 categories' active notes (≤ 120 rows total)
+        existing_by_cat: dict[NoteCategory, list[dict[str, Any]]] = {}
+        existing_hashes: set[str] = set()
+        for cat in _CATEGORIES:
+            rows = memory_client.fetch_active_notes(
+                user_id, cat, correlation_id=correlation_id,
             )
-            counters["hash_reject"] += 1
-            continue
+            existing_by_cat[cat] = rows
+            for r in rows:
+                h = r.get("content_hash")
+                if h:
+                    existing_hashes.add(h)
 
-        if _is_injection(candidate.content):
-            memory_client.write_history(
-                note_id=None, event="REJECT",
-                new_content=candidate.content, old_content=None,
-                reason="injection pattern",
-                source_session_id=session_id, source_event=source_event,
-                correlation_id=correlation_id,
-            )
-            counters["inj_reject"] += 1
-            continue
-
-        neighbors = memory_client.fetch_neighbors(
-            user_id, candidate.category, candidate.content,
-            top_k=5, correlation_id=correlation_id,
+        flat_existing = [
+            {"category": cat, "content": r["content"]}
+            for cat, rows in existing_by_cat.items()
+            for r in rows
+        ]
+        extract_input = _collect_extract_input(
+            state, source_event=source_event, existing_notes=flat_existing,
         )
-        decision = _consolidate(
-            client, candidate, neighbors=neighbors, model=model,
+
+        extract = _extract_candidates(
+            client, extract_input, model=model,
             user_id=user_id, session_id=session_id, correlation_id=correlation_id,
         )
-        action = _apply_decision(
-            decision, candidate,
-            user_id=user_id, session_id=session_id,
-            source_event=source_event, correlation_id=correlation_id,
+        candidates_seen = len(extract.candidates)
+
+        for candidate in extract.candidates:
+            h = _hash(candidate.content)
+            if h in existing_hashes:
+                memory_client.write_history(
+                    note_id=None, event="REJECT",
+                    new_content=candidate.content, old_content=None,
+                    reason="hash duplicate",
+                    source_session_id=session_id, source_event=source_event,
+                    correlation_id=correlation_id,
+                )
+                counters["hash_reject"] += 1
+                continue
+
+            if _is_injection(candidate.content):
+                memory_client.write_history(
+                    note_id=None, event="REJECT",
+                    new_content=candidate.content, old_content=None,
+                    reason="injection pattern",
+                    source_session_id=session_id, source_event=source_event,
+                    correlation_id=correlation_id,
+                )
+                counters["inj_reject"] += 1
+                continue
+
+            neighbors = memory_client.fetch_neighbors(
+                user_id, candidate.category, candidate.content,
+                top_k=5, correlation_id=correlation_id,
+            )
+            decision = _consolidate(
+                client, candidate, neighbors=neighbors, model=model,
+                user_id=user_id, session_id=session_id, correlation_id=correlation_id,
+            )
+            action = _apply_decision(
+                decision, candidate,
+                user_id=user_id, session_id=session_id,
+                source_event=source_event, correlation_id=correlation_id,
+            )
+            counters[action] = counters.get(action, 0) + 1
+
+            # Within-batch dedup: a successful ADD seeds the next iteration
+            if action == "ADD":
+                existing_hashes.add(h)
+    finally:
+        duration_ms = int((time.time() - started_at) * 1000)
+        logger.info(
+            "memory_review corr=%s session=%s event=%s extract=%d hash_reject=%d "
+            "inj_reject=%d add=%d update=%d delete=%d noop=%d reject=%d skip=%d "
+            "duration_ms=%d",
+            correlation_id, session_id, source_event,
+            candidates_seen, counters["hash_reject"], counters["inj_reject"],
+            counters["ADD"], counters["UPDATE"], counters["DELETE"],
+            counters["NOOP"], counters["REJECT"], counters["SKIP"], duration_ms,
         )
-        counters[action] = counters.get(action, 0) + 1
-
-        # Within-batch dedup: a successful ADD seeds the next iteration's set
-        if action == "ADD":
-            existing_hashes.add(h)
-
-    duration_ms = int((time.time() - started_at) * 1000)
-    logger.info(
-        "memory_review corr=%s session=%s event=%s extract=%d hash_reject=%d "
-        "inj_reject=%d add=%d update=%d delete=%d noop=%d reject=%d duration_ms=%d",
-        correlation_id, session_id, source_event,
-        len(extract.candidates), counters["hash_reject"], counters["inj_reject"],
-        counters["ADD"], counters["UPDATE"], counters["DELETE"],
-        counters["NOOP"], counters["REJECT"], duration_ms,
-    )
