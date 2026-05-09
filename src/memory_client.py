@@ -813,7 +813,13 @@ def upsert_progress(
     *,
     correlation_id: str | None = None,
 ) -> None:
-    """progress aggregator entry point. Failure is silent."""
+    """POST /progress to upsert a topic's mastery row.
+
+    The caller passes kp_samples in the shape the server expects
+    (list of dicts with `kp`, `score`, `source` keys; see the spec at
+    docs/superpowers/specs/2026-05-08-hybrid-agent-memory-design.md §5.4).
+    Failure is silent — function always returns None.
+    """
     body = {
         "user_id": user_id,
         "topic": topic,

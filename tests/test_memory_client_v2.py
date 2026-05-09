@@ -596,3 +596,27 @@ def test_upsert_progress_failure_silent_and_logs() -> None:
             last_session_id="s", kp_samples=[],
         )
     assert log_calls and log_calls[0]["op"] == "upsert_progress"
+
+
+def test_write_history_preserves_prefix_after_truncation() -> None:
+    """When reason + correlation prefix exceeds 200 chars, the prefix
+    must remain intact at the start (the message body gets cut, not
+    the prefix). This pins the audit-join contract: every prefixed
+    reason starts with `[corr=<id>] ` regardless of length."""
+    from src import memory_client
+
+    with patch("src.memory_client._get_client") as mk:
+        client = MagicMock()
+        client.post.return_value = MagicMock(status_code=204, text="")
+        mk.return_value = client
+        long_reason = "x" * 195
+        memory_client.write_history(
+            note_id=1, event="ADD",
+            new_content="y", old_content=None,
+            reason=long_reason,
+            source_session_id="s", source_event="submit-quiz",
+            correlation_id="corr-id",
+        )
+    sent_reason = client.post.call_args[1]["json"]["reason"]
+    assert len(sent_reason) == 200
+    assert sent_reason.startswith("[corr=corr-id]")
