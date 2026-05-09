@@ -944,3 +944,23 @@ def test_run_memory_review_skip_path_does_not_write_history(review_state) -> Non
 
     # write_note returned None ⇒ _apply_decision returned SKIP, no client-side history
     wh.assert_not_called()
+
+
+def test_apply_decision_delete_skips_history_when_archive_fails() -> None:
+    """If archive_note returns False (404 / already-archived), skip the
+    client-side history write and return SKIP — mirrors UPDATE's parity."""
+    from unittest.mock import patch
+
+    from src.llm.schemas import ConsolidationDecision, FactCandidate
+    from src import reviewer as rv
+
+    cand = FactCandidate(category="goal", content="x")
+    dec = ConsolidationDecision(action="DELETE", target_id=11, reason="r")
+
+    with patch.object(rv.memory_client, "get_note", return_value={"id": 11, "content": "old"}), \
+         patch.object(rv.memory_client, "archive_note", return_value=False), \
+         patch.object(rv.memory_client, "write_history") as wh:
+        action = rv._apply_decision(dec, cand, **_ctx())
+
+    assert action == "SKIP"
+    wh.assert_not_called()

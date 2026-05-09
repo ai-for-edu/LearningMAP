@@ -311,7 +311,9 @@ def _apply_decision(
 
     if decision.action == "DELETE":
         old = memory_client.get_note(decision.target_id, correlation_id=correlation_id) or {}
-        memory_client.archive_note(decision.target_id, correlation_id=correlation_id)
+        ok = memory_client.archive_note(decision.target_id, correlation_id=correlation_id)
+        if not ok:
+            return "SKIP"
         memory_client.write_history(
             note_id=decision.target_id, event="DELETE",
             old_content=old.get("content"), new_content=None,

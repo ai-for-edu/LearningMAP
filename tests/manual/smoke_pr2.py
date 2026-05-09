@@ -56,6 +56,43 @@ def _row_counts() -> dict[str, int]:
     return out
 
 
+def _recent_correlation_ids(session_id: str, *, since_ts: int) -> dict[str, list[str]]:
+    """Pull correlation_ids from history.reason and op_errors for the given
+    session_id since `since_ts`. Useful for ops grep without prior knowledge.
+    """
+    if not _DB.exists():
+        return {"history": [], "op_errors": []}
+    conn = sqlite3.connect(str(_DB))
+    history_corrs: list[str] = []
+    op_error_corrs: list[str] = []
+    try:
+        rows = conn.execute(
+            "SELECT reason FROM notes_history "
+            "WHERE source_session_id = ? AND ts >= ? "
+            "ORDER BY id DESC LIMIT 20",
+            (session_id, since_ts),
+        ).fetchall()
+        for (reason,) in rows:
+            if reason and reason.startswith("[corr="):
+                end = reason.find("]")
+                if end > 6:
+                    history_corrs.append(reason[6:end])
+        rows = conn.execute(
+            "SELECT correlation_id FROM op_errors "
+            "WHERE session_id = ? AND ts >= ? AND correlation_id IS NOT NULL "
+            "ORDER BY id DESC LIMIT 20",
+            (session_id, since_ts),
+        ).fetchall()
+        op_error_corrs = [r[0] for r in rows]
+    except sqlite3.OperationalError:
+        pass
+    conn.close()
+    return {
+        "history": sorted(set(history_corrs)),
+        "op_errors": sorted(set(op_error_corrs)),
+    }
+
+
 def main() -> int:
     if os.getenv("ENABLE_MEMORY_REVIEW", "false").lower() != "true":
         print("FAIL: set ENABLE_MEMORY_REVIEW=true before running")
@@ -113,6 +150,10 @@ def main() -> int:
 
     deltas = {k: after.get(k, 0) - before.get(k, 0) for k in after}
     print(f"deltas: {deltas}")
+
+    corrs = _recent_correlation_ids(session_id, since_ts=int(time.time()) - 60)
+    print(f"correlation_ids (notes_history): {corrs['history']}")
+    print(f"correlation_ids (op_errors):     {corrs['op_errors']}")
 
     fails: list[str] = []
     if deltas.get("progress_snapshots", 0) < 1:
