@@ -445,3 +445,98 @@ def test_extract_candidates_failure_returns_empty_result_and_writes_op_error() -
     assert kwargs["user_id"] == "u1"
     assert kwargs["session_id"] == "s1"
     assert "submit-quiz" in kwargs["payload_excerpt"]
+
+
+# ----------------------------------------------------------------------
+# _consolidate (LLM call B, mocked)
+# ----------------------------------------------------------------------
+def test_consolidate_returns_decision_on_success() -> None:
+    from unittest.mock import MagicMock
+
+    from src.llm.schemas import ConsolidationDecision, FactCandidate
+    from src.reviewer import _consolidate
+
+    expected = ConsolidationDecision(action="ADD", new_content="x", reason="r")
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.return_value = expected
+
+    cand = FactCandidate(category="goal", content="x")
+    decision = _consolidate(fake_client, cand, neighbors=[], model="m")
+    assert decision is expected
+
+
+def test_consolidate_falls_back_to_reject_on_llm_failure_and_logs_op_error() -> None:
+    """LLM call B failure → REJECT('llm call B failed') + op_error per §12.9."""
+    from unittest.mock import MagicMock, patch
+
+    from src.llm.schemas import FactCandidate
+    from src import reviewer as rv
+
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.side_effect = RuntimeError("oops")
+    cand = FactCandidate(category="goal", content="x")
+    with patch.object(rv.memory_client, "log_error") as le:
+        decision = rv._consolidate(
+            fake_client, cand, neighbors=[], model="m",
+            user_id="u1", session_id="s1", correlation_id="corr-y",
+        )
+    assert decision.action == "REJECT"
+    assert "llm" in decision.reason.lower()
+    le.assert_called_once()
+    kwargs = le.call_args.kwargs
+    assert kwargs["op"] == "consolidate"
+    assert kwargs["error_class"] == "RuntimeError"
+    assert kwargs["correlation_id"] == "corr-y"
+
+
+def test_consolidate_falls_back_to_reject_on_invalid_decision_schema() -> None:
+    """If LLM returned a Decision that fails @model_validator (instructor
+    surfaces as ValidationError), map to REJECT('invalid decision schema').
+    Op_error is also written, with status that differs from a generic failure."""
+    from unittest.mock import MagicMock, patch
+
+    from pydantic import ValidationError
+
+    from src.llm.schemas import FactCandidate
+    from src import reviewer as rv
+
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.side_effect = ValidationError.from_exception_data(
+        "ConsolidationDecision", []
+    )
+    cand = FactCandidate(category="goal", content="x")
+    with patch.object(rv.memory_client, "log_error") as le:
+        decision = rv._consolidate(
+            fake_client, cand, neighbors=[], model="m",
+            user_id="u1", session_id="s1", correlation_id="corr-z",
+        )
+    assert decision.action == "REJECT"
+    assert "schema" in decision.reason.lower() or "invalid" in decision.reason.lower()
+    le.assert_called_once()
+    assert le.call_args.kwargs["op"] == "consolidate"
+    assert le.call_args.kwargs["status"] == "schema_invalid"
+
+
+def test_consolidate_renders_user_template_with_candidate_and_neighbors() -> None:
+    """Verify the user prompt includes the candidate content + each neighbor."""
+    from unittest.mock import MagicMock
+
+    from src.llm.schemas import ConsolidationDecision, FactCandidate
+    from src.reviewer import _consolidate
+
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.return_value = ConsolidationDecision(
+        action="NOOP", target_id=1, reason="r",
+    )
+    cand = FactCandidate(category="misconception", content="独特的候选")
+    neighbors = [
+        {"id": 1, "content": "邻居 A", "sim_score": 0.9, "age_days": 2.0},
+    ]
+    _consolidate(fake_client, cand, neighbors=neighbors, model="m")
+    msgs = fake_client.chat.completions.create.call_args.kwargs["messages"]
+    assert msgs[0]["role"] == "system"
+    assert msgs[1]["role"] == "user"
+    user_content = msgs[1]["content"]
+    assert "独特的候选" in user_content
+    assert "邻居 A" in user_content
+    assert "id=1" in user_content

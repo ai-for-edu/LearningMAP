@@ -18,8 +18,10 @@ import logging
 import re
 from typing import Any
 
+from pydantic import ValidationError as _PydValidationError
+
 from src import memory_client
-from src.llm.schemas import ExtractResult
+from src.llm.schemas import ConsolidationDecision, ExtractResult, FactCandidate
 from src.prompts.loader import render_prompt
 
 logger = logging.getLogger(__name__)
@@ -169,3 +171,71 @@ def _extract_candidates(
             payload_excerpt=f"source_event={extract_input.get('source_event')}",
         )
         return ExtractResult(candidates=[])
+
+
+def _consolidate(
+    client: Any,
+    candidate: FactCandidate,
+    *,
+    neighbors: list[dict[str, Any]],
+    model: str,
+    user_id: str | None = None,
+    session_id: str | None = None,
+    correlation_id: str | None = None,
+) -> ConsolidationDecision:
+    """LLM call B. Hard upper bound = once per candidate.
+
+    Failure modes mapped to REJECT (never raise):
+      - LLM raised pydantic ValidationError (Decision failed @model_validator)
+        → REJECT('invalid decision schema'), op_error status='schema_invalid'
+      - Any other exception → REJECT('llm call B failed'),
+        op_error status='unexpected'
+    Both write a single op_errors row per spec §12.9.
+    """
+    system = render_prompt("memory_consolidate_system")
+    user = render_prompt(
+        "memory_consolidate_user",
+        candidate={"category": candidate.category, "content": candidate.content},
+        neighbors=neighbors,
+    )
+    try:
+        return client.chat.completions.create(
+            model=model,
+            response_model=ConsolidationDecision,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        )
+    except _PydValidationError as exc:
+        logger.warning("LLM call B returned invalid decision schema; rejecting")
+        memory_client.log_error(
+            source="main_app",
+            user_id=user_id,
+            session_id=session_id,
+            correlation_id=correlation_id,
+            op="consolidate",
+            status="schema_invalid",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"category={candidate.category}",
+        )
+        return ConsolidationDecision(
+            action="REJECT", reason="invalid decision schema",
+        )
+    except Exception as exc:
+        logger.exception("LLM call B (consolidate) failed")
+        memory_client.log_error(
+            source="main_app",
+            user_id=user_id,
+            session_id=session_id,
+            correlation_id=correlation_id,
+            op="consolidate",
+            status="unexpected",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"category={candidate.category}",
+        )
+        return ConsolidationDecision(
+            action="REJECT", reason="llm call B failed",
+        )
