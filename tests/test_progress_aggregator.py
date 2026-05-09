@@ -208,6 +208,7 @@ def test_refresh_progress_noop_when_no_topic() -> None:
          patch.dict("os.environ", {"ENABLE_MEMORY_REVIEW": "true"}):
         progress_aggregator.refresh_progress("u1", "s1", {})
     mc.upsert_progress.assert_not_called()
+    mc.log_error.assert_not_called()
 
 
 def test_refresh_progress_noop_when_no_kp_samples() -> None:
@@ -220,6 +221,7 @@ def test_refresh_progress_noop_when_no_kp_samples() -> None:
          patch.dict("os.environ", {"ENABLE_MEMORY_REVIEW": "true"}):
         progress_aggregator.refresh_progress("u1", "s1", state)
     mc.upsert_progress.assert_not_called()
+    mc.log_error.assert_not_called()
 
 
 def test_refresh_progress_swallows_exceptions_and_logs_op_error() -> None:
