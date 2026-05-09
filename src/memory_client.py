@@ -453,12 +453,23 @@ def fetch_active_notes(
             )
             return []
         return resp.json().get("notes", []) or []
+    except httpx.HTTPError as exc:
+        log_error(
+            source="main_app", user_id=user_id, session_id=None,
+            correlation_id=correlation_id,
+            op="fetch_active_notes",
+            status="timeout" if isinstance(exc, httpx.TimeoutException) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"category={category}",
+        )
+        return []
     except Exception as exc:
         log_error(
             source="main_app", user_id=user_id, session_id=None,
             correlation_id=correlation_id,
             op="fetch_active_notes",
-            status="unexpected" if not isinstance(exc, httpx.HTTPError) else "http_5xx",
+            status="unexpected",
             error_class=type(exc).__name__,
             error_msg=str(exc)[:500],
             payload_excerpt=f"category={category}",
@@ -495,12 +506,23 @@ def fetch_neighbors(
             )
             return []
         return resp.json().get("neighbors", []) or []
+    except httpx.HTTPError as exc:
+        log_error(
+            source="main_app", user_id=user_id, session_id=None,
+            correlation_id=correlation_id,
+            op="fetch_neighbors",
+            status="timeout" if isinstance(exc, httpx.TimeoutException) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"category={category}",
+        )
+        return []
     except Exception as exc:
         log_error(
             source="main_app", user_id=user_id, session_id=None,
             correlation_id=correlation_id,
             op="fetch_neighbors",
-            status="unexpected" if not isinstance(exc, httpx.HTTPError) else "http_5xx",
+            status="unexpected",
             error_class=type(exc).__name__,
             error_msg=str(exc)[:500],
             payload_excerpt=f"category={category}",
@@ -533,12 +555,23 @@ def get_note(
             )
             return None
         return resp.json()
+    except httpx.HTTPError as exc:
+        log_error(
+            source="main_app", user_id=None, session_id=None,
+            correlation_id=correlation_id,
+            op="get_note",
+            status="timeout" if isinstance(exc, httpx.TimeoutException) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"note_id={note_id}",
+        )
+        return None
     except Exception as exc:
         log_error(
             source="main_app", user_id=None, session_id=None,
             correlation_id=correlation_id,
             op="get_note",
-            status="unexpected" if not isinstance(exc, httpx.HTTPError) else "http_5xx",
+            status="unexpected",
             error_class=type(exc).__name__,
             error_msg=str(exc)[:500],
             payload_excerpt=f"note_id={note_id}",

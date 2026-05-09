@@ -274,3 +274,18 @@ def test_get_note_5xx_returns_none_and_logs() -> None:
         mk.return_value = client
         assert memory_client.get_note(7) is None
     assert log_calls and log_calls[0]["op"] == "get_note"
+
+
+def test_fetch_active_notes_timeout_reports_timeout_status() -> None:
+    """Timeout must be distinguishable from generic 5xx for ops triage."""
+    from src import memory_client
+
+    log_calls: list[dict] = []
+    with patch("src.memory_client._get_client") as mk, \
+         patch.object(memory_client, "log_error", side_effect=lambda **kw: log_calls.append(kw)):
+        client = MagicMock()
+        client.get.side_effect = httpx.ReadTimeout("slow")
+        mk.return_value = client
+        out = memory_client.fetch_active_notes("u1", "misconception")
+    assert out == []
+    assert log_calls and log_calls[0]["status"] == "timeout"
