@@ -471,3 +471,128 @@ def test_archive_note_400_logs_returns_false() -> None:
     assert ok is False
     assert log_calls and log_calls[0]["op"] == "archive_note"
     assert log_calls[0]["status"] == "http_4xx"
+
+
+# ----------------------------------------------------------------------
+# write_history (correlation_id auto-prefix)
+# ----------------------------------------------------------------------
+def test_write_history_happy_path() -> None:
+    from src import memory_client
+
+    with patch("src.memory_client._get_client") as mk:
+        client = MagicMock()
+        client.post.return_value = MagicMock(status_code=204, text="")
+        mk.return_value = client
+        memory_client.write_history(
+            note_id=42, event="ADD",
+            new_content="x", old_content=None,
+            reason="brand new misconception",
+            source_session_id="s1", source_event="submit-quiz",
+            correlation_id="corr-abc",
+        )
+    body = client.post.call_args[1]["json"]
+    assert body["note_id"] == 42
+    assert body["event"] == "ADD"
+    assert body["new_content"] == "x"
+    # Reason should carry [corr=...] prefix so SQL `LIKE '[corr=' || ?` works
+    assert body["reason"].startswith("[corr=corr-abc]")
+    assert "brand new misconception" in body["reason"]
+
+
+def test_write_history_no_correlation_id_no_prefix() -> None:
+    from src import memory_client
+
+    with patch("src.memory_client._get_client") as mk:
+        client = MagicMock()
+        client.post.return_value = MagicMock(status_code=204, text="")
+        mk.return_value = client
+        memory_client.write_history(
+            note_id=None, event="REJECT",
+            new_content="bad", old_content=None,
+            reason="hash duplicate",
+            source_session_id="s", source_event="submit-quiz",
+        )
+    assert client.post.call_args[1]["json"]["reason"] == "hash duplicate"
+
+
+def test_write_history_does_not_double_prefix() -> None:
+    """If reason already has [corr=...] prefix, don't add another."""
+    from src import memory_client
+
+    with patch("src.memory_client._get_client") as mk:
+        client = MagicMock()
+        client.post.return_value = MagicMock(status_code=204, text="")
+        mk.return_value = client
+        memory_client.write_history(
+            note_id=1, event="NOOP",
+            new_content=None, old_content=None,
+            reason="[corr=existing] already prefixed",
+            source_session_id="s", source_event="submit-quiz",
+            correlation_id="new-corr",
+        )
+    reason = client.post.call_args[1]["json"]["reason"]
+    assert reason == "[corr=existing] already prefixed"
+    # Make sure we didn't double-wrap
+    assert reason.count("[corr=") == 1
+
+
+def test_write_history_failure_silent_and_logs() -> None:
+    from src import memory_client
+
+    log_calls: list[dict] = []
+    with patch("src.memory_client._get_client") as mk, \
+         patch.object(memory_client, "log_error", side_effect=lambda **kw: log_calls.append(kw)):
+        client = MagicMock()
+        client.post.side_effect = httpx.HTTPError("nope")
+        mk.return_value = client
+        memory_client.write_history(
+            note_id=1, event="NOOP",
+            new_content=None, old_content=None,
+            reason="r",
+            source_session_id="s", source_event="submit-quiz",
+        )
+    assert log_calls and log_calls[0]["op"] == "write_history"
+
+
+# ----------------------------------------------------------------------
+# upsert_progress
+# ----------------------------------------------------------------------
+def test_upsert_progress_happy_path() -> None:
+    from src import memory_client
+
+    with patch("src.memory_client._get_client") as mk:
+        client = MagicMock()
+        client.post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"topic": "t", "new_status": "in_progress",
+                          "sample_count": 2},
+        )
+        mk.return_value = client
+        memory_client.upsert_progress(
+            user_id="u1", topic="勾股定理", mastery_overall=0.6,
+            last_session_id="s1",
+            kp_samples=[
+                {"kp": "公式", "score": 0.5, "source": "quiz"},
+                {"kp": "坐标距离", "score": 0.0, "source": "quiz"},
+            ],
+        )
+    body = client.post.call_args[1]["json"]
+    assert body["topic"] == "勾股定理"
+    assert body["mastery_overall"] == 0.6
+    assert len(body["kp_samples"]) == 2
+
+
+def test_upsert_progress_failure_silent_and_logs() -> None:
+    from src import memory_client
+
+    log_calls: list[dict] = []
+    with patch("src.memory_client._get_client") as mk, \
+         patch.object(memory_client, "log_error", side_effect=lambda **kw: log_calls.append(kw)):
+        client = MagicMock()
+        client.post.side_effect = Exception("oops")
+        mk.return_value = client
+        memory_client.upsert_progress(
+            user_id="u1", topic="x", mastery_overall=0.0,
+            last_session_id="s", kp_samples=[],
+        )
+    assert log_calls and log_calls[0]["op"] == "upsert_progress"

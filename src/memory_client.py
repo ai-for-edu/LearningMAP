@@ -738,3 +738,119 @@ def archive_note(
             payload_excerpt=f"note_id={note_id}",
         )
         return False
+
+
+def write_history(
+    note_id: int | None,
+    event: str,
+    new_content: str | None,
+    old_content: str | None,
+    reason: str,
+    source_session_id: str,
+    source_event: str,
+    *,
+    correlation_id: str | None = None,
+) -> None:
+    """Audit row for any reviewer decision (ADD/UPDATE/DELETE/NOOP/REJECT).
+
+    The reason is auto-prefixed with `[corr=<id>] ` when correlation_id
+    is provided AND the reason doesn't already carry such a prefix, so
+    post-mortem joins via SQL LIKE work without the caller having to
+    remember to format it.
+    """
+    if correlation_id and not reason.startswith("[corr="):
+        reason = f"[corr={correlation_id}] {reason}"
+    body = {
+        "note_id": note_id,
+        "event": event,
+        "new_content": new_content,
+        "old_content": old_content,
+        "reason": reason[:200],
+        "source_session_id": source_session_id,
+        "source_event": source_event,
+    }
+    try:
+        resp = _get_client().post("/history", json=body)
+        if resp.status_code == 204:
+            return
+        log_error(
+            source="main_app", user_id=None, session_id=source_session_id,
+            correlation_id=correlation_id,
+            op="write_history",
+            status=f"http_{resp.status_code // 100}xx",
+            error_class="HTTPError",
+            error_msg=getattr(resp, "text", "")[:500],
+            payload_excerpt=f"event={event}",
+        )
+    except httpx.HTTPError as exc:
+        log_error(
+            source="main_app", user_id=None, session_id=source_session_id,
+            correlation_id=correlation_id,
+            op="write_history",
+            status="timeout" if isinstance(exc, httpx.TimeoutException) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"event={event}",
+        )
+    except Exception as exc:
+        log_error(
+            source="main_app", user_id=None, session_id=source_session_id,
+            correlation_id=correlation_id,
+            op="write_history",
+            status="unexpected",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"event={event}",
+        )
+
+
+def upsert_progress(
+    user_id: str,
+    topic: str,
+    mastery_overall: float,
+    last_session_id: str,
+    kp_samples: list[dict[str, Any]],
+    *,
+    correlation_id: str | None = None,
+) -> None:
+    """progress aggregator entry point. Failure is silent."""
+    body = {
+        "user_id": user_id,
+        "topic": topic,
+        "mastery_overall": mastery_overall,
+        "last_session_id": last_session_id,
+        "kp_samples": kp_samples,
+    }
+    try:
+        resp = _get_client().post("/progress", json=body)
+        if resp.status_code == 200:
+            return
+        log_error(
+            source="main_app", user_id=user_id, session_id=last_session_id,
+            correlation_id=correlation_id,
+            op="upsert_progress",
+            status=f"http_{resp.status_code // 100}xx",
+            error_class="HTTPError",
+            error_msg=getattr(resp, "text", "")[:500],
+            payload_excerpt=f"topic={topic}",
+        )
+    except httpx.HTTPError as exc:
+        log_error(
+            source="main_app", user_id=user_id, session_id=last_session_id,
+            correlation_id=correlation_id,
+            op="upsert_progress",
+            status="timeout" if isinstance(exc, httpx.TimeoutException) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"topic={topic}",
+        )
+    except Exception as exc:
+        log_error(
+            source="main_app", user_id=user_id, session_id=last_session_id,
+            correlation_id=correlation_id,
+            op="upsert_progress",
+            status="unexpected",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"topic={topic}",
+        )
