@@ -384,3 +384,163 @@ def log_error(
             )
         except Exception:
             pass  # truly nothing we can do
+
+
+def fetch_snapshot(user_id: str, *, correlation_id: str | None = None) -> str:
+    """Session-startup read of /memory/snapshot/{user_id}.
+
+    Returns Markdown body or empty string on any failure (graceful
+    degradation — chat node will simply not inject the snapshot block).
+    """
+    try:
+        resp = _get_client().get(f"/memory/snapshot/{user_id}")
+        if resp.status_code != 200:
+            log_error(
+                source="main_app", user_id=user_id, session_id=None,
+                correlation_id=correlation_id,
+                op="fetch_snapshot",
+                status=f"http_{resp.status_code // 100}xx",
+                error_class="HTTPError",
+                error_msg=getattr(resp, "text", "")[:500],
+            )
+            return ""
+        return resp.json().get("snapshot_md", "")
+    except httpx.HTTPError as exc:
+        log_error(
+            source="main_app", user_id=user_id, session_id=None,
+            correlation_id=correlation_id,
+            op="fetch_snapshot",
+            status="timeout" if isinstance(exc, httpx.TimeoutException) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+        )
+        return ""
+    except Exception as exc:
+        log_error(
+            source="main_app", user_id=user_id, session_id=None,
+            correlation_id=correlation_id,
+            op="fetch_snapshot",
+            status="unexpected",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+        )
+        return ""
+
+
+def fetch_active_notes(
+    user_id: str,
+    category: str,
+    *,
+    correlation_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Pull all active notes in one (user, category). Empty on failure.
+
+    content_hash MUST be in the rows — reviewer uses it for hash-dedup.
+    """
+    try:
+        resp = _get_client().get(
+            f"/notes/{user_id}", params={"category": category},
+        )
+        if resp.status_code != 200:
+            log_error(
+                source="main_app", user_id=user_id, session_id=None,
+                correlation_id=correlation_id,
+                op="fetch_active_notes",
+                status=f"http_{resp.status_code // 100}xx",
+                error_class="HTTPError",
+                error_msg=getattr(resp, "text", "")[:500],
+                payload_excerpt=f"category={category}",
+            )
+            return []
+        return resp.json().get("notes", []) or []
+    except Exception as exc:
+        log_error(
+            source="main_app", user_id=user_id, session_id=None,
+            correlation_id=correlation_id,
+            op="fetch_active_notes",
+            status="unexpected" if not isinstance(exc, httpx.HTTPError) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"category={category}",
+        )
+        return []
+
+
+def fetch_neighbors(
+    user_id: str,
+    category: str,
+    query_text: str,
+    top_k: int = 5,
+    *,
+    correlation_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Same-category neighbors of `query_text` for the consolidate step.
+
+    Empty on any failure or empty index.
+    """
+    try:
+        resp = _get_client().get(
+            f"/notes/{user_id}/neighbors",
+            params={"category": category, "query_text": query_text, "top_k": top_k},
+        )
+        if resp.status_code != 200:
+            log_error(
+                source="main_app", user_id=user_id, session_id=None,
+                correlation_id=correlation_id,
+                op="fetch_neighbors",
+                status=f"http_{resp.status_code // 100}xx",
+                error_class="HTTPError",
+                error_msg=getattr(resp, "text", "")[:500],
+                payload_excerpt=f"category={category}",
+            )
+            return []
+        return resp.json().get("neighbors", []) or []
+    except Exception as exc:
+        log_error(
+            source="main_app", user_id=user_id, session_id=None,
+            correlation_id=correlation_id,
+            op="fetch_neighbors",
+            status="unexpected" if not isinstance(exc, httpx.HTTPError) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"category={category}",
+        )
+        return []
+
+
+def get_note(
+    note_id: int,
+    *,
+    correlation_id: str | None = None,
+) -> dict[str, Any] | None:
+    """Read a single note by id. 404 → None silently (normal not-found).
+
+    Used by reviewer UPDATE/DELETE to capture old_content for audit.
+    """
+    try:
+        resp = _get_client().get(f"/notes/by-id/{note_id}")
+        if resp.status_code == 404:
+            return None
+        if resp.status_code != 200:
+            log_error(
+                source="main_app", user_id=None, session_id=None,
+                correlation_id=correlation_id,
+                op="get_note",
+                status=f"http_{resp.status_code // 100}xx",
+                error_class="HTTPError",
+                error_msg=getattr(resp, "text", "")[:500],
+                payload_excerpt=f"note_id={note_id}",
+            )
+            return None
+        return resp.json()
+    except Exception as exc:
+        log_error(
+            source="main_app", user_id=None, session_id=None,
+            correlation_id=correlation_id,
+            op="get_note",
+            status="unexpected" if not isinstance(exc, httpx.HTTPError) else "http_5xx",
+            error_class=type(exc).__name__,
+            error_msg=str(exc)[:500],
+            payload_excerpt=f"note_id={note_id}",
+        )
+        return None
