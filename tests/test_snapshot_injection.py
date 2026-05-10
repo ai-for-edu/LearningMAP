@@ -79,3 +79,18 @@ def test_knowledge_graph_template_injects_snapshot():
     )
     assert SAMPLE_SNAPSHOT in out
     assert "## 该学生的学习进程" in out
+
+
+def test_quiz_generate_template_injects_snapshot():
+    from src.prompts.loader import render_prompt
+
+    block = memory_snapshot_block({"memory_snapshot": SAMPLE_SNAPSHOT})
+    out = render_prompt(
+        "quiz_generate",
+        skill_instructions="",
+        kc_skill_block="",
+        knowledge_points=[{"name": "KP1", "description": "desc1"}],
+        questions_per_point=2,
+        memory_snapshot_block=block,
+    )
+    assert SAMPLE_SNAPSHOT in out

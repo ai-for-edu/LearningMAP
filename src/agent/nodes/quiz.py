@@ -8,6 +8,7 @@ from langchain_core.messages import AIMessage
 from src.agent.state import LearningState
 from src.llm.client import get_llm_client, get_model_name
 from src.llm.schemas import KnowledgeNode, QuizQuestion
+from src.agent.nodes._helpers import memory_snapshot_block
 from src.prompts.loader import render_kc_skill_block, render_prompt
 from src.skills.loader import get_skill_section
 
@@ -125,6 +126,7 @@ def quiz_node(state: LearningState) -> dict:
                 questions_per_point=count,
                 skill_instructions=skill_instructions,
                 kc_skill_block=kc_skill_block,
+                memory_snapshot_block=memory_snapshot_block(state),
             )
             batch = client.chat.completions.create(
                 model=get_model_name(),
@@ -196,6 +198,7 @@ def quiz_generate_progressive(state: dict):
             questions_per_point=count,
             skill_instructions=skill_instructions,
             kc_skill_block=kc_skill_block,
+            memory_snapshot_block=memory_snapshot_block(state),
         )
         try:
             batch = client.chat.completions.create(

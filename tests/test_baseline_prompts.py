@@ -32,3 +32,18 @@ def test_knowledge_graph_baseline_env_off():
         memory_snapshot_block="",
     )
     assert out == EXPECTED_KG_BASELINE
+
+
+EXPECTED_QUIZ_BASELINE = 'You are a quiz generator for adaptive learning. Generate multiple-choice questions to diagnose student mastery.\n\n\n\nKnowledge points to test:\n\n- KP1: desc1\n\n\nGenerate 2 questions per knowledge point. Each question should:\n1. Test understanding of the specific concept\n2. Have exactly 4 options (A/B/C/D)\n3. Have exactly one correct answer\n4. Be appropriate for middle school level\n\nReturn a list of questions.\n'
+
+
+def test_quiz_generate_baseline_env_off():
+    out = render_prompt(
+        "quiz_generate",
+        skill_instructions="",
+        kc_skill_block="",
+        knowledge_points=[{"name": "KP1", "description": "desc1"}],
+        questions_per_point=2,
+        memory_snapshot_block="",
+    )
+    assert out == EXPECTED_QUIZ_BASELINE
