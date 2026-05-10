@@ -47,6 +47,11 @@ _USE_KC_SKILLS_DEFAULT = os.environ.get("USE_KC_SKILLS", "true").lower() == "tru
 
 _REVIEW_FLOW_ENABLED = os.environ.get("ENABLE_REVIEW_FLOW", "false").lower() == "true"
 
+# Hybrid agent memory write-path gate (PR-3). Same env var also gates PR-2's
+# reviewer + progress aggregator (they check internally). Module-level: a
+# fresh process picks up env changes; tests use monkeypatch.setattr.
+_MEMORY_REVIEW_ENABLED = os.environ.get("ENABLE_MEMORY_REVIEW", "false").lower() == "true"
+
 # Module-level cache for has_history (gate-on path); 60s TTL keyed by user_id.
 _has_history_cache: dict[str, tuple[float, bool]] = {}
 _HAS_HISTORY_TTL_S = 60.0
