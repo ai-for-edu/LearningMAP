@@ -27,6 +27,8 @@ from src.memory_client import (
     ingest_review_session,
     ingest_session,
 )
+from src.progress_aggregator import refresh_progress
+from src.reviewer import run_memory_review
 from src.skills.loader import get_skill, list_skills
 
 logger = logging.getLogger(__name__)
@@ -95,6 +97,84 @@ async def _ensure_memory_snapshot(state: dict[str, Any]) -> None:
     snap = await asyncio.to_thread(memory_client.fetch_snapshot, DEFAULT_USER_ID)
     state["memory_snapshot"] = snap or ""
     state["memory_snapshot_loaded_at"] = int(time.time())
+
+
+# ---------------------------------------------------------------------------
+# Background-task dispatch for hybrid memory write path (PR-3).
+#
+# Three independent BG tasks fan out per trigger event: ingest_session
+# (existing L1 vector store), run_memory_review (PR-2 LLM consolidation),
+# refresh_progress (PR-2 SQL aggregation). Each has its own top-level
+# try/except, so a failure inside one does not affect the other two.
+# ---------------------------------------------------------------------------
+
+_bg_tasks: set[asyncio.Task] = set()
+
+
+def _spawn(coro, *, name: str) -> None:
+    """Spawn a task and hold a strong reference until it completes.
+
+    Without this, asyncio.create_task() returns a Task that may be GC'd
+    mid-flight and silently cancelled. The set + done_callback pattern
+    is the documented Python recommendation.
+    """
+    t = asyncio.create_task(coro, name=name)
+    _bg_tasks.add(t)
+    t.add_done_callback(_bg_tasks.discard)
+
+
+def _dispatch_memory_writes(
+    user_id: str,
+    session_id: str,
+    state: dict[str, Any],
+    source_event: str,
+    *,
+    ingest_fn=None,
+    extra_ingest_session_id: str | None = None,
+) -> None:
+    """Fire 3 background tasks in parallel: ingest + reviewer + progress.
+
+    Contract: never raises. reviewer + progress have their own top-level
+    try/except (PR-2 §6.1 / §7), and the ingest functions silently swallow.
+    The dispatch helper itself only catches RuntimeError from create_task in
+    pathological event-loop states.
+
+    extra_ingest_session_id: tasks.py run_lesson_generation passes
+    f"{sid}_lesson" to namespace-separate the ingest row; reviewer +
+    progress always use the real session_id for audit accuracy.
+
+    ingest_fn: defaults to ingest_session; submit-review passes
+    ingest_review_session. Resolved at call time (not at definition time) so
+    that test patches on the module attribute are honoured.
+    """
+    try:
+        state_snapshot = dict(state)        # shallow copy → BG sees stable view
+        ingest_sid = extra_ingest_session_id or session_id
+        _ingest_fn = ingest_fn if ingest_fn is not None else ingest_session
+
+        _spawn(
+            asyncio.to_thread(_ingest_fn, user_id, ingest_sid, state_snapshot),
+            name=f"ingest:{session_id}:{source_event}",
+        )
+        _spawn(
+            asyncio.to_thread(
+                run_memory_review, user_id, session_id, state_snapshot, source_event,
+            ),
+            name=f"memory_review:{session_id}:{source_event}",
+        )
+        _spawn(
+            asyncio.to_thread(
+                refresh_progress, user_id, session_id, state_snapshot,
+            ),
+            name=f"refresh_progress:{session_id}:{source_event}",
+        )
+        logger.info(
+            "memory_dispatch session=%s event=%s ingest_sid=%s "
+            "tasks=ingest+review+progress",
+            session_id, source_event, ingest_sid,
+        )
+    except Exception:
+        logger.exception("memory_dispatch failed (events lost)")
 
 
 _DEFAULT_STATE = {

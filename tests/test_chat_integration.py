@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import uuid
 
+import asyncio
+
 import pytest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from src.api import chat as chat_module
 
@@ -174,3 +176,80 @@ async def test_chat_endpoint_no_fetch_when_env_off(env_off):
             r = await client.post("/api/chat", json={"message": "hi"})
             assert r.status_code == 200
     mock_fs.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _dispatch_memory_writes helper
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_dispatch_spawns_three_bg_tasks(env_on):
+    """dispatch fires ingest + run_memory_review + refresh_progress concurrently."""
+    state = {"topic": "X", "diagnosis_result": None}
+    with patch.object(chat_module, "ingest_session") as mock_ingest, \
+         patch.object(chat_module, "run_memory_review") as mock_review, \
+         patch.object(chat_module, "refresh_progress") as mock_progress:
+        chat_module._dispatch_memory_writes(
+            "uid", "sid", state, source_event="test-event"
+        )
+        # asyncio.to_thread schedules in default ThreadPoolExecutor; let it run
+        await asyncio.sleep(0.1)
+    mock_ingest.assert_called_once()
+    mock_review.assert_called_once()
+    mock_progress.assert_called_once()
+
+    # Verify args (state is shallow-copied so identity differs but contents equal)
+    review_args = mock_review.call_args.args
+    assert review_args[0] == "uid"
+    assert review_args[1] == "sid"
+    assert review_args[2] is not state          # shallow copy
+    assert review_args[2] == state              # equal contents
+    assert review_args[3] == "test-event"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_uses_ingest_fn_param(env_on):
+    """ingest_fn parameter overrides default (used by submit-review)."""
+    custom_ingest = MagicMock()
+    state = {"topic": "Y"}
+    with patch.object(chat_module, "ingest_session") as default_ingest, \
+         patch.object(chat_module, "run_memory_review"), \
+         patch.object(chat_module, "refresh_progress"):
+        chat_module._dispatch_memory_writes(
+            "uid", "sid", state, source_event="test", ingest_fn=custom_ingest,
+        )
+        await asyncio.sleep(0.1)
+    custom_ingest.assert_called_once()
+    default_ingest.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_uses_extra_ingest_session_id(env_on):
+    """extra_ingest_session_id only affects ingest_fn, not reviewer/progress."""
+    state = {"topic": "Z"}
+    with patch.object(chat_module, "ingest_session") as mock_ingest, \
+         patch.object(chat_module, "run_memory_review") as mock_review, \
+         patch.object(chat_module, "refresh_progress") as mock_progress:
+        chat_module._dispatch_memory_writes(
+            "uid", "sid", state, source_event="generate-lesson",
+            extra_ingest_session_id="sid_lesson",
+        )
+        await asyncio.sleep(0.1)
+    assert mock_ingest.call_args.args[1] == "sid_lesson"
+    assert mock_review.call_args.args[1] == "sid"        # real sid for audit
+    assert mock_progress.call_args.args[1] == "sid"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_swallows_exceptions(env_on, caplog):
+    """If asyncio.create_task fails (pathological), dispatch logs and returns."""
+    state = {"topic": "W"}
+    with patch.object(chat_module, "asyncio") as mock_asyncio:
+        mock_asyncio.create_task.side_effect = RuntimeError("no running loop")
+        # to_thread also accessed — let it return a coro stub
+        mock_asyncio.to_thread = lambda *a, **kw: None
+        # Should not raise even though create_task explodes
+        chat_module._dispatch_memory_writes(
+            "uid", "sid", state, source_event="t",
+        )
