@@ -103,6 +103,8 @@ _DEFAULT_STATE = {
     "review_questions": [],
     "review_answers": [],
     "review_result": None,
+    "memory_snapshot": None,
+    "memory_snapshot_loaded_at": None,
 }
 
 

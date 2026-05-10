@@ -38,7 +38,7 @@ class LearningState(MessagesState):
     # KC skills (knowledge-component metadata loaded from XES3G5M/metadata/kc_skills.json)
     # Orthogonal to the existing knowledge_skills field (which holds pedagogy-derived text).
     kc_skills: dict | None  # {kp_name: KCSkill.model_dump()}
-    use_kc_skills: bool     # whether kc_skill_resolver should run + prompts inject
+    use_kc_skills: bool  # whether kc_skill_resolver should run + prompts inject
 
     # Pending topic waiting for skill selection
     pending_topic: str | None
@@ -48,3 +48,7 @@ class LearningState(MessagesState):
     review_questions: list[QuizQuestion] | None
     review_answers: list[int] | None
     review_result: dict | None  # {weak_kps, strong_kps, score, focus_directive}
+
+    # Hybrid agent memory — frozen per-session snapshot (PR-3)
+    memory_snapshot: str | None  # session-startup snapshot Markdown; "" = empty/failed; frozen for session
+    memory_snapshot_loaded_at: int | None  # epoch seconds; debug/audit only

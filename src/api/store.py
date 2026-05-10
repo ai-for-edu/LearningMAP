@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,12 @@ from src.llm.schemas import DiagnosisResult, KnowledgeGraph, QuizQuestion
 
 logger = logging.getLogger(__name__)
 
-_DB_PATH = Path(__file__).resolve().parent.parent.parent / "sessions.db"
+_DB_PATH = Path(
+    os.environ.get(
+        "SESSIONS_DB_PATH",
+        str(Path(__file__).resolve().parent.parent.parent / "sessions.db"),
+    )
+)
 
 
 def _serialize_state(state: dict[str, Any]) -> str:
