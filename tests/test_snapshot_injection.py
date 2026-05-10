@@ -54,3 +54,28 @@ def test_helper_strips_leading_trailing_whitespace_in_content():
     """Content with surrounding whitespace is stripped before block render."""
     out = memory_snapshot_block({"memory_snapshot": "\n\n  ## X  \n\n"})
     assert out == "\n\n## X"
+
+
+# ---------------------------------------------------------------------------
+# Per-template snapshot injection
+# ---------------------------------------------------------------------------
+
+
+def test_knowledge_graph_template_injects_snapshot():
+    """When memory_snapshot_block is non-empty, it appears in rendered output."""
+    from src.prompts.loader import render_prompt
+
+    block = memory_snapshot_block({"memory_snapshot": SAMPLE_SNAPSHOT})
+    out = render_prompt(
+        "knowledge_graph",
+        topic="X",
+        max_nodes=8,
+        skill_instructions="",
+        focus_directive="",
+        review_weak_kps=[],
+        review_strong_kps=[],
+        existing_mastery=[],
+        memory_snapshot_block=block,
+    )
+    assert SAMPLE_SNAPSHOT in out
+    assert "## 该学生的学习进程" in out

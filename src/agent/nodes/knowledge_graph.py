@@ -14,6 +14,7 @@ from src.llm.schemas import KnowledgeGraph
 from src.memory_client import DEFAULT_USER_ID, fetch_mastery
 from src.prompts.loader import render_prompt
 from src.skills.kc_graph import resolve_kc_graph
+from src.agent.nodes._helpers import memory_snapshot_block
 from src.skills.loader import get_skill_section
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,7 @@ def _llm_generate_graph(
         review_weak_kps=review_weak_kps,
         review_strong_kps=review_strong_kps,
         existing_mastery=existing_mastery or [],
+        memory_snapshot_block=memory_snapshot_block(state),
     )
     try:
         client = get_llm_client()
