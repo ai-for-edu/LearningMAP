@@ -216,6 +216,59 @@ def test_chat_node_calls_retrieve_for_long_message():
     mock_retrieve.assert_called_once()
 
 
+def _capture_chat_stream_system_prompt(state, *, retrieve_return=""):
+    """Run chat_node_stream (a generator); return the captured system prompt.
+
+    Mocks the streaming LLM client; consumes one yielded token to ensure
+    the request was made.
+    """
+    from src.agent.nodes import chat as chat_mod
+
+    captured = {}
+
+    class _FakeDelta:
+        content = "ok"
+
+    class _FakeChunkChoice:
+        delta = _FakeDelta()
+
+    class _FakeChunk:
+        choices = [_FakeChunkChoice()]
+
+    def _fake_stream_create(**kwargs):
+        captured["messages"] = kwargs["messages"]
+        return iter([_FakeChunk()])
+
+    with patch.object(chat_mod, "retrieve_memory", return_value=retrieve_return) as mock_retrieve, \
+         patch.object(chat_mod, "get_raw_client") as mock_client:
+        mock_client.return_value.chat.completions.create.side_effect = _fake_stream_create
+        # Drive the generator to make the LLM call
+        list(chat_mod.chat_node_stream(state))
+
+    return captured["messages"][0]["content"], mock_retrieve
+
+
+def test_chat_node_stream_appends_snapshot_when_present():
+    """chat_node_stream: state has memory_snapshot → system prompt contains snapshot."""
+    state = {
+        "messages": [HumanMessage(content="解释勾股定理是什么意思")],  # ≥10 chars
+        "memory_snapshot": SAMPLE_SNAPSHOT,
+        "memory_snapshot_loaded_at": 1000,
+    }
+    sys_prompt, _ = _capture_chat_stream_system_prompt(state)
+    assert SAMPLE_SNAPSHOT in sys_prompt
+
+
+def test_chat_node_stream_skips_retrieve_for_short_message():
+    """chat_node_stream: user msg <10 chars → retrieve_memory NOT called."""
+    state = {
+        "messages": [HumanMessage(content="嗯")],  # 1 char
+        "memory_snapshot": None,
+    }
+    _, mock_retrieve = _capture_chat_stream_system_prompt(state)
+    mock_retrieve.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # review path — fetch_active_notes('misconception') + soft-guidance template
 # ---------------------------------------------------------------------------
@@ -285,3 +338,41 @@ def test_review_does_not_fetch_env_off(monkeypatch):
 
     mock_fetch.assert_not_called()
     assert "易混点" not in captured["prompt"]
+
+
+def test_review_filters_empty_content_misconceptions(monkeypatch):
+    """env=on, fetch returns notes with empty/missing content → those filtered out.
+
+    Spec §6.3: 'env=on, 有 notes 但 content 空字符串 → 过滤掉 (if n.get("content")), 不进 prompt'.
+    """
+    review_mod = _make_review_module_with_env(monkeypatch, enabled=True)
+
+    fake_notes = [
+        {"content": "valid misconception"},
+        {"content": ""},                  # filtered (empty string)
+        {"content": None},                # filtered (None)
+        {},                               # filtered (missing key)
+        {"content": "another valid one"},
+    ]
+    candidates = [
+        {"subtopic": "X", "last_seen_at": "2026-04-01T00:00:00Z",
+         "last_accuracy": 0.5, "topic": "T"}
+    ]
+
+    captured = {}
+
+    def _fake_create(**kwargs):
+        captured["prompt"] = kwargs["messages"][0]["content"]
+        return []
+
+    with patch("src.memory_client.fetch_active_notes", return_value=fake_notes), \
+         patch("src.llm.client.get_llm_client") as mock_llm:
+        mock_llm.return_value.chat.completions.create.side_effect = _fake_create
+        review_mod.generate_review_questions(candidates)
+
+    # Two valid items appear, three falsy items don't
+    assert "valid misconception" in captured["prompt"]
+    assert "another valid one" in captured["prompt"]
+    # The empty/None/missing-content items should NOT appear as bullet lines
+    # (they would render as bare "- " with no text — assert there's no such empty bullet)
+    assert "\n- \n" not in captured["prompt"]
