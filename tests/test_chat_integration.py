@@ -305,3 +305,49 @@ async def test_submit_quiz_dispatches_three_bg_tasks(env_on):
     mock_review.assert_called_once()
     mock_progress.assert_called_once()
     assert mock_review.call_args.args[3] == "submit-quiz"  # source_event
+
+
+# ---------------------------------------------------------------------------
+# Trigger point: submit-review
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_submit_review_uses_ingest_review_session(env_on, monkeypatch):
+    """submit-review dispatches with ingest_review_session, not ingest_session."""
+    monkeypatch.setattr(chat_module, "_REVIEW_FLOW_ENABLED", True)
+    from httpx import ASGITransport, AsyncClient
+    from run.serve import app
+    from src.llm.schemas import QuizQuestion
+
+    qs = [
+        QuizQuestion(
+            id="q1",
+            knowledge_point="X",
+            question="Q?",
+            options=["a", "b", "c", "d"],
+            answer=0,
+        )
+    ]
+    sid = _make_session({"review_questions": qs, "topic": "T"})
+
+    fake_review_result = MagicMock()
+    fake_review_result.model_dump.return_value = {"score": 1.0}
+
+    with patch.object(chat_module, "ingest_session") as default_ingest, \
+         patch.object(chat_module, "ingest_review_session") as review_ingest, \
+         patch.object(chat_module, "run_memory_review") as mock_review, \
+         patch.object(chat_module, "refresh_progress") as mock_progress, \
+         patch("src.agent.nodes.review.grade_review", return_value=fake_review_result):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://t") as client:
+            r = await client.post(
+                f"/api/chat/{sid}/submit-review", json={"answers": [0]},
+            )
+            assert r.status_code == 200
+        await asyncio.sleep(0.1)
+    review_ingest.assert_called_once()
+    default_ingest.assert_not_called()
+    mock_review.assert_called_once()
+    mock_progress.assert_called_once()
+    assert mock_review.call_args.args[3] == "submit-review"

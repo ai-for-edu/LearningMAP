@@ -1135,10 +1135,11 @@ async def submit_review(session_id: str, req: SubmitReviewRequest) -> dict:
     _save(session_id, state)
     _has_history_cache.pop(DEFAULT_USER_ID, None)
 
-    # Persist review answers as memory rows (one ingest per touched topic).
-    # Background, non-blocking — same pattern as submit-quiz.
-    asyncio.get_event_loop().run_in_executor(
-        None, ingest_review_session, DEFAULT_USER_ID, session_id, state
+    # Fan out 3 BG tasks: ingest_review_session + reviewer + progress (PR-3).
+    _dispatch_memory_writes(
+        DEFAULT_USER_ID, session_id, state,
+        source_event="submit-review",
+        ingest_fn=ingest_review_session,
     )
 
     return {"review_result": result.model_dump()}
