@@ -20,6 +20,7 @@ from src.agent.mastery_annotator import annotate_graph_with_mastery
 from src.api.store import load_session, save_session
 from src.forgetting import get_forgetting_model
 from src.llm.schemas import KnowledgeGraph
+from src import memory_client
 from src.memory_client import (
     DEFAULT_USER_ID,
     fetch_mastery,
@@ -74,9 +75,26 @@ async def _has_history(user_id: str) -> bool:
     if cached is not None and (now - cached[0]) < _HAS_HISTORY_TTL_S:
         return cached[1]
     from src.memory_client import fetch_mastery
+
     result = bool(await asyncio.to_thread(fetch_mastery, user_id))
     _has_history_cache[user_id] = (now, result)
     return result
+
+
+async def _ensure_memory_snapshot(state: dict[str, Any]) -> None:
+    """If snapshot field is None and env is on, fetch once and freeze.
+
+    Mutates state in place. Never raises — fetch_snapshot already swallows
+    on its own (returns ""). After this returns, state["memory_snapshot"]
+    is a str (possibly empty) and stays frozen for the rest of the session.
+    """
+    if not _MEMORY_REVIEW_ENABLED:
+        return
+    if state.get("memory_snapshot") is not None:
+        return  # already filled (incl. ""); never re-fetch in same session
+    snap = await asyncio.to_thread(memory_client.fetch_snapshot, DEFAULT_USER_ID)
+    state["memory_snapshot"] = snap or ""
+    state["memory_snapshot_loaded_at"] = int(time.time())
 
 
 _DEFAULT_STATE = {
@@ -1027,6 +1045,7 @@ async def submit_review(session_id: str, req: SubmitReviewRequest) -> dict:
         )
 
     from src.agent.nodes.review import grade_review
+
     result = grade_review(questions, req.answers)
 
     state["review_answers"] = req.answers
