@@ -459,3 +459,30 @@ async def test_tasks_run_lesson_generation_dispatches(env_on, monkeypatch):
     assert mock_ingest.call_args.args[1] == f"{sid}_lesson"
     assert mock_review.call_args.args[1] == sid
     assert mock_progress.call_args.args[1] == sid
+
+
+# ---------------------------------------------------------------------------
+# Failure isolation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_one_bg_task_failing_does_not_block_others(env_on):
+    """If run_memory_review raises, ingest + progress still run.
+
+    Note: real PR-2 reviewer has its own top-level try/except so it would
+    never propagate. This test simulates a violation of that contract by
+    having the mock raise, and verifies dispatch's _spawn isolation."""
+    state = {"topic": "X"}
+    with patch.object(chat_module, "ingest_session") as mock_ingest, \
+         patch.object(chat_module, "run_memory_review",
+                      side_effect=RuntimeError("boom")) as mock_review, \
+         patch.object(chat_module, "refresh_progress") as mock_progress:
+        chat_module._dispatch_memory_writes(
+            "uid", "sid", state, source_event="t",
+        )
+        await asyncio.sleep(0.1)
+    # Even though review raised, the other two were spawned + ran
+    mock_ingest.assert_called_once()
+    mock_progress.assert_called_once()
+    mock_review.assert_called_once()
