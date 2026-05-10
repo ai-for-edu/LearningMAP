@@ -184,6 +184,7 @@ async def run_lesson_generation(
 ) -> None:
     """Generate lesson content in background using two-step pipeline."""
     from src.agent.nodes.lesson import retrieve_skills, _generate_review_lesson
+    from src.agent.nodes._helpers import memory_snapshot_block
     from src.prompts.loader import render_prompt
     from src.llm.client import get_raw_client, get_model_name
     from src.memory_client import DEFAULT_USER_ID
@@ -221,6 +222,7 @@ async def run_lesson_generation(
                 state_snapshot.get("topic", ""),
                 nodes,
                 pedagogy_instructions,
+                state=state_snapshot,
             )
         else:
             # Step 2: Generate per-point content (with progress updates)
@@ -244,6 +246,7 @@ async def run_lesson_generation(
                     point_index=i + 1,
                     total_points=total,
                     focus_directive=focus_directive,
+                    memory_snapshot_block=memory_snapshot_block(state_snapshot),
                 )
                 response = await asyncio.to_thread(
                     lambda p=prompt: client.chat.completions.create(

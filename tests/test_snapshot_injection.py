@@ -94,3 +94,49 @@ def test_quiz_generate_template_injects_snapshot():
         memory_snapshot_block=block,
     )
     assert SAMPLE_SNAPSHOT in out
+
+
+def test_lesson_plan_template_injects_snapshot():
+    from src.prompts.loader import render_prompt
+    block = memory_snapshot_block({"memory_snapshot": SAMPLE_SNAPSHOT})
+    out = render_prompt(
+        "lesson_plan",
+        skill_instructions="",
+        focus_directive="",
+        topic="X",
+        weak_points=[{"name": "WP1", "description": "d1"}],
+        memory_snapshot_block=block,
+    )
+    assert SAMPLE_SNAPSHOT in out
+
+
+def test_lesson_point_template_injects_snapshot():
+    from src.prompts.loader import render_prompt
+    block = memory_snapshot_block({"memory_snapshot": SAMPLE_SNAPSHOT})
+    out = render_prompt(
+        "lesson_point",
+        topic="X",
+        knowledge_point_name="KP1",
+        knowledge_point_description="d",
+        pedagogy_instructions="",
+        knowledge_skill="",
+        point_index=1,
+        total_points=1,
+        kc_skill_block="",
+        focus_directive="",
+        memory_snapshot_block=block,
+    )
+    assert SAMPLE_SNAPSHOT in out
+
+
+def test_lesson_review_template_injects_snapshot():
+    from src.prompts.loader import render_prompt
+    block = memory_snapshot_block({"memory_snapshot": SAMPLE_SNAPSHOT})
+    out = render_prompt(
+        "lesson_review",
+        topic="X",
+        points=[{"name": "P1", "description": "d"}],
+        skill_instructions="",
+        memory_snapshot_block=block,
+    )
+    assert SAMPLE_SNAPSHOT in out

@@ -47,3 +47,48 @@ def test_quiz_generate_baseline_env_off():
         memory_snapshot_block="",
     )
     assert out == EXPECTED_QUIZ_BASELINE
+
+
+EXPECTED_LESSON_PLAN_BASELINE = "You are a personalized lesson plan generator. Create a lesson that addresses the student's weak knowledge areas.\n\n\n\nTopic: X\n\nWeak areas that need teaching:\n\n- WP1: d1\n\n\nCreate a comprehensive lesson covering each weak area with:\n1. Clear explanation of the concept\n2. Key formulas or rules (if applicable)\n3. Worked examples with step-by-step solutions\n4. Common mistakes to avoid\n\nUse clear, concise language appropriate for a middle school student. Write in Chinese.\n"
+EXPECTED_LESSON_POINT_BASELINE = '你是一个个性化教案生成器。请为以下知识点生成一段教学内容。\n\n## 教学法要求\n\n\n\n\n\n\n## 知识点信息\n主题：X\n知识点（第 1/1 个）：KP1\n描述：d\n\n## 输出要求\n\n请生成该知识点的教学内容，包含：\n1. 概念讲解（遵循教学法中的策略）\n2. 关键公式或规则（如适用）\n3. 一个完整的例题及分步解答\n4. 常见错误及纠正\n\n用中文撰写，语言通俗易懂，适合中学生阅读。\n以 Markdown 格式输出，用 `## KP1` 作为章节标题。\n'
+EXPECTED_LESSON_REVIEW_BASELINE = 'You are a personalized lesson plan generator. The student has mastered all knowledge points — create a review and consolidation lesson.\n\n\nTopic: X\n\nKnowledge points the student has mastered:\n\n- P1: d\n\n\nCreate a consolidation lesson with:\n1. Key concepts summary for each knowledge point\n2. Connections between the concepts\n3. Challenge problems that combine multiple knowledge points\n4. Tips for long-term retention\n\nUse clear, concise language appropriate for a middle school student. Write in Chinese.\n'
+
+
+def test_lesson_plan_baseline_env_off():
+    out = render_prompt(
+        "lesson_plan",
+        skill_instructions="",
+        focus_directive="",
+        topic="X",
+        weak_points=[{"name": "WP1", "description": "d1"}],
+        memory_snapshot_block="",
+    )
+    assert out == EXPECTED_LESSON_PLAN_BASELINE
+
+
+def test_lesson_point_baseline_env_off():
+    out = render_prompt(
+        "lesson_point",
+        topic="X",
+        knowledge_point_name="KP1",
+        knowledge_point_description="d",
+        pedagogy_instructions="",
+        knowledge_skill="",
+        point_index=1,
+        total_points=1,
+        kc_skill_block="",
+        focus_directive="",
+        memory_snapshot_block="",
+    )
+    assert out == EXPECTED_LESSON_POINT_BASELINE
+
+
+def test_lesson_review_baseline_env_off():
+    out = render_prompt(
+        "lesson_review",
+        topic="X",
+        points=[{"name": "P1", "description": "d"}],
+        skill_instructions="",
+        memory_snapshot_block="",
+    )
+    assert out == EXPECTED_LESSON_REVIEW_BASELINE

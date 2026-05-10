@@ -5,6 +5,7 @@ from src.agent.state import LearningState
 from src.llm.client import get_raw_client, get_model_name
 from src.prompts.loader import render_prompt, render_kc_skill_block
 from src.skills.loader import get_skill_section
+from src.agent.nodes._helpers import memory_snapshot_block
 from langchain_core.messages import AIMessage
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,7 @@ def generate_lesson_per_point(
     knowledge_skills: dict[str, str],
     kc_skills: dict | None = None,
     focus_directive: str = "",
+    state: dict | None = None,
 ) -> str:
     """Step 2: Generate lesson content per knowledge point, then concatenate."""
     client = get_raw_client()
@@ -152,6 +154,7 @@ def generate_lesson_per_point(
             total_points=total,
             kc_skill_block=kc_skill_block,
             focus_directive=focus_directive,
+            memory_snapshot_block=memory_snapshot_block(state),
         )
         response = client.chat.completions.create(
             model=get_model_name(),
@@ -163,7 +166,12 @@ def generate_lesson_per_point(
     return "\n\n---\n\n".join(sections)
 
 
-def _generate_review_lesson(topic: str, nodes: list, skill_instructions: str) -> str:
+def _generate_review_lesson(
+    topic: str,
+    nodes: list,
+    skill_instructions: str,
+    state: dict | None = None,
+) -> str:
     """Generate a review/consolidation lesson when all points are mastered."""
     all_points = [
         {
@@ -179,6 +187,7 @@ def _generate_review_lesson(topic: str, nodes: list, skill_instructions: str) ->
         topic=topic,
         points=all_points,
         skill_instructions=skill_instructions,
+        memory_snapshot_block=memory_snapshot_block(state),
     )
     client = get_raw_client()
     response = client.chat.completions.create(
@@ -204,7 +213,7 @@ def lesson_node(state: LearningState) -> dict:
     pedagogy_instructions, knowledge_skills, weak_points = retrieve_skills(state)
 
     if not weak_points:
-        lesson_text = _generate_review_lesson(topic, nodes, pedagogy_instructions)
+        lesson_text = _generate_review_lesson(topic, nodes, pedagogy_instructions, state=state)
         return {
             "lesson_content": lesson_text,
             "knowledge_skills": None,
@@ -218,6 +227,7 @@ def lesson_node(state: LearningState) -> dict:
         topic, weak_points, pedagogy_instructions, knowledge_skills,
         kc_skills=state.get("kc_skills"),
         focus_directive=focus_directive,
+        state=state,
     )
 
     return {
@@ -269,6 +279,7 @@ def _build_lesson_prompt(state: dict) -> str | None:
             topic=topic,
             points=all_points,
             skill_instructions=skill_instructions,
+            memory_snapshot_block=memory_snapshot_block(state),
         )
 
     weak_points = []
@@ -287,6 +298,7 @@ def _build_lesson_prompt(state: dict) -> str | None:
         weak_points=weak_points,
         skill_instructions=skill_instructions,
         focus_directive=focus_directive,
+        memory_snapshot_block=memory_snapshot_block(state),
     )
 
 
@@ -320,6 +332,7 @@ def lesson_node_stream(state: dict):
             topic=topic,
             points=all_points,
             skill_instructions=skill_instructions,
+            memory_snapshot_block=memory_snapshot_block(state),
         )
         client = get_raw_client()
         stream = client.chat.completions.create(
@@ -355,6 +368,7 @@ def lesson_node_stream(state: dict):
             total_points=total,
             kc_skill_block=kc_skill_block,
             focus_directive=focus_directive,
+            memory_snapshot_block=memory_snapshot_block(state),
         )
         stream = client.chat.completions.create(
             model=get_model_name(),
