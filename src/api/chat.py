@@ -175,6 +175,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
 
     # Get or init session state
     state = _get_session(session_id) or dict(_DEFAULT_STATE)
+    await _ensure_memory_snapshot(state)
 
     # Add user message
     state["messages"] = list(state.get("messages", []))
@@ -257,6 +258,7 @@ async def chat_stream(req: ChatRequest):
 
     session_id = req.session_id or str(uuid.uuid4())
     state = _get_session(session_id) or dict(_DEFAULT_STATE)
+    await _ensure_memory_snapshot(state)
 
     state["messages"] = list(state.get("messages", []))
     state["messages"].append(HumanMessage(content=req.message))

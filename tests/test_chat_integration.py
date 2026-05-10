@@ -123,3 +123,54 @@ async def test_ensure_memory_snapshot_failure_freezes_empty(env_on):
     mock_fs.reset_mock()
     await chat_module._ensure_memory_snapshot(state)
     mock_fs.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# chat() / chat_stream() snapshot wiring
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_chat_endpoint_fetches_snapshot_on_new_session(env_on):
+    """POST /api/chat with no session_id → fetch_snapshot called once;
+    second call same session_id does NOT re-fetch."""
+    from httpx import ASGITransport, AsyncClient
+    from run.serve import app
+
+    fake_graph_result = {
+        "messages": [],
+        "mode": "chat",
+        "memory_snapshot": "## 进程\n- X",
+        "memory_snapshot_loaded_at": 1000,
+    }
+
+    with patch.object(
+        chat_module.memory_client, "fetch_snapshot", return_value="## 进程\n- X"
+    ) as mock_fs, patch.object(chat_module, "_get_graph") as mock_graph:
+        mock_graph.return_value.invoke.return_value = fake_graph_result
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://t") as client:
+            r1 = await client.post("/api/chat", json={"message": "hello"})
+            assert r1.status_code == 200
+            sid = r1.json()["session_id"]
+            r2 = await client.post(
+                "/api/chat", json={"session_id": sid, "message": "again"}
+            )
+            assert r2.status_code == 200
+    assert mock_fs.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_chat_endpoint_no_fetch_when_env_off(env_off):
+    """env=off: fetch_snapshot is never called from chat()."""
+    from httpx import ASGITransport, AsyncClient
+    from run.serve import app
+
+    with patch.object(chat_module.memory_client, "fetch_snapshot") as mock_fs, \
+         patch.object(chat_module, "_get_graph") as mock_graph:
+        mock_graph.return_value.invoke.return_value = {"messages": [], "mode": "chat"}
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://t") as client:
+            r = await client.post("/api/chat", json={"message": "hi"})
+            assert r.status_code == 200
+    mock_fs.assert_not_called()
