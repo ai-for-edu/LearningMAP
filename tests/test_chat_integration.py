@@ -388,6 +388,10 @@ async def test_generate_lesson_dispatches_three_bg_tasks(env_on):
     mock_review.assert_called_once()
     mock_progress.assert_called_once()
     assert mock_review.call_args.args[3] == "generate-lesson"
+    # ingest gets sid_lesson; reviewer/progress get real sid (spec §6.6)
+    assert mock_ingest.call_args.args[1] == f"{sid}_lesson"
+    assert mock_review.call_args.args[1] == sid
+    assert mock_progress.call_args.args[1] == sid
 
 
 @pytest.mark.asyncio
@@ -416,6 +420,64 @@ async def test_generate_lesson_stream_dispatches_three_bg_tasks(env_on):
     mock_review.assert_called_once()
     mock_progress.assert_called_once()
     assert mock_review.call_args.args[3] == "generate-lesson"
+    # ingest gets sid_lesson; reviewer/progress get real sid (spec §6.6)
+    assert mock_ingest.call_args.args[1] == f"{sid}_lesson"
+    assert mock_review.call_args.args[1] == sid
+    assert mock_progress.call_args.args[1] == sid
+
+
+@pytest.mark.asyncio
+async def test_env_off_generate_lesson_does_not_dispatch(env_off):
+    """env=off: POST /generate-lesson must not call ingest/reviewer/progress.
+
+    Pre-PR-3 this HTTP entry never called ingest_session at all. Spec §6.1
+    requires env=off to preserve that invariant — no new student_memory
+    rows because of PR-3.
+    """
+    from httpx import ASGITransport, AsyncClient
+    from run.serve import app
+
+    sid = _make_session({"topic": "T", "diagnosis_result": {"breakdown": []}})
+
+    with patch.object(chat_module, "ingest_session") as mock_ingest, \
+         patch.object(chat_module, "run_memory_review") as mock_review, \
+         patch.object(chat_module, "refresh_progress") as mock_progress, \
+         patch("src.agent.nodes.lesson.lesson_node",
+               return_value={"lesson_content": "## Lesson"}):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://t") as client:
+            r = await client.post(f"/api/chat/{sid}/generate-lesson")
+            assert r.status_code == 200
+        await asyncio.sleep(0.1)
+    mock_ingest.assert_not_called()
+    mock_review.assert_not_called()
+    mock_progress.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_env_off_generate_lesson_stream_does_not_dispatch(env_off):
+    """env=off: POST /generate-lesson/stream must not call ingest/reviewer/progress."""
+    from httpx import ASGITransport, AsyncClient
+    from run.serve import app
+
+    sid = _make_session({"topic": "T", "diagnosis_result": {"breakdown": []}})
+
+    def _fake_token_stream(_state):
+        yield "## Lesson"
+
+    with patch.object(chat_module, "ingest_session") as mock_ingest, \
+         patch.object(chat_module, "run_memory_review") as mock_review, \
+         patch.object(chat_module, "refresh_progress") as mock_progress, \
+         patch("src.agent.nodes.lesson.lesson_node_stream", side_effect=_fake_token_stream):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://t") as client:
+            r = await client.post(f"/api/chat/{sid}/generate-lesson/stream")
+            assert r.status_code == 200
+            await r.aread()
+        await asyncio.sleep(0.1)
+    mock_ingest.assert_not_called()
+    mock_review.assert_not_called()
+    mock_progress.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

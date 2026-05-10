@@ -485,10 +485,15 @@ async def generate_lesson_stream(session_id: str):
         state["lesson_format"] = "markdown"
         _save(session_id, state)
 
-        # Fan out 3 BG tasks (PR-3).
-        _dispatch_memory_writes(
-            DEFAULT_USER_ID, session_id, state, source_event="generate-lesson",
-        )
+        # Fan out 3 BG tasks (PR-3). Gated on env=on: pre-PR-3 this HTTP
+        # entry never called ingest, so env=off must preserve that to satisfy
+        # spec §6.1 "no new rows under env=off". Lesson namespace per §6.6.
+        if _MEMORY_REVIEW_ENABLED:
+            _dispatch_memory_writes(
+                DEFAULT_USER_ID, session_id, state,
+                source_event="generate-lesson",
+                extra_ingest_session_id=f"{session_id}_lesson",
+            )
 
         yield _sse_event({"type": "done", "session_id": session_id})
 
@@ -609,10 +614,15 @@ async def generate_lesson(session_id: str) -> dict:
     state.update(lesson_result)
     _save(session_id, state)
 
-    # Fan out 3 BG tasks (PR-3).
-    _dispatch_memory_writes(
-        DEFAULT_USER_ID, session_id, state, source_event="generate-lesson",
-    )
+    # Fan out 3 BG tasks (PR-3). Gated on env=on: pre-PR-3 this HTTP
+    # entry never called ingest, so env=off must preserve that to satisfy
+    # spec §6.1 "no new rows under env=off". Lesson namespace per §6.6.
+    if _MEMORY_REVIEW_ENABLED:
+        _dispatch_memory_writes(
+            DEFAULT_USER_ID, session_id, state,
+            source_event="generate-lesson",
+            extra_ingest_session_id=f"{session_id}_lesson",
+        )
 
     return {
         "session_id": session_id,
