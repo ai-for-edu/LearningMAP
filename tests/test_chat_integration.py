@@ -253,3 +253,55 @@ async def test_dispatch_swallows_exceptions(env_on, caplog):
         chat_module._dispatch_memory_writes(
             "uid", "sid", state, source_event="t",
         )
+
+
+# ---------------------------------------------------------------------------
+# Trigger point: submit-quiz
+# ---------------------------------------------------------------------------
+
+
+def _make_session(state_overrides: dict | None = None) -> str:
+    """Create a session pre-populated for testing trigger points."""
+    sid = f"test-{uuid.uuid4().hex[:8]}"
+    state = dict(chat_module._DEFAULT_STATE)
+    if state_overrides:
+        state.update(state_overrides)
+    chat_module._sessions[sid] = state
+    return sid
+
+
+@pytest.mark.asyncio
+async def test_submit_quiz_dispatches_three_bg_tasks(env_on):
+    """submit-quiz fires ingest_session + run_memory_review + refresh_progress."""
+    from httpx import ASGITransport, AsyncClient
+    from run.serve import app
+    from src.llm.schemas import QuizQuestion
+
+    # Need at least one question for submit-quiz; bypass diagnosis_node
+    qs = [
+        QuizQuestion(
+            id="q1",
+            knowledge_point="X",
+            question="Q?",
+            options=["a", "b", "c", "d"],
+            answer=0,
+        )
+    ]
+    sid = _make_session({"questions": qs, "topic": "T"})
+
+    with patch.object(chat_module, "ingest_session") as mock_ingest, \
+         patch.object(chat_module, "run_memory_review") as mock_review, \
+         patch.object(chat_module, "refresh_progress") as mock_progress, \
+         patch("src.agent.nodes.diagnosis.diagnosis_node",
+               return_value={"diagnosis_result": {"breakdown": []}}):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://t") as client:
+            r = await client.post(
+                f"/api/chat/{sid}/submit-quiz", json={"answers": [0]},
+            )
+            assert r.status_code == 200
+        await asyncio.sleep(0.1)  # give thread pool time
+    mock_ingest.assert_called_once()
+    mock_review.assert_called_once()
+    mock_progress.assert_called_once()
+    assert mock_review.call_args.args[3] == "submit-quiz"  # source_event

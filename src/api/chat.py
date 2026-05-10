@@ -579,9 +579,9 @@ async def submit_quiz(session_id: str, req: SubmitQuizRequest) -> dict:
     _save(session_id, state)
     _has_history_cache.pop(DEFAULT_USER_ID, None)
 
-    # Persist to student_memory service (background, non-blocking)
-    asyncio.get_event_loop().run_in_executor(
-        None, ingest_session, DEFAULT_USER_ID, session_id, state
+    # Fan out 3 BG tasks: ingest_session + reviewer + progress (PR-3).
+    _dispatch_memory_writes(
+        DEFAULT_USER_ID, session_id, state, source_event="submit-quiz",
     )
 
     dr = state.get("diagnosis_result")
