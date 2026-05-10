@@ -244,15 +244,23 @@ async def test_dispatch_uses_extra_ingest_session_id(env_on):
 @pytest.mark.asyncio
 async def test_dispatch_swallows_exceptions(env_on, caplog):
     """If asyncio.create_task fails (pathological), dispatch logs and returns."""
+    import logging
+
     state = {"topic": "W"}
-    with patch.object(chat_module, "asyncio") as mock_asyncio:
-        mock_asyncio.create_task.side_effect = RuntimeError("no running loop")
-        # to_thread also accessed — let it return a coro stub
-        mock_asyncio.to_thread = lambda *a, **kw: None
+    caplog.set_level(logging.ERROR, logger="src.api.chat")
+    with patch.object(
+        chat_module.asyncio, "create_task", side_effect=RuntimeError("no running loop")
+    ) as mock_create_task:
         # Should not raise even though create_task explodes
         chat_module._dispatch_memory_writes(
             "uid", "sid", state, source_event="t",
         )
+        mock_create_task.assert_called()  # dispatch did try
+
+    # logger.exception was called by dispatch's outer try/except
+    assert any(
+        "memory_dispatch failed" in record.message for record in caplog.records
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -486,3 +494,35 @@ async def test_one_bg_task_failing_does_not_block_others(env_on):
     mock_ingest.assert_called_once()
     mock_progress.assert_called_once()
     mock_review.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Frontend non-exposure
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_state_does_not_expose_memory_snapshot(env_on):
+    """GET /api/chat/{sid}/state response excludes memory_snapshot fields.
+
+    The snapshot is internal context for prompt injection (PR-4) — frontend
+    should never see it. Spec §6.5.
+    """
+    from httpx import ASGITransport, AsyncClient
+    from run.serve import app
+
+    sid = _make_session(
+        {
+            "topic": "T",
+            "memory_snapshot": "## 进程\n- 学生在学 X",
+            "memory_snapshot_loaded_at": 1715000000,
+        }
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://t") as client:
+        r = await client.get(f"/api/chat/{sid}/state")
+    assert r.status_code == 200
+    body = r.json()
+    assert "memory_snapshot" not in body
+    assert "memory_snapshot_loaded_at" not in body
