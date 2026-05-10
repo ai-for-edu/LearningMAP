@@ -5,11 +5,19 @@ from src.agent.state import LearningState
 from src.llm.client import get_raw_client, get_model_name
 from src.memory_client import retrieve_memory, DEFAULT_USER_ID
 from src.skills.loader import get_skill_section
+from src.agent.nodes._helpers import memory_snapshot_block
 from langchain_core.messages import AIMessage
 
 logger = logging.getLogger(__name__)
 
 _BASE_SYSTEM_PROMPT = "You are a friendly AI learning assistant. Help students with their questions. Respond in the same language as the student."
+
+# NOTE (PR-4): chat is the only agent node that does NOT use a Jinja
+# template. The streaming variant (chat_node_stream) and runtime decisions
+# (≥10-char threshold for retrieve_memory) make Python construction
+# more direct than j2 + filters. Other 3 nodes (knowledge_graph / quiz /
+# lesson) use render_prompt(...) and inject {{- memory_snapshot_block }}
+# at template end.
 
 
 def _build_context_summary(state: LearningState) -> str:
@@ -84,11 +92,17 @@ def chat_node(state: LearningState) -> dict:
     if context:
         system_prompt += f"\n\n{context}"
 
-    # ④ Retrieve past learning memory (graceful — empty string on failure)
+    # Frozen snapshot (PR-4): cache-friendly, before retrieve_memory
+    system_prompt += memory_snapshot_block(state)
+
+    # Per-turn L1 retrieval (existing). PR-4 adds ≥10-char threshold to skip
+    # tiny utterances ("嗯"/"继续") that produce noisy embeddings. NOT env-gated:
+    # pre-PR-4 this was unconditional, so env=off keeps L1 retrieval enabled.
     user_msg = messages[-1].content if messages else ""
-    memory_context = retrieve_memory(DEFAULT_USER_ID, user_msg)
-    if memory_context:
-        system_prompt += f"\n\n## 历史学习记忆\n{memory_context}\n\n参考以上历史记录回答，但不要直接复述。"
+    if len(user_msg.strip()) >= 10:
+        memory_context = retrieve_memory(DEFAULT_USER_ID, user_msg)
+        if memory_context:
+            system_prompt += f"\n\n## 历史学习记忆\n{memory_context}\n\n参考以上历史记录回答，但不要直接复述。"
 
     # Convert to OpenAI format
     api_messages = [{"role": "system", "content": system_prompt}]
@@ -130,10 +144,14 @@ def chat_node_stream(state: dict):
     if context:
         system_prompt += f"\n\n{context}"
 
+    # Frozen snapshot (PR-4) — same as chat_node
+    system_prompt += memory_snapshot_block(state)
+
     user_msg = messages[-1].content if messages and hasattr(messages[-1], "content") else ""
-    memory_context = retrieve_memory(DEFAULT_USER_ID, user_msg)
-    if memory_context:
-        system_prompt += f"\n\n## 历史学习记忆\n{memory_context}\n\n参考以上历史记录回答，但不要直接复述。"
+    if len(user_msg.strip()) >= 10:
+        memory_context = retrieve_memory(DEFAULT_USER_ID, user_msg)
+        if memory_context:
+            system_prompt += f"\n\n## 历史学习记忆\n{memory_context}\n\n参考以上历史记录回答，但不要直接复述。"
 
     api_messages = [{"role": "system", "content": system_prompt}]
     for msg in messages:

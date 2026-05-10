@@ -8,6 +8,10 @@ Covers:
 """
 from __future__ import annotations
 
+from unittest.mock import patch
+
+from langchain_core.messages import HumanMessage
+
 from src.agent.nodes._helpers import memory_snapshot_block
 
 
@@ -140,3 +144,73 @@ def test_lesson_review_template_injects_snapshot():
         memory_snapshot_block=block,
     )
     assert SAMPLE_SNAPSHOT in out
+
+
+# ---------------------------------------------------------------------------
+# chat node — snapshot block + retrieve_memory threshold
+# ---------------------------------------------------------------------------
+
+
+def _capture_chat_system_prompt(state, *, retrieve_return=""):
+    """Run chat_node with all LLM/IO mocked; return the captured system prompt."""
+    from src.agent.nodes import chat as chat_mod
+
+    captured = {}
+
+    class _FakeChoice:
+        message = type("M", (), {"content": "ok"})()
+
+    class _FakeResp:
+        choices = [_FakeChoice()]
+
+    def _fake_create(**kwargs):
+        captured["messages"] = kwargs["messages"]
+        return _FakeResp()
+
+    with patch.object(chat_mod, "retrieve_memory", return_value=retrieve_return) as mock_retrieve, \
+         patch.object(chat_mod, "get_raw_client") as mock_client:
+        mock_client.return_value.chat.completions.create.side_effect = _fake_create
+        chat_mod.chat_node(state)
+
+    return captured["messages"][0]["content"], mock_retrieve
+
+
+def test_chat_node_appends_snapshot_when_present():
+    """state has memory_snapshot → system prompt contains snapshot text."""
+    state = {
+        "messages": [HumanMessage(content="解释勾股定理是什么意思")],  # ≥10 chars
+        "memory_snapshot": SAMPLE_SNAPSHOT,
+        "memory_snapshot_loaded_at": 1000,
+    }
+    sys_prompt, _ = _capture_chat_system_prompt(state)
+    assert SAMPLE_SNAPSHOT in sys_prompt
+
+
+def test_chat_node_no_snapshot_when_field_is_none():
+    """state has memory_snapshot=None → system prompt does NOT contain snapshot."""
+    state = {
+        "messages": [HumanMessage(content="解释勾股定理是什么意思")],
+        "memory_snapshot": None,
+    }
+    sys_prompt, _ = _capture_chat_system_prompt(state)
+    assert "## 该学生" not in sys_prompt
+
+
+def test_chat_node_skips_retrieve_for_short_message():
+    """User msg <10 chars → retrieve_memory NOT called."""
+    state = {
+        "messages": [HumanMessage(content="嗯")],   # 1 char
+        "memory_snapshot": None,
+    }
+    _, mock_retrieve = _capture_chat_system_prompt(state)
+    mock_retrieve.assert_not_called()
+
+
+def test_chat_node_calls_retrieve_for_long_message():
+    """User msg ≥10 chars → retrieve_memory called once."""
+    state = {
+        "messages": [HumanMessage(content="解释一下勾股定理的证明")],  # ≥10 chars
+        "memory_snapshot": None,
+    }
+    _, mock_retrieve = _capture_chat_system_prompt(state)
+    mock_retrieve.assert_called_once()
