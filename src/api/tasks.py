@@ -186,7 +186,7 @@ async def run_lesson_generation(
     from src.agent.nodes.lesson import retrieve_skills, _generate_review_lesson
     from src.prompts.loader import render_prompt
     from src.llm.client import get_raw_client, get_model_name
-    from src.memory_client import ingest_session, DEFAULT_USER_ID
+    from src.memory_client import DEFAULT_USER_ID
 
     try:
         state = get_session(session_id) or {}
@@ -273,13 +273,15 @@ async def run_lesson_generation(
             state["knowledge_skills"] = knowledge_skills
         save_session(session_id, state)
 
-        # Memory ingest
-        asyncio.get_event_loop().run_in_executor(
-            None,
-            ingest_session,
+        # Fan out 3 BG tasks (PR-3): ingest + reviewer + progress.
+        # Function-body import dodges the api.chat ↔ api.tasks circular.
+        from src.api.chat import _dispatch_memory_writes
+        _dispatch_memory_writes(
             DEFAULT_USER_ID,
-            f"{session_id}_lesson",
-            state_snapshot,
+            session_id,
+            state,
+            source_event="generate-lesson",
+            extra_ingest_session_id=f"{session_id}_lesson",
         )
 
     except Exception:

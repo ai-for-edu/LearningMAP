@@ -408,3 +408,54 @@ async def test_generate_lesson_stream_dispatches_three_bg_tasks(env_on):
     mock_review.assert_called_once()
     mock_progress.assert_called_once()
     assert mock_review.call_args.args[3] == "generate-lesson"
+
+
+# ---------------------------------------------------------------------------
+# Trigger point: tasks.py run_lesson_generation (background)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_tasks_run_lesson_generation_dispatches(env_on, monkeypatch):
+    """Background lesson task also fans out the three BG tasks via dispatch.
+
+    Drives run_lesson_generation directly (not via HTTP). Verifies that the
+    function-body import + dispatch call replace the prior run_in_executor
+    pattern.
+    """
+    from src.api import tasks as tasks_module
+
+    sid = _make_session({"topic": "T"})
+    state_snapshot = dict(chat_module._sessions[sid])
+    state_snapshot["topic"] = "T"
+    state_snapshot["knowledge_graph"] = None  # short-circuit deeper logic
+
+    def fake_get_session(_sid):
+        return chat_module._sessions[sid]
+
+    def fake_save_session(_sid, _s):
+        pass
+
+    with patch.object(chat_module, "ingest_session") as mock_ingest, \
+         patch.object(chat_module, "run_memory_review") as mock_review, \
+         patch.object(chat_module, "refresh_progress") as mock_progress, \
+         patch("src.agent.nodes.lesson.retrieve_skills",
+               return_value=("", {}, [])), \
+         patch("src.agent.nodes.lesson._generate_review_lesson",
+               return_value="## Lesson"):
+        # No weak_points (third arg = []) hits the all-mastered branch; needs a
+        # knowledge_graph for that path to read .nodes — provide a stub
+        state_snapshot["knowledge_graph"] = type("KG", (), {"nodes": []})()
+        await tasks_module.run_lesson_generation(
+            sid, state_snapshot, fake_get_session, fake_save_session,
+        )
+        await asyncio.sleep(0.1)
+
+    mock_ingest.assert_called_once()
+    mock_review.assert_called_once()
+    mock_progress.assert_called_once()
+    assert mock_review.call_args.args[3] == "generate-lesson"
+    # ingest gets sid_lesson; reviewer/progress get real sid
+    assert mock_ingest.call_args.args[1] == f"{sid}_lesson"
+    assert mock_review.call_args.args[1] == sid
+    assert mock_progress.call_args.args[1] == sid
