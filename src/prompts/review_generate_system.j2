@@ -4,7 +4,13 @@
 {% for kp in candidates %}
 - {{ kp.subtopic }} (上次正确率 {{ "%.0f"|format(kp.last_accuracy * 100) }}%, 距今 {{ kp.days_ago }} 天)
 {% endfor %}
+{% if misconceptions %}
+该学生历史易混点（出干扰项时**优先**从中选取，但若与本题 KP 不相关则可不用）:
+{% for m in misconceptions %}
+- {{ m }}
+{% endfor %}
 
+{% endif %}
 要求:
 1. 每个知识点出 **1 道** 4 选 1 单选题, 总数 = {{ candidates | length }}
 2. 难度对齐上次成绩: 正确率 < 50% 出基础检验题, >= 70% 出应用题

@@ -10,9 +10,22 @@ import logging
 import os
 from datetime import datetime, timezone
 
-from src.llm.client import get_llm_client, get_reviewer_model_name
+import src.llm.client as _llm_client_mod
+import src.memory_client as _memory_client_mod
+from src.llm.client import get_reviewer_model_name
+from src.memory_client import DEFAULT_USER_ID
 
 logger = logging.getLogger(__name__)
+
+_MEMORY_REVIEW_ENABLED = (
+    os.environ.get("ENABLE_MEMORY_REVIEW", "false").lower() == "true"
+)
+
+
+def get_llm_client():
+    """Thin wrapper so old tests can patch src.agent.nodes.review.get_llm_client
+    while new tests can patch src.llm.client.get_llm_client — both intercept."""
+    return _llm_client_mod.get_llm_client()
 
 
 # ---------------------------------------------------------------------------
@@ -181,8 +194,16 @@ def generate_review_questions(candidates: list[dict]) -> list:
             "last_accuracy": c.get("last_accuracy") or 0.0,
         })
 
+    # PR-4: live-fetch misconception notes (review path is the exception —
+    # snapshot is too stale; reviewer-written notes must take effect on the
+    # very next review). env=off skips the fetch entirely.
+    misconceptions: list[str] = []
+    if _MEMORY_REVIEW_ENABLED:
+        notes = _memory_client_mod.fetch_active_notes(DEFAULT_USER_ID, "misconception")
+        misconceptions = [n["content"] for n in notes if n.get("content")]
+
     user_prompt = render_prompt(
-        "review_generate_system", candidates=enriched
+        "review_generate_system", candidates=enriched, misconceptions=misconceptions
     )
 
     try:

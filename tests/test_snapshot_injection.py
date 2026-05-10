@@ -214,3 +214,74 @@ def test_chat_node_calls_retrieve_for_long_message():
     }
     _, mock_retrieve = _capture_chat_system_prompt(state)
     mock_retrieve.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# review path — fetch_active_notes('misconception') + soft-guidance template
+# ---------------------------------------------------------------------------
+
+
+def _make_review_module_with_env(monkeypatch, enabled: bool):
+    """Reload review module with monkeypatched env constant.
+
+    `_MEMORY_REVIEW_ENABLED` is computed at import time, so we set both
+    the env var (for completeness) and force the module-level constant.
+    """
+    from src.agent.nodes import review as review_mod
+    monkeypatch.setenv("ENABLE_MEMORY_REVIEW", "true" if enabled else "false")
+    monkeypatch.setattr(review_mod, "_MEMORY_REVIEW_ENABLED", enabled)
+    return review_mod
+
+
+def test_review_injects_misconceptions_env_on(monkeypatch):
+    """env=on: fetch_active_notes called once, misconceptions appear in prompt."""
+    review_mod = _make_review_module_with_env(monkeypatch, enabled=True)
+
+    fake_notes = [
+        {"content": "把两点距离误用为坐标差不平方"},
+        {"content": "勾股定理只在直角三角形成立但学生在锐角也用"},
+    ]
+    candidates = [
+        {"subtopic": "勾股定理", "last_seen_at": "2026-04-01T00:00:00Z",
+         "last_accuracy": 0.5, "topic": "几何"}
+    ]
+
+    captured = {}
+
+    def _fake_create(**kwargs):
+        captured["prompt"] = kwargs["messages"][0]["content"]
+        return []
+
+    with patch("src.memory_client.fetch_active_notes", return_value=fake_notes) as mock_fetch, \
+         patch("src.llm.client.get_llm_client") as mock_llm:
+        mock_llm.return_value.chat.completions.create.side_effect = _fake_create
+        review_mod.generate_review_questions(candidates)
+
+    mock_fetch.assert_called_once_with(
+        "default_user", "misconception"
+    )
+    assert "把两点距离误用为坐标差不平方" in captured["prompt"]
+    assert "易混点" in captured["prompt"]
+
+
+def test_review_does_not_fetch_env_off(monkeypatch):
+    """env=off: fetch_active_notes never called, misconceptions absent from prompt."""
+    review_mod = _make_review_module_with_env(monkeypatch, enabled=False)
+
+    candidates = [
+        {"subtopic": "X", "last_seen_at": "2026-04-01T00:00:00Z",
+         "last_accuracy": 0.5, "topic": "T"}
+    ]
+
+    captured = {}
+    def _fake_create(**kwargs):
+        captured["prompt"] = kwargs["messages"][0]["content"]
+        return []
+
+    with patch("src.memory_client.fetch_active_notes") as mock_fetch, \
+         patch("src.llm.client.get_llm_client") as mock_llm:
+        mock_llm.return_value.chat.completions.create.side_effect = _fake_create
+        review_mod.generate_review_questions(candidates)
+
+    mock_fetch.assert_not_called()
+    assert "易混点" not in captured["prompt"]

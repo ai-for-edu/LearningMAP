@@ -92,3 +92,19 @@ def test_lesson_review_baseline_env_off():
         memory_snapshot_block="",
     )
     assert out == EXPECTED_LESSON_REVIEW_BASELINE
+
+
+EXPECTED_REVIEW_BASELINE = '你在为学生生成复习检测题. 学生过去学过以下知识点, 现在需要检测每个 KP 是否仍掌握.\n\n候选知识点 (附上次成绩):\n\n- KP1 (上次正确率 50%, 距今 3 天)\n\n\n要求:\n1. 每个知识点出 **1 道** 4 选 1 单选题, 总数 = 1\n2. 难度对齐上次成绩: 正确率 < 50% 出基础检验题, >= 70% 出应用题\n3. 题目独立, 不要"组合题"或跨知识点综合题\n4. 输出严格 JSON, 数组顺序与 candidates 输入一致\n\n输出 schema:\n[\n  {\n    "id": "rq_<index>",\n    "knowledge_point": "<候选 KP 的 subtopic 字段原值>",\n    "question": "<题干, 中文>",\n    "options": ["A 选项", "B 选项", "C 选项", "D 选项"],\n    "answer": <正确选项 index 0-3>\n  },\n  ...\n]\n'
+
+
+def test_review_generate_system_baseline_env_off():
+    """env=off: misconceptions=[] → byte-identical to pre-PR-4 (modulo {% if %} early return)."""
+    out = render_prompt(
+        "review_generate_system",
+        candidates=[
+            {"subtopic": "KP1", "last_accuracy": 0.5, "days_ago": 3,
+             "topic": "T"}
+        ],
+        misconceptions=[],
+    )
+    assert out == EXPECTED_REVIEW_BASELINE
