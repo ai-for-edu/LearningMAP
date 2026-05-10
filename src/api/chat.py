@@ -485,6 +485,11 @@ async def generate_lesson_stream(session_id: str):
         state["lesson_format"] = "markdown"
         _save(session_id, state)
 
+        # Fan out 3 BG tasks (PR-3).
+        _dispatch_memory_writes(
+            DEFAULT_USER_ID, session_id, state, source_event="generate-lesson",
+        )
+
         yield _sse_event({"type": "done", "session_id": session_id})
 
     return StreamingResponse(stream_sse(), media_type="text/event-stream")
@@ -603,6 +608,11 @@ async def generate_lesson(session_id: str) -> dict:
     lesson_result = await asyncio.to_thread(lesson_node, state)
     state.update(lesson_result)
     _save(session_id, state)
+
+    # Fan out 3 BG tasks (PR-3).
+    _dispatch_memory_writes(
+        DEFAULT_USER_ID, session_id, state, source_event="generate-lesson",
+    )
 
     return {
         "session_id": session_id,

@@ -351,3 +351,60 @@ async def test_submit_review_uses_ingest_review_session(env_on, monkeypatch):
     mock_review.assert_called_once()
     mock_progress.assert_called_once()
     assert mock_review.call_args.args[3] == "submit-review"
+
+
+# ---------------------------------------------------------------------------
+# Trigger point: generate-lesson (HTTP entries)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_generate_lesson_dispatches_three_bg_tasks(env_on):
+    """POST /generate-lesson dispatches ingest + reviewer + progress."""
+    from httpx import ASGITransport, AsyncClient
+    from run.serve import app
+
+    sid = _make_session({"topic": "T", "diagnosis_result": {"breakdown": []}})
+
+    with patch.object(chat_module, "ingest_session") as mock_ingest, \
+         patch.object(chat_module, "run_memory_review") as mock_review, \
+         patch.object(chat_module, "refresh_progress") as mock_progress, \
+         patch("src.agent.nodes.lesson.lesson_node",
+               return_value={"lesson_content": "## Lesson"}):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://t") as client:
+            r = await client.post(f"/api/chat/{sid}/generate-lesson")
+            assert r.status_code == 200
+        await asyncio.sleep(0.1)
+    mock_ingest.assert_called_once()
+    mock_review.assert_called_once()
+    mock_progress.assert_called_once()
+    assert mock_review.call_args.args[3] == "generate-lesson"
+
+
+@pytest.mark.asyncio
+async def test_generate_lesson_stream_dispatches_three_bg_tasks(env_on):
+    """POST /generate-lesson/stream also dispatches the three BG tasks."""
+    from httpx import ASGITransport, AsyncClient
+    from run.serve import app
+
+    sid = _make_session({"topic": "T", "diagnosis_result": {"breakdown": []}})
+
+    def _fake_token_stream(_state):
+        yield "## Lesson"
+
+    with patch.object(chat_module, "ingest_session") as mock_ingest, \
+         patch.object(chat_module, "run_memory_review") as mock_review, \
+         patch.object(chat_module, "refresh_progress") as mock_progress, \
+         patch("src.agent.nodes.lesson.lesson_node_stream", side_effect=_fake_token_stream):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://t") as client:
+            r = await client.post(f"/api/chat/{sid}/generate-lesson/stream")
+            assert r.status_code == 200
+            # Drain SSE body
+            await r.aread()
+        await asyncio.sleep(0.1)
+    mock_ingest.assert_called_once()
+    mock_review.assert_called_once()
+    mock_progress.assert_called_once()
+    assert mock_review.call_args.args[3] == "generate-lesson"
