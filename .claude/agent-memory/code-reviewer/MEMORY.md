@@ -1,0 +1,3 @@
+- [Frontend restyle initiative](project_frontend_restyle.md) — 5-page Material→Claude warm cream/orange redesign in progress on demo+memory.
+- [XSS discipline](feedback_xss_escape.md) — all innerHTML writes must use escapeHtml or DOMPurify per CLAUDE.md.
+- [KC Skills feature review](project_kc_skills_feature.md) — ec35306..HEAD approved; latent risk: _llm_resolve dumps full catalogue to LLM prompt (fine at 5 entries, risky at scale).
