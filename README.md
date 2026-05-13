@@ -18,9 +18,9 @@
 - [LangGraph 节点](#langgraph-节点)
 - [Skills / Prompts 体系](#skills--prompts-体系)
 - [Memory 子服务](#memory-子服务)
+- [所需设备推荐](#所需设备推荐)
 - [测试](#测试)
 - [开发约定](#开发约定)
-- [本分支特有改动](#本分支特有改动)
 
 ---
 
@@ -129,6 +129,52 @@ OpenAILearning/
 | [uv](https://docs.astral.sh/uv/) | 0.4+ | 唯一受支持的包管理器 |
 | SQLite | 3.35+ | Python 自带 |
 | OpenAI 兼容 LLM | — | DeepSeek / Moonshot / 任意 OpenAI-Compatible 网关均可 |
+
+详细的硬件建议见下文 [所需设备推荐](#所需设备推荐)。
+
+---
+
+## 所需设备推荐
+
+主服务本身**不跑模型**（推理走外部 LLM 网关），机器压力主要来自 `student_memory` 的本地嵌入模型。按使用方式分档：
+
+### 仅跑主服务（外部 LLM，不启用 memory 子服务）
+
+| 资源 | 推荐 | 最低 |
+|---|---|---|
+| CPU | 4 核 | 2 核 |
+| 内存 | 4 GB | 2 GB |
+| 磁盘 | 2 GB（含依赖 + `sessions.db`） | 1 GB |
+| GPU | 不需要 | 不需要 |
+| 网络 | 能访问 `OPENAI_BASE_URL` 即可；延迟越低响应越快 | — |
+
+> 真正决定体验的是 **LLM 网关的延迟和并发额度**，不是本机性能。流式接口（`/chat/stream` 等）的首字时间几乎等于网关首字时间。
+
+### 启用 memory 子服务（含本地向量嵌入）
+
+memory 服务把全部嵌入推理放在本机，按嵌入器选择决定硬件需求：
+
+| 嵌入器 | `SM_EMBEDDING_MODEL` | 维度 | 内存占用 | 磁盘 | GPU |
+|---|---|---|---|---|---|
+| **FakeEmbedder**（开发/演示） | `fake-test` | 16 | < 100 MB | < 10 MB | 不需要 |
+| **bge-small-zh-v1.5**（轻量） | `BAAI/bge-small-zh-v1.5` | 512 | ~1 GB | ~500 MB | 可选（CPU 可跑） |
+| **bge-m3**（默认，多语言） | `BAAI/bge-m3` | 1024 | ~3 GB | ~2.5 GB | 推荐 |
+
+主服务 + memory 服务**部署在同一台机器**时的综合推荐：
+
+| 场景 | CPU | 内存 | 磁盘 | GPU |
+|---|---|---|---|---|
+| 开发 / 演示（FakeEmbedder） | 4 核 | 4 GB | 2 GB | 无 |
+| 单机生产 · bge-small-zh，纯 CPU | 8 核 | 6 GB | 4 GB | 无 |
+| 单机生产 · bge-m3，CPU | 8 核 | 8 GB | 6 GB | 无（响应稍慢） |
+| 单机生产 · bge-m3，GPU 加速 | 4 核 | 8 GB | 6 GB | ≥ 6 GB 显存（如 RTX 3060 / T4） |
+
+实操建议：
+
+- **首次启动需要下载模型**：bge-m3 ≈ 2 GB、bge-small-zh ≈ 500 MB。提前预热或挂代理。
+- **没有 GPU 也能跑** bge-m3，但单条 `/retrieve` 推理在 CPU 上约 200–500 ms；高并发场景建议切 bge-small-zh 或加 GPU。
+- **Mac Apple Silicon (M1/M2/M3)** 可用 `SM_EMBEDDING_DEVICE=mps` 走 Metal 加速；8 GB 统一内存机型建议用 bge-small-zh。
+- **多进程禁用**：memory 服务的 hnswlib 索引非进程安全，**只跑单 worker**，通过线程并发。
 
 ---
 
@@ -347,22 +393,6 @@ uv run ruff format src/ run/ tests/
 - **状态可重放**：任何前端需要在刷新后还原的视觉元素，都要能从 `GET /api/chat/{sid}/state` 推导。
 - **PPTElement 扩展**：新增类型时同步修改 5 处 ——`slide_schemas.py`、slides 后处理链、`slides.html` 渲染器、`pptx_export.py`、`slide_content_system.j2`。
 - **XSS**：前端所有 `innerHTML` 必须先 `escapeHtml` 或 DOMPurify。
-
----
-
-## 本分支特有改动
-
-`demo+memory` 在 `demo` 之上叠加了以下能力：
-
-| 范围 | 提交序列（节选） | 说明 |
-|---|---|---|
-| **memory PR-1/2/3/4** | `93b5cfa` `5e9fb1f` `6943201` `2e82628` `4316207` `70aa24d` `99e325b` `8a2a39c` `2f21ad6` `a1051d6` `2e82628` | 把 memory snapshot 注入到 chat / quiz / knowledge_graph / lesson；review 路径实时拉 misconception notes |
-| **review 多样化** | `f7b1b07` | 用最近题干反馈打散复盘题目分布 |
-| **LLM 客户端代理修复** | `fc7e51c` | 强制绕过系统 HTTP 代理 |
-| **Smoke 修复** | `66e7983` | proxy bypass + intent gate + schema 对齐 |
-| **L2 反思笔记落库** | memory PR-1 系列 | `POST /notes` 4-category 写入 |
-
-> 设计文档归档在 `docs/plans/` 与 `docs/superpowers/specs/`（这两个目录已被 `.gitignore`，本地查看）。
 
 ---
 
