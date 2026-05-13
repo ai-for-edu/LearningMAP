@@ -248,6 +248,54 @@ class TestGenerateReviewQuestions:
         assert call_kwargs["model"] == "test-cheap-model"
 
     @patch("src.agent.nodes.review.get_llm_client")
+    def test_recent_questions_rendered_into_prompt(self, mock_get_client) -> None:
+        """When `recent_questions_by_kp` is supplied, the rendered prompt
+        must include the stems so the LLM is told to vary angle on those KPs.
+        KPs absent from the dict must NOT trigger the section."""
+        from src.agent.nodes.review import generate_review_questions
+        from src.llm.schemas import QuizQuestion
+
+        mock_client = mock_get_client.return_value
+        mock_client.chat.completions.create.return_value = [
+            QuizQuestion(id="rq_0", knowledge_point="A",
+                         question="Q", options=["a", "b", "c", "d"], answer=0),
+            QuizQuestion(id="rq_1", knowledge_point="B",
+                         question="Q", options=["a", "b", "c", "d"], answer=0),
+        ]
+        candidates = [
+            _make_item("A", last_seen_days_ago=10, last_accuracy=0.5),
+            _make_item("B", last_seen_days_ago=10, last_accuracy=0.5),
+        ]
+        recent = {"A": ["Q-old-1", "Q-old-2"]}  # nothing for B
+
+        generate_review_questions(candidates, recent_questions_by_kp=recent)
+
+        rendered = mock_client.chat.completions.create.call_args.kwargs[
+            "messages"
+        ][0]["content"]
+        assert "Q-old-1" in rendered
+        assert "Q-old-2" in rendered
+
+    @patch("src.agent.nodes.review.get_llm_client")
+    def test_recent_questions_none_omits_section(self, mock_get_client) -> None:
+        """No recent-questions input → no 已出过 block in prompt (default path)."""
+        from src.agent.nodes.review import generate_review_questions
+        from src.llm.schemas import QuizQuestion
+
+        mock_client = mock_get_client.return_value
+        mock_client.chat.completions.create.return_value = [
+            QuizQuestion(id="rq_0", knowledge_point="A",
+                         question="Q", options=["a", "b", "c", "d"], answer=0),
+        ]
+        candidates = [_make_item("A", last_seen_days_ago=10, last_accuracy=0.5)]
+        generate_review_questions(candidates)  # no recent kwarg
+
+        rendered = mock_client.chat.completions.create.call_args.kwargs[
+            "messages"
+        ][0]["content"]
+        assert "已出过" not in rendered
+
+    @patch("src.agent.nodes.review.get_llm_client")
     def test_none_last_accuracy_does_not_crash(self, mock_get_client) -> None:
         """A candidate with last_accuracy=None must not crash the template."""
         from src.agent.nodes.review import generate_review_questions

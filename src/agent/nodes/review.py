@@ -166,11 +166,21 @@ def grade_review(
 # LLM-bearing question generation
 # ---------------------------------------------------------------------------
 
-def generate_review_questions(candidates: list[dict]) -> list:
+def generate_review_questions(
+    candidates: list[dict],
+    *,
+    recent_questions_by_kp: dict[str, list[str]] | None = None,
+) -> list:
     """Call LLM with the review_generate prompt, return list[QuizQuestion].
 
     Empty input → empty output, no LLM call. Failure → empty list (caller
     sees an empty review and the front-end can skip silently).
+
+    ``recent_questions_by_kp`` is the caller's record of stems already asked
+    on each KP in earlier reviews; surfacing them in the prompt steers the
+    LLM to vary the angle without us touching ``temperature`` (which would
+    risk factual hallucination on a graded item). None / empty dict =
+    no-op, prompt stays the original shape.
     """
     if not candidates:
         return []
@@ -202,8 +212,16 @@ def generate_review_questions(candidates: list[dict]) -> list:
         notes = _memory_client_mod.fetch_active_notes(DEFAULT_USER_ID, "misconception")
         misconceptions = [n["content"] for n in notes if n.get("content")]
 
+    recent_prompt_block = {
+        kp: list(stems) for kp, stems in (recent_questions_by_kp or {}).items()
+        if stems
+    }
+
     user_prompt = render_prompt(
-        "review_generate_system", candidates=enriched, misconceptions=misconceptions
+        "review_generate_system",
+        candidates=enriched,
+        misconceptions=misconceptions,
+        recent_questions=recent_prompt_block,
     )
 
     try:

@@ -209,3 +209,120 @@ def test_submit_review_rejects_out_of_range_answer(
         json={"answers": [99]},
     )
     assert r.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Variety: snapshot refresh + recent-question feedback
+# ---------------------------------------------------------------------------
+
+
+@patch("src.agent.nodes.review.get_llm_client")
+@patch("src.memory_client.fetch_mastery")
+def test_start_review_refetches_mastery_even_when_state_has_snapshot(
+    mock_fetch, mock_llm, client_gate_on, session_id_gate_on
+):
+    """Stale state['mastery_snapshot'] must NOT short-circuit fetch_mastery.
+
+    Reason: after submit-review the server-side mastery rows update, but the
+    session-cached snapshot stays put — re-using it pins the candidate KP
+    list across repeated reviews, which pins the LLM prompt, which pins the
+    questions. The fix is to always re-fetch on start-review entry.
+    """
+    from src.llm.schemas import QuizQuestion
+
+    # Plant a stale snapshot directly in state.
+    state = chat_module._sessions[session_id_gate_on]
+    state["mastery_snapshot"] = [{
+        "subtopic": "STALE", "topic": "T",
+        "last_seen_at": "2026-01-01T00:00:00Z",
+        "session_count": 1, "total_questions": 1, "total_correct": 0,
+        "last_accuracy": 0.0,
+    }]
+    chat_module._save(session_id_gate_on, state)
+
+    mock_fetch.return_value = [{
+        "subtopic": "FRESH", "topic": "T",
+        "last_seen_at": "2026-04-01T00:00:00Z",
+        "session_count": 1, "total_questions": 4, "total_correct": 2,
+        "last_accuracy": 0.5,
+    }]
+    mock_llm.return_value.chat.completions.create.return_value = [
+        QuizQuestion(id="rq_0", knowledge_point="FRESH",
+                     question="q", options=["a", "b", "c", "d"], answer=0),
+    ]
+
+    r = client_gate_on.post(f"/api/chat/{session_id_gate_on}/start-review")
+    assert r.status_code == 200, r.text
+    assert mock_fetch.called, "fetch_mastery must be invoked even with a cached snapshot"
+    fresh = chat_module._sessions[session_id_gate_on]["mastery_snapshot"]
+    assert any(row["subtopic"] == "FRESH" for row in fresh)
+    assert not any(row["subtopic"] == "STALE" for row in fresh)
+
+
+@patch("src.agent.nodes.review.get_llm_client")
+@patch("src.memory_client.fetch_mastery")
+def test_repeated_start_review_feeds_prior_question_into_prompt(
+    mock_fetch, mock_llm, client_gate_on, session_id_gate_on
+):
+    """Two start-review calls in a row → second call's prompt MUST mention
+    the first call's question stem, so the LLM is asked to change angle
+    without us touching `temperature` (which would risk factual hallucination)."""
+    from src.llm.schemas import QuizQuestion
+
+    mock_fetch.return_value = [{
+        "subtopic": "A", "topic": "T",
+        "last_seen_at": "2026-04-01T00:00:00Z",
+        "session_count": 1, "total_questions": 4, "total_correct": 2,
+        "last_accuracy": 0.5,
+    }]
+    mock_llm.return_value.chat.completions.create.side_effect = [
+        [QuizQuestion(id="rq_0", knowledge_point="A",
+                      question="Q-FIRST-uniq", options=["a", "b", "c", "d"], answer=0)],
+        [QuizQuestion(id="rq_0", knowledge_point="A",
+                      question="Q-SECOND", options=["a", "b", "c", "d"], answer=0)],
+    ]
+
+    r1 = client_gate_on.post(f"/api/chat/{session_id_gate_on}/start-review")
+    assert r1.status_code == 200, r1.text
+    r2 = client_gate_on.post(f"/api/chat/{session_id_gate_on}/start-review")
+    assert r2.status_code == 200, r2.text
+
+    second_prompt = (
+        mock_llm.return_value.chat.completions.create
+        .call_args_list[1].kwargs["messages"][0]["content"]
+    )
+    assert "Q-FIRST-uniq" in second_prompt, (
+        "Second start-review's prompt should reference the first call's "
+        "question so the LLM is directed to switch angle"
+    )
+
+
+@patch("src.agent.nodes.review.get_llm_client")
+@patch("src.memory_client.fetch_mastery")
+def test_review_question_history_capped_per_kp(
+    mock_fetch, mock_llm, client_gate_on, session_id_gate_on
+):
+    """state['review_question_history'][kp] must not grow unboundedly.
+    Cap = 3 (keep last 3 stems per KP)."""
+    from src.llm.schemas import QuizQuestion
+
+    mock_fetch.return_value = [{
+        "subtopic": "A", "topic": "T",
+        "last_seen_at": "2026-04-01T00:00:00Z",
+        "session_count": 1, "total_questions": 4, "total_correct": 2,
+        "last_accuracy": 0.5,
+    }]
+    mock_llm.return_value.chat.completions.create.side_effect = [
+        [QuizQuestion(id="rq_0", knowledge_point="A",
+                      question=f"Qv{i}", options=["a", "b", "c", "d"], answer=0)]
+        for i in range(5)
+    ]
+
+    for _ in range(5):
+        r = client_gate_on.post(f"/api/chat/{session_id_gate_on}/start-review")
+        assert r.status_code == 200
+
+    hist = chat_module._sessions[session_id_gate_on]["review_question_history"]["A"]
+    assert len(hist) == 3
+    # Oldest two ("Qv0", "Qv1") evicted; last three retained
+    assert hist == ["Qv2", "Qv3", "Qv4"]

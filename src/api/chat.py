@@ -206,6 +206,7 @@ _DEFAULT_STATE = {
     "review_questions": [],
     "review_answers": [],
     "review_result": None,
+    "review_question_history": {},
     "memory_snapshot": None,
     "memory_snapshot_loaded_at": None,
 }
@@ -1099,19 +1100,43 @@ async def start_review(session_id: str) -> dict:
         select_candidate_kps, generate_review_questions,
     )
 
-    snapshot = state.get("mastery_snapshot")
-    # Refresh snapshot if missing (cheap; small payload)
-    if not snapshot:
-        snapshot = await asyncio.to_thread(fetch_mastery, DEFAULT_USER_ID)
-        state["mastery_snapshot"] = snapshot
+    # Always re-fetch: the in-state snapshot is stale by definition after
+    # submit-review runs progress aggregation. Pinning it would pin the
+    # candidate KP list → pin the LLM prompt → pin the generated questions.
+    snapshot = await asyncio.to_thread(fetch_mastery, DEFAULT_USER_ID)
+    state["mastery_snapshot"] = snapshot
 
     candidates = select_candidate_kps(snapshot)
     if not candidates:
         raise HTTPException(status_code=404, detail="No history to review")
 
-    questions = await asyncio.to_thread(generate_review_questions, candidates)
+    # Surface only the candidate KPs' prior questions to keep the prompt tight.
+    history: dict[str, list[str]] = state.get("review_question_history") or {}
+    candidate_kp_set = {c["subtopic"] for c in candidates}
+    recent_for_prompt = {
+        kp: list(stems) for kp, stems in history.items()
+        if kp in candidate_kp_set and stems
+    }
+
+    questions = await asyncio.to_thread(
+        generate_review_questions, candidates,
+        recent_questions_by_kp=recent_for_prompt or None,
+    )
     if not questions:
         raise HTTPException(status_code=502, detail="Failed to generate review questions")
+
+    # Accumulate stems per KP, cap to last 3 — bigger windows blow the prompt
+    # without adding diversity (LLM already pattern-broke after a couple).
+    updated_history = dict(history)
+    for q in questions:
+        kp = q.knowledge_point
+        stem = q.question
+        if not kp or not stem:
+            continue
+        prev = list(updated_history.get(kp) or [])
+        prev.append(stem)
+        updated_history[kp] = prev[-3:]
+    state["review_question_history"] = updated_history
 
     state["review_questions"] = questions
     state["review_answers"] = []

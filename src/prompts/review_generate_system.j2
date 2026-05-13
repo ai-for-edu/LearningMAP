@@ -11,6 +11,17 @@
 {% endfor %}
 
 {% endif %}
+{%- if recent_questions -%}
+{# inject a 'changed-angle' steering block; emitted only when caller passes recent_questions #}
+以下题型最近已出过, 请换考察角度避免重复（仍考查同一 KP，但改变情境/提问方式/数字）:
+{% for kp, stems in recent_questions.items() %}
+- {{ kp }}:
+{% for stem in stems %}
+  · {{ stem }}
+{% endfor %}
+{% endfor %}
+
+{% endif %}
 要求:
 1. 每个知识点出 **1 道** 4 选 1 单选题, 总数 = {{ candidates | length }}
 2. 难度对齐上次成绩: 正确率 < 50% 出基础检验题, >= 70% 出应用题
