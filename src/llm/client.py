@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import logging
 
+import httpx
 import openai
 import instructor
 from dotenv import load_dotenv
@@ -15,10 +16,20 @@ _raw_client: openai.OpenAI | None = None
 
 
 def _get_base_client(api_key: str | None = None) -> openai.OpenAI:
-    """Create an OpenAI-compatible client."""
+    """Create an OpenAI-compatible client.
+
+    trust_env=False skips OS-level HTTP(S)_PROXY auto-detection. Domestic
+    relays like yunwu.ai are reachable directly; routing them through a
+    local proxy (e.g. ClashX at 127.0.0.1:6152) causes TLS handshake
+    timeouts in the CONNECT tunnel. Mirrors memory_client.py.
+    """
     key = api_key or os.environ.get("OPENAI_API_KEY", "")
     base_url = os.environ.get("OPENAI_BASE_URL", None)
-    return openai.OpenAI(api_key=key, base_url=base_url)
+    http_client = httpx.Client(
+        trust_env=False,
+        timeout=httpx.Timeout(120.0, connect=10.0),
+    )
+    return openai.OpenAI(api_key=key, base_url=base_url, http_client=http_client)
 
 
 def get_llm_client(api_key: str | None = None) -> instructor.Instructor:
