@@ -1,0 +1,371 @@
+# OpenAILearning · `demo+memory` 分支
+
+面向自适应学习场景的 AI 教学助手。前端是一组静态页面，后端是基于 **LangGraph** 状态机的 FastAPI 服务；本分支在主 demo 之上接入了一个独立的**学习记忆微服务**（`student_memory/`），用于跨会话语义检索 + L2 反思笔记。
+
+> 单次 HTTP 请求驱动一次 LangGraph 单轮执行：`intent → (chat | knowledge_graph | quiz | grading→diagnosis→lesson | slides)`。会话状态持久化在内存 + SQLite。
+
+---
+
+## 目录
+
+- [功能流水线](#功能流水线)
+- [仓库结构](#仓库结构)
+- [运行环境](#运行环境)
+- [快速开始](#快速开始)
+- [环境变量](#环境变量)
+- [API 接口](#api-接口)
+- [前端页面](#前端页面)
+- [LangGraph 节点](#langgraph-节点)
+- [Skills / Prompts 体系](#skills--prompts-体系)
+- [Memory 子服务](#memory-子服务)
+- [测试](#测试)
+- [开发约定](#开发约定)
+- [本分支特有改动](#本分支特有改动)
+
+---
+
+## 功能流水线
+
+```
+用户输入主题
+      │
+      ▼
+┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+│ knowledge_   │──►│  自适应 Quiz │──►│  Grading +   │
+│  graph 节点  │   │   (quiz 节点)│   │  Diagnosis   │
+└──────────────┘   └──────────────┘   └──────┬───────┘
+                                             │
+                       ┌─────────────────────┴───────────────┐
+                       ▼                                     ▼
+                ┌──────────────┐                      ┌──────────────┐
+                │ Markdown 课时│                      │  PPT 幻灯片  │
+                │ (lesson 节点)│                      │ (slides 节点)│
+                └──────────────┘                      └──────────────┘
+                       │                                     │
+                       └─────────────┬───────────────────────┘
+                                     ▼
+                         Review 节点 (复盘 / L2 笔记)
+                                     │
+                                     ▼
+               POST /ingest + /notes  →  student_memory
+                                     │
+                  下次会话 chat 节点  ◄── POST /retrieve
+```
+
+- **chat 节点**注入历史 memory snapshot 作为 system prompt 增强项；空库时安全降级。
+- **review 节点**触发 L2 反思，把错题摘要落入 memory 的 `/notes` (4-category)。
+- **大模型调用**统一走 `src/llm/client.py`（OpenAI SDK + Instructor 结构化输出），全部包在 `asyncio.to_thread` 中，不阻塞事件循环。
+
+---
+
+## 仓库结构
+
+```
+OpenAILearning/
+├── run/
+│   ├── serve.py                 # FastAPI 入口（端口 8080）
+│   ├── classba_client.py        # 外部 ClassBA Agent 客户端（可选）
+│   └── build_kc_skills.py       # 离线构建 KC-skill 知识表
+├── src/
+│   ├── api/                     # FastAPI router + session store（SQLite）
+│   │   ├── chat.py              # 全部 HTTP 端点
+│   │   ├── store.py             # 内存 dict + sessions.db 双写
+│   │   └── tasks.py             # 后台异步任务（生成 lesson / slides）
+│   ├── agent/
+│   │   ├── graph.py             # LangGraph 状态机装配
+│   │   ├── state.py             # LearningState（Pydantic）
+│   │   ├── mastery_annotator.py # KG 节点上的掌握度标注
+│   │   └── nodes/
+│   │       ├── intent.py        # 入口路由：chat / kg / quiz / lesson / slides
+│   │       ├── chat.py          # 自由问答 + memory snapshot 注入
+│   │       ├── knowledge_graph.py
+│   │       ├── quiz.py          # 自适应出题
+│   │       ├── grading.py       # 阅卷
+│   │       ├── diagnosis.py     # 学情诊断
+│   │       ├── lesson.py        # Markdown 课程
+│   │       ├── slides.py        # PPT 大纲 + 逐页布局
+│   │       ├── review.py        # L2 反思 / 错题复盘
+│   │       ├── kc_skill_resolver.py
+│   │       └── _helpers.py
+│   ├── llm/
+│   │   ├── client.py            # OpenAI 兼容客户端 + Instructor
+│   │   ├── schemas.py           # 核心 Pydantic 模型
+│   │   └── slide_schemas.py     # PPTElement / SlideData
+│   ├── prompts/                 # 全部 Jinja2 .j2 模板
+│   ├── skills/                  # 教学法 skills 加载器
+│   ├── forgetting/              # 遗忘曲线（Ebbinghaus）
+│   ├── export/pptx_export.py    # PPT → .pptx 导出（python-pptx）
+│   ├── utils/json_repair.py     # 4 策略 JSON 修复
+│   ├── memory_client.py         # 调用 student_memory 的唯一接缝
+│   ├── progress_aggregator.py
+│   └── reviewer.py
+├── skills/                      # 可插拔教学法（feynman / scaffolding / socratic）
+│   └── <skill>/SKILL.md
+├── static/                      # 前端（vanilla JS + Tailwind）
+│   ├── index.html               # 主对话页
+│   ├── diagnosis.html           # 诊断卡 + 学情图
+│   ├── lesson.html              # Markdown 课时阅读
+│   ├── slides.html              # PPT 渲染
+│   ├── results.html
+│   ├── api.js                   # 共享 HTTP 客户端
+│   ├── sidebar.js               # 会话列表
+│   └── session-data.js
+├── tests/                       # pytest 用例（含 manual/ smoke 脚本，pytest 默认跳过）
+├── student_memory/              # 独立 FastAPI 微服务（见下文）
+├── pyproject.toml               # 主项目依赖
+├── .python-version              # 3.11
+└── sessions.db                  # SQLite 会话持久化（运行时生成）
+```
+
+> `student_memory/` 是**独立子项目**，自带 `pyproject.toml` / `uv.lock` / `tests/`，**不**会被根目录 `uv sync` 安装。
+
+---
+
+## 运行环境
+
+| 依赖 | 版本 | 备注 |
+|---|---|---|
+| Python | 3.11 | `.python-version` 锁定 |
+| [uv](https://docs.astral.sh/uv/) | 0.4+ | 唯一受支持的包管理器 |
+| SQLite | 3.35+ | Python 自带 |
+| OpenAI 兼容 LLM | — | DeepSeek / Moonshot / 任意 OpenAI-Compatible 网关均可 |
+
+---
+
+## 快速开始
+
+### 1. 安装依赖
+
+```bash
+uv sync                              # 主服务
+cd student_memory && uv sync && cd ..  # memory 子服务（按需）
+```
+
+### 2. 写入 `.env`
+
+```bash
+# .env （仓库根目录）
+OPENAI_API_KEY=sk-xxxxxxxx
+OPENAI_BASE_URL=https://api.deepseek.com/v1
+LLM_MODEL=deepseek-chat
+
+# 可选 —— 不写则使用默认值
+MEMORY_SERVICE_URL=http://127.0.0.1:8090
+ALLOWED_ORIGINS=*
+REVIEW_MIN_AGE_SECONDS=86400
+
+# 可选 —— ClassBA 外部 Agent，仅在调用 run/classba_client.py 时需要
+# CLASSBA_AUTH=...
+# CLASSBA_API_URL=...
+# CLASSBA_AGENT_NAME=...
+```
+
+### 3. 启动
+
+**主服务（8080）**
+
+```bash
+uv run python run/serve.py
+# Uvicorn → http://0.0.0.0:8080
+```
+
+**Memory 子服务（8090，可选）**
+
+```bash
+cd student_memory
+SM_USE_FAKE_EMBEDDER=1 uv run uvicorn app.main:app --host 127.0.0.1 --port 8090
+```
+
+> Memory 服务不可用时，主服务**自动优雅降级**（不注入 context_text、不写 ingest），不会阻塞对话。
+
+### 4. 访问前端
+
+浏览器打开 `http://localhost:8080/`（FastAPI 已挂载 `static/`）。
+
+---
+
+## 环境变量
+
+主服务读取的全部变量（在 `.env` 或进程环境中）：
+
+| 变量 | 默认值 | 用途 |
+|---|---|---|
+| `OPENAI_API_KEY` | — | **必填**，LLM 鉴权 |
+| `OPENAI_BASE_URL` | — | **必填**，OpenAI 兼容端点 |
+| `LLM_MODEL` | — | **必填**，模型名 |
+| `MEMORY_SERVICE_URL` | `http://127.0.0.1:8090` | student_memory 服务地址 |
+| `ALLOWED_ORIGINS` | `*` | CORS 白名单，逗号分隔 |
+| `REVIEW_MIN_AGE_SECONDS` | `86400` | 复盘节点最低间隔（秒） |
+| `CLASSBA_AUTH` / `CLASSBA_API_URL` / `CLASSBA_AGENT_NAME` | — | 可选，调用 ClassBA 外部 Agent |
+
+LLM 客户端已强制 **bypass OS HTTP proxy**（见 commit `fc7e51c`），无需额外配置代理。
+
+---
+
+## API 接口
+
+主要路由（全部挂在 `/api` 前缀下，详见 `src/api/chat.py`）：
+
+| Method | Path | 说明 |
+|---|---|---|
+| POST | `/api/chat` | 单轮对话（同步） |
+| POST | `/api/chat/stream` | 单轮对话（SSE 流式） |
+| POST | `/api/chat/{sid}/generate-quiz/stream` | 生成自适应题目 |
+| POST | `/api/chat/{sid}/submit-quiz` | 提交答题 → grading → diagnosis |
+| POST | `/api/chat/{sid}/generate-lesson` | 生成 Markdown 课时 |
+| POST | `/api/chat/{sid}/generate-lesson/stream` | 同上（SSE） |
+| POST | `/api/chat/{sid}/generate-slides` | 生成 PPT |
+| POST | `/api/chat/{sid}/generate-slides/stream` | 同上（SSE） |
+| GET  | `/api/chat/{sid}/export-pptx` | 导出 `.pptx` 文件 |
+| GET  | `/api/chat/{sid}/state` | 取会话完整快照（前端重建用） |
+| POST | `/api/chat/{sid}/generate/{task_type}` | 通用后台任务调度 |
+| GET  | `/api/chat/{sid}/generate/{task_type}/status` | 查任务状态 |
+| POST | `/api/chat/{sid}/generate/{task_type}/cancel` | 取消任务 |
+| GET  | `/api/skills` | 列教学法 skill |
+| POST | `/api/chat/{sid}/set-skill` | 切换当前 skill |
+| POST | `/api/chat/{sid}/toggle-knowledge-skills` | 开关 KS 注入 |
+| POST | `/api/chat/{sid}/toggle-kc-skills` | 开关 KC-skill 注入 |
+| POST | `/api/chat/{sid}/start-review` | 启动 L2 复盘 |
+| POST | `/api/chat/{sid}/submit-review` | 提交复盘结果 |
+| GET  | `/health` | 健康检查 |
+
+> 前端会用 `GET /api/chat/{sid}/state` **完整重建**会话视图（图表 / 诊断卡 / 课时按钮）。任何想在刷新后保留的视图元素都**必须可从 state 推导**，不能只依赖消息流。
+
+---
+
+## 前端页面
+
+| 页面 | 入口 | 职责 |
+|---|---|---|
+| `index.html` | `/` | 主对话、题目作答、流式渲染 |
+| `diagnosis.html` | `/diagnosis.html?session_id=…` | 诊断卡片 + 学情雷达图 |
+| `lesson.html` | `/lesson.html?session_id=…` | Markdown 课时阅读 |
+| `slides.html` | `/slides.html?session_id=…` | PPT 渲染（与 PPTX 导出共用 `SlideData`） |
+| `results.html` | `/results.html?session_id=…` | 答题汇总 |
+
+共享脚本：
+
+- `api.js`：HTTP 客户端 + `escapeHtml` / `safeMarkdown` / 导出工具
+- `sidebar.js`：会话列表
+- `session-data.js`：state 反序列化
+
+**XSS 纪律**：所有 `innerHTML` 必须经 `escapeHtml` 或 DOMPurify。
+
+---
+
+## LangGraph 节点
+
+`src/agent/graph.py` 装配的状态机，按 `intent` 节点的判定分支：
+
+```
+intent ──► chat
+       ├─► knowledge_graph
+       ├─► quiz
+       ├─► grading ──► diagnosis ──► lesson
+       └─► slides   (outline → 逐页内容 + 布局)
+```
+
+幻灯片 pipeline 的后处理链（移植自 OpenMAIC `scene-generator.ts`）：
+
+```
+LLM JSON
+   │
+   ▼
+parse_json_response  →  _fix_element_defaults
+                              │
+                              ▼
+                      _process_latex_elements  (CJK → TextElement)
+                              │
+                              ▼
+                      _enforce_canvas_bounds   (1000 × 562.5)
+                              │
+                              ▼
+                      _assign_ids_and_rotation
+                              │
+                              ▼
+                          Pydantic 校验
+```
+
+LLM 返回的 JSON 脆弱性问题由 `src/utils/json_repair.py` 的 **4 策略修复**承担，**不要**在 node 里写 ad-hoc 修复。
+
+---
+
+## Skills / Prompts 体系
+
+- **Skills**（`skills/<name>/SKILL.md`）：可插拔教学法 prompt 片段，加载方 `src/skills/loader.py`，在 chat 节点按 intent/state 注入。
+  - 已内置：`feynman` / `scaffolding` / `socratic`
+  - **新增 skill = 新目录 + `SKILL.md`，零代码改动**
+- **Prompts**（`src/prompts/*.j2`）：所有 LLM prompt 都是 Jinja2 模板，**禁止在 node 里 inline 字符串**。
+  - `slide_content_system.j2` ≈ 961 行，移植自 OpenMAIC，视为 load-bearing，谨慎修改。
+
+---
+
+## Memory 子服务
+
+`student_memory/` 是独立 FastAPI 服务，详见其 [README](student_memory/README.md)。本仓库通过 **`src/memory_client.py`** 这一个文件与其通信，无其他耦合。
+
+主要交互点（见 `docs/superpowers/specs/2026-05-08-hybrid-agent-memory-design.md`）：
+
+- `chat` 节点 →  `POST /retrieve`：注入 `context_text` 进 system prompt
+- 诊断/课程结束 →  `POST /ingest`：写入子主题级 MemoryUnit
+- `review` 节点 →  `POST /notes` / `GET /notes/{uid}/neighbors`：4-category L2 反思笔记
+
+> 默认 8090 端口；可通过 `MEMORY_SERVICE_URL` 覆盖。**不可用时主服务自动跳过**。
+
+---
+
+## 测试
+
+```bash
+# 主项目
+uv run python -m pytest tests/ -v
+uv run python -m pytest tests/test_api.py::test_name -v   # 单例
+
+# memory 子项目
+cd student_memory && uv run pytest -v
+```
+
+约定：
+
+- `tests/manual/` 下是手动 smoke 脚本，pytest 默认通过 `norecursedirs` **跳过**。
+- 一次性回归脚本写完跑过即 `rm`，**不要 `git add`**（见 `MEMORY.md`）。
+
+Lint / Format：
+
+```bash
+uv run ruff check src/ run/ tests/
+uv run ruff format src/ run/ tests/
+```
+
+---
+
+## 开发约定
+
+- **包管理**：仅 `uv`，不混用 pip / poetry。
+- **LLM 调用**：全部走 `src/llm/client.py`，全部 `asyncio.to_thread` 包裹。
+- **Prompt 修改**：仅改 `.j2` 文件，禁止在 Python 里拼接 prompt 字符串。
+- **状态可重放**：任何前端需要在刷新后还原的视觉元素，都要能从 `GET /api/chat/{sid}/state` 推导。
+- **PPTElement 扩展**：新增类型时同步修改 5 处 ——`slide_schemas.py`、slides 后处理链、`slides.html` 渲染器、`pptx_export.py`、`slide_content_system.j2`。
+- **XSS**：前端所有 `innerHTML` 必须先 `escapeHtml` 或 DOMPurify。
+
+---
+
+## 本分支特有改动
+
+`demo+memory` 在 `demo` 之上叠加了以下能力：
+
+| 范围 | 提交序列（节选） | 说明 |
+|---|---|---|
+| **memory PR-1/2/3/4** | `93b5cfa` `5e9fb1f` `6943201` `2e82628` `4316207` `70aa24d` `99e325b` `8a2a39c` `2f21ad6` `a1051d6` `2e82628` | 把 memory snapshot 注入到 chat / quiz / knowledge_graph / lesson；review 路径实时拉 misconception notes |
+| **review 多样化** | `f7b1b07` | 用最近题干反馈打散复盘题目分布 |
+| **LLM 客户端代理修复** | `fc7e51c` | 强制绕过系统 HTTP 代理 |
+| **Smoke 修复** | `66e7983` | proxy bypass + intent gate + schema 对齐 |
+| **L2 反思笔记落库** | memory PR-1 系列 | `POST /notes` 4-category 写入 |
+
+> 设计文档归档在 `docs/plans/` 与 `docs/superpowers/specs/`（这两个目录已被 `.gitignore`，本地查看）。
+
+---
+
+## License / Authors
+
+未发布，内部研究项目。
