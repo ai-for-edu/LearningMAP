@@ -256,6 +256,7 @@ def _save(session_id: str, state: dict[str, Any]) -> None:
 class ChatRequest(BaseModel):
     session_id: str | None = None
     message: str = Field(..., min_length=1, max_length=5000)
+    mode: str | None = None  # only honored for newly-created sessions
 
 
 class SkillInfo(BaseModel):
@@ -280,6 +281,9 @@ async def chat(req: ChatRequest) -> ChatResponse:
 
     # Get or init session state
     state = _get_session(session_id) or _new_session_state()
+    # Only honor req.mode if this is a brand-new session.
+    if req.mode in ("chat", "learning") and not state.get("messages"):
+        state["session_mode"] = req.mode
     await _ensure_memory_snapshot(state)
 
     # Add user message
@@ -363,6 +367,9 @@ async def chat_stream(req: ChatRequest):
 
     session_id = req.session_id or str(uuid.uuid4())
     state = _get_session(session_id) or _new_session_state()
+    # Only honor req.mode if this is a brand-new session.
+    if req.mode in ("chat", "learning") and not state.get("messages"):
+        state["session_mode"] = req.mode
     await _ensure_memory_snapshot(state)
 
     state["messages"] = list(state.get("messages", []))
@@ -783,6 +790,7 @@ async def get_state(session_id: str) -> dict:
     result = {
         "session_id": session_id,
         "mode": state.get("mode", "chat"),
+        "session_mode": state.get("session_mode", "chat"),
         "topic": state.get("topic"),
         "has_graph": state.get("knowledge_graph") is not None,
         "question_progress": f"{state.get('current_question_index', 0)}/{len(state.get('questions', []))}",
@@ -848,9 +856,10 @@ async def get_state(session_id: str) -> dict:
             {
                 "role": "ai" if getattr(m, "type", "human") == "ai" else "user",
                 "content": m.content,
+                "additional_kwargs": getattr(m, "additional_kwargs", {}) or {},
             }
             if hasattr(m, "content")
-            else {"role": "user", "content": str(m)}
+            else {"role": "user", "content": str(m), "additional_kwargs": {}}
             for m in messages
         ]
 
@@ -957,6 +966,23 @@ async def set_skill(session_id: str, req: SetSkillRequest) -> dict:
             "sections": skill_meta.affects,
         },
     }
+
+
+class SetModeRequest(BaseModel):
+    mode: str  # "chat" | "learning"
+
+
+@router.post("/chat/{session_id}/set-mode")
+async def set_mode(session_id: str, req: SetModeRequest) -> dict:
+    """Switch a session's user-facing mode (chat vs learning)."""
+    if req.mode not in ("chat", "learning"):
+        raise HTTPException(status_code=400, detail=f"Invalid mode '{req.mode}'")
+    state = _get_session(session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+    state["session_mode"] = req.mode
+    _save(session_id, state)
+    return {"session_id": session_id, "session_mode": req.mode}
 
 
 class ToggleKnowledgeSkillsRequest(BaseModel):
