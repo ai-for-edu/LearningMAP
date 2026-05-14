@@ -179,6 +179,7 @@ def _dispatch_memory_writes(
 
 _DEFAULT_STATE = {
     "messages": [],
+    "chat_messages": [],
     "mode": "chat",
     "topic": None,
     "knowledge_graph": None,
@@ -239,7 +240,11 @@ def _apply_initial_mode(state: dict[str, Any], req_mode: str | None) -> None:
     Prevents reconnecting clients from accidentally overwriting an
     established session's mode via a stale `mode` field on subsequent posts.
     """
-    if req_mode in ("chat", "learning") and not state.get("messages"):
+    if (
+        req_mode in ("chat", "learning")
+        and not state.get("messages")
+        and not state.get("chat_messages")
+    ):
         state["session_mode"] = req_mode
 
 
@@ -253,6 +258,7 @@ def _get_session(session_id: str) -> dict[str, Any] | None:
             return None
         _sessions[session_id] = stored
         state = stored
+    state.setdefault("chat_messages", [])
     _ensure_skill_content(state)
     return state
 

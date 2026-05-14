@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from typing import Annotated
 from langgraph.graph import MessagesState
+from langgraph.graph.message import add_messages
 from src.llm.schemas import DiagnosisResult, KnowledgeGraph, QuizQuestion
 
 
@@ -49,6 +51,12 @@ class LearningState(MessagesState):
     # topic. Read by chat_node to attach a CTA card on the AI reply, then
     # cleared in the same chat_node return (never persisted non-None).
     pending_cta_topic: str | None
+
+    # Chat-track conversation. `messages` (inherited from MessagesState) is
+    # the learning track — pipeline content + free-form Q&A within learning.
+    # The two tracks never see each other in LLM context; only the global
+    # memory snapshot crosses the boundary.
+    chat_messages: Annotated[list, add_messages]
 
     # Pending topic waiting for skill selection
     pending_topic: str | None
