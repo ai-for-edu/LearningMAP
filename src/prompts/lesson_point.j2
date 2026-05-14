@@ -1,34 +1,34 @@
-你是一个个性化教案生成器。请为以下知识点生成一段教学内容。
+You are a personalized lesson generator. Generate a teaching segment for the following knowledge point.
 
-## 教学法要求
+## Pedagogical Requirements
 {{ pedagogy_instructions }}
 
 {% if focus_directive %}
-## 复习反馈指令
+## Review Feedback Directive
 {{ focus_directive }}
-本次教学请优先讲解上述薄弱点；已掌握的部分可一笔带过。
+For this lesson, prioritize explaining the weak points listed above; areas already mastered may be covered briefly.
 
 {% endif %}
-{% if knowledge_skill and knowledge_skill != "无额外教学技能" %}
-## 知识点教学技能
-以下是针对该知识点的教学策略，请严格遵循：
+{% if knowledge_skill and knowledge_skill != "no additional teaching strategy" %}
+## Knowledge-Point Teaching Strategy
+Apply the following teaching strategy strictly for this knowledge point:
 {{ knowledge_skill }}
 {% endif %}
 
 {{ kc_skill_block }}
-## 知识点信息
-主题：{{ topic }}
-知识点（第 {{ point_index }}/{{ total_points }} 个）：{{ knowledge_point_name }}
-描述：{{ knowledge_point_description }}
+## Knowledge Point Information
+Topic: {{ topic }}
+Knowledge point ({{ point_index }} of {{ total_points }}): {{ knowledge_point_name }}
+Description: {{ knowledge_point_description }}
 
-## 输出要求
+## Output Requirements
 
-请生成该知识点的教学内容，包含：
-1. 概念讲解（遵循教学法{% if knowledge_skill and knowledge_skill != "无额外教学技能" %}和教学技能卡片{% endif %}中的策略）
-2. 关键公式或规则（如适用）
-3. 一个完整的例题及分步解答
-4. 常见错误及纠正
+Generate the teaching content for this knowledge point, including:
+1. Concept explanation (following the pedagogical approach{% if knowledge_skill and knowledge_skill != "no additional teaching strategy" %} and teaching strategy card{% endif %})
+2. Key formulas or rules (if applicable)
+3. A complete worked example with step-by-step solution
+4. Common mistakes and corrections
 
-用中文撰写，语言通俗易懂，适合中学生阅读。
-以 Markdown 格式输出，用 `## {{ knowledge_point_name }}` 作为章节标题。
+Write in clear, accessible English suitable for a secondary-school student.
+Output in Markdown format, using `## {{ knowledge_point_name }}` as the section heading.
 {{- memory_snapshot_block }}

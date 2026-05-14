@@ -242,7 +242,7 @@ async def run_lesson_generation(
                     knowledge_point_name=wp["name"],
                     knowledge_point_description=wp["description"],
                     pedagogy_instructions=pedagogy_instructions or "无特定教学法要求",
-                    knowledge_skill=knowledge_skills.get(wp["name"], "无额外教学技能"),
+                    knowledge_skill=knowledge_skills.get(wp["name"], "no additional teaching strategy"),
                     point_index=i + 1,
                     total_points=total,
                     focus_directive=focus_directive,

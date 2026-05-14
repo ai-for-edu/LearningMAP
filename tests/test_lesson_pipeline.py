@@ -62,11 +62,11 @@ def test_lesson_point_prompt_without_knowledge_skill():
         knowledge_point_name="基础",
         knowledge_point_description="desc",
         pedagogy_instructions="用简单语言解释",
-        knowledge_skill="无额外教学技能",
+        knowledge_skill="no additional teaching strategy",
         point_index=1,
         total_points=1,
     )
-    assert "知识点教学技能" not in result
+    assert "Knowledge-Point Teaching Strategy" not in result
 
 
 # ---------------------------------------------------------------------------
@@ -395,4 +395,4 @@ def test_generate_lesson_per_point_threads_focus_directive_into_prompt():
         call_kwargs = mock_client.return_value.chat.completions.create.call_args.kwargs
         sent_prompt = call_kwargs["messages"][0]["content"]
         assert directive in sent_prompt
-        assert "复习反馈指令" in sent_prompt
+        assert "Review Feedback Directive" in sent_prompt

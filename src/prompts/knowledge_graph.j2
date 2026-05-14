@@ -27,13 +27,13 @@ Organize the knowledge graph according to the above teaching method.
 
 {% endif %}
 {% if existing_mastery %}
-## 已有学习记录（Prior Mastery Hints）
-该学生在此主题下的历史学习子主题如下：
+## Prior Mastery Hints
+The student has previously studied the following subtopics in this subject:
 {% for m in existing_mastery %}
-- {{ m.subtopic }}（上次正确率 {{ '%.0f%%' | format(m.last_accuracy * 100) if m.last_accuracy is not none else '未测试' }}，{{ m.last_seen_at }}，状态 {{ m.status }}）
+- {{ m.subtopic }} (last accuracy: {{ '%.0f%%' | format(m.last_accuracy * 100) if m.last_accuracy is not none else 'not tested' }}, last seen: {{ m.last_seen_at }}, status: {{ m.status }})
 {% endfor %}
 
-生成 KG 时，若你打算包含这些已有子主题，请**直接复用上述名字作为节点 `name`**（一字不差），以便系统跨会话关联记忆。新增的概念可自由命名。
+When generating the KG, if you plan to include any of these existing subtopics, **reuse their names exactly as node `name`** (character-for-character) so the system can link memory across sessions. Newly introduced concepts may be named freely.
 
 {% endif %}
 Topic: {{ topic }}

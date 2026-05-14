@@ -1,11 +1,11 @@
-你在为学生生成复习检测题. 学生过去学过以下知识点, 现在需要检测每个 KP 是否仍掌握.
+You are generating review quiz questions for a student. The student has previously studied the knowledge points below, and you now need to check whether each KP is still retained.
 
-候选知识点 (附上次成绩):
+Candidate knowledge points (with last scores):
 {% for kp in candidates %}
-- {{ kp.subtopic }} (上次正确率 {{ "%.0f"|format(kp.last_accuracy * 100) }}%, 距今 {{ kp.days_ago }} 天)
+- {{ kp.subtopic }} (last accuracy: {{ "%.0f"|format(kp.last_accuracy * 100) }}%, {{ kp.days_ago }} days ago)
 {% endfor %}
 {% if misconceptions %}
-该学生历史易混点（出干扰项时**优先**从中选取，但若与本题 KP 不相关则可不用）:
+The student's historical common confusions (when writing distractors, **prefer** drawing from these — but skip if not relevant to the current KP):
 {% for m in misconceptions %}
 - {{ m }}
 {% endfor %}
@@ -13,7 +13,7 @@
 {% endif %}
 {%- if recent_questions -%}
 {# inject a 'changed-angle' steering block; emitted only when caller passes recent_questions #}
-以下题型最近已出过, 请换考察角度避免重复（仍考查同一 KP，但改变情境/提问方式/数字）:
+The following question types were used recently — please vary the angle to avoid repetition (still test the same KP, but change context / phrasing / numbers):
 {% for kp, stems in recent_questions.items() %}
 - {{ kp }}:
 {% for stem in stems %}
@@ -22,20 +22,20 @@
 {% endfor %}
 
 {% endif %}
-要求:
-1. 每个知识点出 **1 道** 4 选 1 单选题, 总数 = {{ candidates | length }}
-2. 难度对齐上次成绩: 正确率 < 50% 出基础检验题, >= 70% 出应用题
-3. 题目独立, 不要"组合题"或跨知识点综合题
-4. 输出严格 JSON, 数组顺序与 candidates 输入一致
+Requirements:
+1. Generate **1** 4-option single-choice question per knowledge point — total = {{ candidates | length }}
+2. Calibrate difficulty to the last score: accuracy < 50% → basic recall question; >= 70% → application question
+3. Questions must be independent — no "combined" or cross-KP questions
+4. Output strict JSON; array order must match the candidates input order
 
-输出 schema:
+Output schema:
 [
   {
     "id": "rq_<index>",
-    "knowledge_point": "<候选 KP 的 subtopic 字段原值>",
-    "question": "<题干, 中文>",
-    "options": ["A 选项", "B 选项", "C 选项", "D 选项"],
-    "answer": <正确选项 index 0-3>
+    "knowledge_point": "<subtopic field value of the candidate KP, verbatim>",
+    "question": "<question stem, in English>",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "answer": <correct option index 0-3>
   },
   ...
 ]

@@ -124,7 +124,7 @@ def test_lesson_point_renders_kc_skill_block():
         knowledge_point_name="直角三角形",
         knowledge_point_description="desc",
         pedagogy_instructions="无特定教学法要求",
-        knowledge_skill="无额外教学技能",
+        knowledge_skill="no additional teaching strategy",
         point_index=1,
         total_points=1,
         kc_skill_block=block,
@@ -207,13 +207,13 @@ def test_lesson_point_prompt_omits_directive_when_empty() -> None:
         knowledge_point_name="A",
         knowledge_point_description="...",
         pedagogy_instructions="x",
-        knowledge_skill="无额外教学技能",
+        knowledge_skill="no additional teaching strategy",
         point_index=1,
         total_points=1,
         kc_skill_block="",
         focus_directive="",
     )
-    assert "复习反馈指令" not in out
+    assert "Review Feedback Directive" not in out
 
 
 def test_lesson_point_prompt_includes_directive_when_provided() -> None:
@@ -225,13 +225,13 @@ def test_lesson_point_prompt_includes_directive_when_provided() -> None:
         knowledge_point_name="A",
         knowledge_point_description="...",
         pedagogy_instructions="x",
-        knowledge_skill="无额外教学技能",
+        knowledge_skill="no additional teaching strategy",
         point_index=1,
         total_points=1,
         kc_skill_block="",
         focus_directive="学生在 分配律 上薄弱，已掌握 求根公式。",
     )
-    assert "复习反馈指令" in out
+    assert "Review Feedback Directive" in out
     assert "分配律" in out
 
 
@@ -303,7 +303,7 @@ class TestKnowledgeGraphMasteryBlock:
         # Must not leak Python repr "None" into the prompt
         assert "None" not in text
         # Should present a human-readable fallback
-        assert "未测试" in text
+        assert "not tested" in text
 
     def test_mastery_block_formats_accuracy_as_percent(self) -> None:
         text = render_prompt(

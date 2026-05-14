@@ -320,7 +320,7 @@ def test_review_injects_misconceptions_env_on(monkeypatch):
         "default_user", "misconception"
     )
     assert "把两点距离误用为坐标差不平方" in captured["prompt"]
-    assert "易混点" in captured["prompt"]
+    assert "common confusions" in captured["prompt"]
 
 
 def test_review_does_not_fetch_env_off(monkeypatch):
@@ -343,7 +343,7 @@ def test_review_does_not_fetch_env_off(monkeypatch):
         review_mod.generate_review_questions(candidates)
 
     mock_fetch.assert_not_called()
-    assert "易混点" not in captured["prompt"]
+    assert "common confusions" not in captured["prompt"]
 
 
 def test_review_filters_empty_content_misconceptions(monkeypatch):
