@@ -416,8 +416,8 @@ async function handleInputChange(e) {
         <div class="skill-item" style="border-top:1px solid var(--border);">
           <div class="skill-item-main" data-clear-skill="1">
             <div style="display:flex;align-items:center;gap:6px;">
-              <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-4);">close</span>
-              <span style="font-size:13px;color:var(--text-3);">清除教学方法（恢复默认）</span>
+              <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-4);">refresh</span>
+              <span style="font-size:13px;color:var(--text-3);">恢复默认（费曼学习法）</span>
             </div>
           </div>
         </div>`;
@@ -543,9 +543,15 @@ async function clearSkill() {
   input.value = '';
 
   if (currentSessionId) {
-    try { await setSkill(currentSessionId, null); } catch (err) { /* ignore */ }
+    try {
+      const result = await setSkill(currentSessionId, 'feynman');
+      _activeSkillInfo = (_cachedSkills || []).find(s => s.name === 'feynman') || null;
+    } catch (err) {
+      console.error('Reset to feynman failed', err);
+    }
+  } else {
+    _activeSkillInfo = (_cachedSkills || []).find(s => s.name === 'feynman') || null;
   }
-  _activeSkillInfo = null;
   input.focus();
 }
 
