@@ -57,3 +57,8 @@ class TestNewSessionDefaultsViaAPI:
             assert state_resp.status_code == 200
             data = state_resp.json()
             assert data.get("active_skill") == "feynman"
+            # Verify _ensure_skill_content actually ran — content materialized.
+            # The /state endpoint exposes active_skill_lesson_section when content
+            # is loaded (see chat.py:864).
+            assert data.get("active_skill_lesson_section"), \
+                "active_skill_content should have been materialized via _ensure_skill_content"

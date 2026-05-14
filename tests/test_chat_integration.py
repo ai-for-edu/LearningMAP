@@ -20,7 +20,7 @@ from src.api import chat as chat_module
 
 def test_default_state_has_memory_snapshot_fields():
     """_DEFAULT_STATE includes the two PR-3 fields, both None."""
-    state = dict(chat_module._DEFAULT_STATE)
+    state = chat_module._new_session_state()
     assert "memory_snapshot" in state
     assert "memory_snapshot_loaded_at" in state
     assert state["memory_snapshot"] is None
@@ -38,7 +38,7 @@ def test_state_persistence_roundtrip_preserves_memory_snapshot(tmp_path, monkeyp
     importlib.reload(store_module)
 
     sid = f"test-{uuid.uuid4().hex[:8]}"
-    state = dict(chat_module._DEFAULT_STATE)
+    state = chat_module._new_session_state()
     state["memory_snapshot"] = "## 学习进程\n- 已开始: X"
     state["memory_snapshot_loaded_at"] = 1715000000
     state["messages"] = []
@@ -271,7 +271,7 @@ async def test_dispatch_swallows_exceptions(env_on, caplog):
 def _make_session(state_overrides: dict | None = None) -> str:
     """Create a session pre-populated for testing trigger points."""
     sid = f"test-{uuid.uuid4().hex[:8]}"
-    state = dict(chat_module._DEFAULT_STATE)
+    state = chat_module._new_session_state()
     if state_overrides:
         state.update(state_overrides)
     chat_module._sessions[sid] = state

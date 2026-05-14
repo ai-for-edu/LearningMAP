@@ -17,7 +17,7 @@ from src.api import chat as chat_module
 def _make_session_id() -> str:
     """Create a pre-populated session directly in the in-memory store."""
     sid = str(uuid.uuid4())
-    chat_module._sessions[sid] = dict(chat_module._DEFAULT_STATE)
+    chat_module._sessions[sid] = chat_module._new_session_state()
     return sid
 
 
