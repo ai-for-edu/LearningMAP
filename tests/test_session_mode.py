@@ -116,32 +116,41 @@ def _mock_chat_llm(reply: str):
 
 
 class TestChatNodeCTA:
-    def test_pending_cta_topic_attaches_additional_kwargs(self) -> None:
+    def test_chat_mode_pending_cta_attaches_to_chat_messages(self) -> None:
         state = {
-            "messages": [HumanMessage(content="什么是微积分")],
+            "session_mode": "chat",
+            "messages": [],
+            "chat_messages": [HumanMessage(content="什么是微积分")],
             "pending_cta_topic": "微积分",
         }
         with _mock_chat_llm("微积分是研究变化率的数学分支……"), \
              patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
             result = chat_node(state)
 
-        msgs = result["messages"]
-        assert len(msgs) == 1
-        assert isinstance(msgs[0], AIMessage)
-        assert msgs[0].additional_kwargs == {
+        assert "chat_messages" in result
+        assert "messages" not in result  # learning track untouched
+        assert len(result["chat_messages"]) == 1
+        assert isinstance(result["chat_messages"][0], AIMessage)
+        assert result["chat_messages"][0].additional_kwargs == {
             "cta": {"type": "learn_topic", "topic": "微积分"}
         }
 
-    def test_no_pending_cta_topic_means_empty_kwargs(self) -> None:
-        state = {"messages": [HumanMessage(content="hi")]}
+    def test_chat_mode_no_pending_cta_means_empty_kwargs(self) -> None:
+        state = {
+            "session_mode": "chat",
+            "messages": [],
+            "chat_messages": [HumanMessage(content="hi")],
+        }
         with _mock_chat_llm("hello"), \
              patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
             result = chat_node(state)
-        assert result["messages"][0].additional_kwargs == {}
+        assert result["chat_messages"][0].additional_kwargs == {}
 
     def test_chat_node_clears_pending_cta_topic(self) -> None:
         state = {
-            "messages": [HumanMessage(content="什么是微积分")],
+            "session_mode": "chat",
+            "messages": [],
+            "chat_messages": [HumanMessage(content="什么是微积分")],
             "pending_cta_topic": "微积分",
         }
         with _mock_chat_llm("ok"), \
@@ -150,12 +159,63 @@ class TestChatNodeCTA:
         assert result["pending_cta_topic"] is None
 
     def test_empty_string_pending_cta_topic_means_empty_kwargs(self) -> None:
-        state = {"messages": [HumanMessage(content="hi")], "pending_cta_topic": ""}
+        state = {
+            "session_mode": "chat",
+            "messages": [],
+            "chat_messages": [HumanMessage(content="hi")],
+            "pending_cta_topic": "",
+        }
         with _mock_chat_llm("hello"), \
              patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
             result = chat_node(state)
-        assert result["messages"][0].additional_kwargs == {}
+        assert result["chat_messages"][0].additional_kwargs == {}
         assert result["pending_cta_topic"] is None
+
+    def test_learning_mode_returns_to_messages_not_chat_messages(self) -> None:
+        state = {
+            "session_mode": "learning",
+            "messages": [HumanMessage(content="再讲讲连续性")],
+            "chat_messages": [],
+        }
+        with _mock_chat_llm("连续性的意思是……"), \
+             patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
+            result = chat_node(state)
+
+        assert "messages" in result
+        assert "chat_messages" not in result  # chat track untouched
+        assert isinstance(result["messages"][0], AIMessage)
+        # CTA is never attached in learning mode (pending_cta_topic is None)
+        assert result["messages"][0].additional_kwargs == {}
+
+    def test_chat_node_reads_active_track_for_llm_context(self) -> None:
+        # In chat mode, api_messages should be built from chat_messages,
+        # NOT from the learning track's messages.
+        captured_messages = []
+
+        fake_client = MagicMock()
+        fake_response = MagicMock()
+        fake_response.choices = [MagicMock(message=MagicMock(content="天气是大气层的状态"))]
+
+        def capture_create(*, model, max_tokens, messages, **_):
+            captured_messages.extend(messages)
+            return fake_response
+
+        fake_client.chat.completions.create.side_effect = capture_create
+
+        state = {
+            "session_mode": "chat",
+            "messages": [HumanMessage(content="学习 积分"), AIMessage(content="积分的图谱")],
+            "chat_messages": [HumanMessage(content="什么是天气")],
+        }
+        with patch("src.agent.nodes.chat.get_raw_client", return_value=fake_client), \
+             patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
+            chat_node(state)
+
+        # Find the user message in api_messages — should be from chat_messages,
+        # not the learning track's "学习 积分".
+        user_msgs = [m for m in captured_messages if m["role"] == "user"]
+        assert len(user_msgs) == 1
+        assert user_msgs[0]["content"] == "什么是天气"
 
 
 class TestIntentNodeReadsActiveTrack:

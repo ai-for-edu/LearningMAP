@@ -86,8 +86,14 @@ def _cta_kwargs(topic: str | None) -> dict:
 
 
 def chat_node(state: LearningState) -> dict:
-    """Handle general conversation with learning context awareness."""
-    messages = state.get("messages", [])
+    """Handle general conversation with learning context awareness.
+
+    Reads and writes the active conversation track based on session_mode:
+    chat mode → chat_messages; learning mode → messages.
+    """
+    session_mode = state.get("session_mode", "chat")
+    track_key = "chat_messages" if session_mode == "chat" else "messages"
+    messages = state.get(track_key, [])
 
     # Build system prompt with context summary
     system_prompt = _BASE_SYSTEM_PROMPT
@@ -136,7 +142,7 @@ def chat_node(state: LearningState) -> dict:
         reply = "抱歉，AI 服务暂时不可用，请稍后再试。"
     extra_kwargs = _cta_kwargs(state.get("pending_cta_topic"))
     return {
-        "messages": [AIMessage(content=reply, **extra_kwargs)],
+        track_key: [AIMessage(content=reply, **extra_kwargs)],
         "mode": "chat",
         "pending_cta_topic": None,  # always clear, even if it wasn't set
     }
@@ -148,8 +154,12 @@ def chat_node_stream(state: dict):
     Not called by LangGraph — used directly by the SSE endpoint.
     The SSE caller owns: CTA attachment, state mutation, and persistence
     (chat_node_stream is a pure token generator).
+
+    Reads from the active conversation track based on session_mode.
     """
-    messages = state.get("messages", [])
+    session_mode = state.get("session_mode", "chat")
+    track_key = "chat_messages" if session_mode == "chat" else "messages"
+    messages = state.get(track_key, [])
 
     system_prompt = _BASE_SYSTEM_PROMPT
 
