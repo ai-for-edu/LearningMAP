@@ -17,8 +17,13 @@ class IntentResult(BaseModel):
 
 
 def intent_node(state: LearningState) -> dict:
-    """Classify user intent and match skill from the latest message."""
-    # If already in quiz mode, treat as answer
+    """Classify user intent and route based on session_mode.
+
+    chat mode  → always route to chat; if learn_topic detected, stash
+                 _pending_cta_topic so chat_node can attach a CTA card.
+    learning mode → existing routing (chat / graph / quiz).
+    """
+    # If already in quiz step, treat as answer
     if state.get("mode") == "quiz":
         return {"mode": "quiz"}
 
@@ -27,14 +32,9 @@ def intent_node(state: LearningState) -> dict:
         return {"mode": "chat"}
 
     last_msg = messages[-1]
-    if hasattr(last_msg, "content"):
-        content = last_msg.content
-    else:
-        content = str(last_msg)
+    content = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
 
-    # Build skill summaries for intent prompt
     available_skills = list_skills()
-
     prompt = render_prompt(
         "intent",
         messages=[{"role": "user", "content": content}],
@@ -49,42 +49,39 @@ def intent_node(state: LearningState) -> dict:
             messages=[{"role": "user", "content": prompt}],
             response_model=IntentResult,
         )
-
-        # Build return state updates
-        updates: dict = {}
-
-        # Handle skill matching
-        matched_skill_name = result.skill
-        if matched_skill_name:
-            skill_meta = get_skill(matched_skill_name)
-            if skill_meta:
-                updates["active_skill"] = skill_meta.name
-                updates["active_skill_content"] = dict(skill_meta.sections)
-                logger.info("Skill matched: %s", skill_meta.name)
-            else:
-                logger.warning("LLM returned unknown skill: %s", matched_skill_name)
-
-        # Handle intent routing
-        if result.intent == "learn_topic" and result.topic:
-            # GATE: Pedagogy skill is mandatory for learning flow
-            if not state.get("active_skill") and not matched_skill_name:
-                updates["mode"] = "chat"
-                updates["pending_topic"] = result.topic
-                from langchain_core.messages import AIMessage
-                updates["messages"] = [AIMessage(
-                    content=f"开始学习「{result.topic}」之前，请先选择一种教学法 🎓\n\n"
-                            "请使用 `/skill` 选择教学法（费曼学习法、苏格拉底提问法、脚手架教学法），"
-                            "选择后我会自动开始生成知识图谱。"
-                )]
-                return updates
-            updates["mode"] = "graph"
-            updates["topic"] = result.topic
-        elif result.intent == "start_diagnosis":
-            updates["mode"] = "quiz"
-        else:
-            updates["mode"] = "chat"
-
-        return updates
     except Exception:
         logger.exception("Intent classification failed, falling back to chat")
         return {"mode": "chat"}
+
+    updates: dict = {}
+
+    # Skill matching (unchanged)
+    if result.skill:
+        skill_meta = get_skill(result.skill)
+        if skill_meta:
+            updates["active_skill"] = skill_meta.name
+            updates["active_skill_content"] = dict(skill_meta.sections)
+            logger.info("Skill matched: %s", skill_meta.name)
+        else:
+            logger.warning("LLM returned unknown skill: %s", result.skill)
+
+    session_mode = state.get("session_mode", "chat")
+
+    if session_mode == "chat":
+        # Force chat routing. If the user expressed learning intent, surface
+        # it via CTA in chat_node — do NOT enter the pipeline.
+        updates["mode"] = "chat"
+        if result.intent == "learn_topic" and result.topic:
+            updates["_pending_cta_topic"] = result.topic
+        return updates
+
+    # session_mode == "learning" — full routing, no GATE.
+    if result.intent == "learn_topic" and result.topic:
+        updates["mode"] = "graph"
+        updates["topic"] = result.topic
+    elif result.intent == "start_diagnosis":
+        updates["mode"] = "quiz"
+    else:
+        updates["mode"] = "chat"
+
+    return updates
