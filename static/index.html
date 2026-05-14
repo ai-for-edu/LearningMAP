@@ -258,8 +258,8 @@ body.sidebar-collapsed #bottomBar { left: 0; }
   <div class="topnav-left">
     <span class="topnav-title" id="topNavTitle">EduAI</span>
     <div class="mode-toggle" id="modeToggle" role="group" aria-label="会话模式">
-      <button type="button" id="modeToggleChat" data-mode="chat" class="active">对话</button>
-      <button type="button" id="modeToggleLearning" data-mode="learning">学习</button>
+      <button type="button" id="modeToggleChat" data-mode="chat" class="active" aria-pressed="true">对话</button>
+      <button type="button" id="modeToggleLearning" data-mode="learning" aria-pressed="false">学习</button>
     </div>
     <span id="topNavSkillPill" class="topnav-skill-pill" style="display:none;" onclick="showSkillModal(_activeSkillInfo?.name)">
       <span class="topnav-skill-dot"></span>
@@ -315,7 +315,9 @@ let _pendingMode = null;      // chosen before session_id exists
 function _renderModeToggle(mode) {
   _sessionMode = mode;
   document.querySelectorAll('#modeToggle button').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.mode === mode);
+    const isActive = btn.dataset.mode === mode;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
   });
 }
 
@@ -665,7 +667,7 @@ async function handleSend(text) {
 
     const body = { message };
     if (currentSessionId) body.session_id = currentSessionId;
-    if (!currentSessionId && _pendingMode) body.mode = _pendingMode;
+    if (_pendingMode) body.mode = _pendingMode;
 
     await streamSSE(`${API_BASE}/chat/stream`, body, {
       skill(d) {
