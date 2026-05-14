@@ -161,7 +161,7 @@
     input.focus();
 
     function save() {
-      const newName = input.value.trim() || '未命名';
+      const newName = input.value.trim() || 'Untitled';
       session.name = newName;
       saveSessions(sessions);
       renderSidebar(sessions, getCurrentId());
@@ -184,7 +184,7 @@
       '    <span class="material-symbols-outlined text-error text-2xl">warning</span>' +
       '    <h3 class="font-headline font-bold text-lg text-on-surface">Delete Conversation</h3>' +
       '  </div>' +
-      '  <p class="font-body text-sm text-on-surface-variant mb-6">确定要删除「' + escapeHtml(sessionName) + '」吗？此操作不可撤销。</p>' +
+      '  <p class="font-body text-sm text-on-surface-variant mb-6">Are you sure you want to delete "' + escapeHtml(sessionName) + '"? This cannot be undone.</p>' +
       '  <div class="flex gap-3 justify-end">' +
       '    <button id="cancelDelete" class="px-5 py-2.5 rounded-xl text-sm font-headline font-bold text-on-surface-variant hover:bg-slate-100 transition-colors">Cancel</button>' +
       '    <button id="confirmDelete" class="px-5 py-2.5 rounded-xl text-sm font-headline font-bold text-white bg-error hover:bg-error/90 transition-colors shadow-sm">Delete</button>' +
@@ -217,17 +217,17 @@
       '    <span class="material-symbols-outlined text-primary text-2xl">download</span>' +
       '    <h3 class="font-headline font-bold text-lg text-on-surface">Export Session</h3>' +
       '  </div>' +
-      '  <p class="font-body text-sm text-on-surface-variant mb-6">选择导出格式：</p>' +
+      '  <p class="font-body text-sm text-on-surface-variant mb-6">Choose export format:</p>' +
       '  <div class="flex gap-3">' +
       '    <button id="exportMd" class="flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-slate-200 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">' +
       '      <span class="material-symbols-outlined text-2xl text-primary">description</span>' +
       '      <span class="font-headline font-bold text-sm">Markdown</span>' +
-      '      <span class="text-xs text-on-surface-variant">学习报告</span>' +
+      '      <span class="text-xs text-on-surface-variant">Learning Report</span>' +
       '    </button>' +
       '    <button id="exportJson" class="flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-slate-200 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">' +
       '      <span class="material-symbols-outlined text-2xl text-primary">data_object</span>' +
       '      <span class="font-headline font-bold text-sm">JSON</span>' +
-      '      <span class="text-xs text-on-surface-variant">结构化数据</span>' +
+      '      <span class="text-xs text-on-surface-variant">Structured Data</span>' +
       '    </button>' +
       '  </div>' +
       '  <button id="exportCancel" class="w-full mt-4 px-5 py-2.5 rounded-xl text-sm font-headline font-bold text-on-surface-variant hover:bg-slate-100 transition-colors">Cancel</button>' +
@@ -276,7 +276,7 @@
   window.createNewSession = function () {
     const sessions = getSessions();
     const id = Date.now().toString();
-    sessions.unshift({ id: id, name: '未命名' });
+    sessions.unshift({ id: id, name: 'Untitled' });
     saveSessions(sessions);
     setCurrentId(id);
     window.location.href = '/?session_id=' + id;

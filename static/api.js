@@ -16,19 +16,19 @@ function safeMarkdown(text) {
   return html;
 }
 
-// 从 URL 参数获取 session_id
+// Get session_id from URL parameters
 function getSessionId() {
   return new URLSearchParams(window.location.search).get('session_id');
 }
 
-// 保存 session_id 到 URL（不刷新页面）
+// Save session_id to URL without page reload
 function setSessionId(id) {
   const url = new URL(window.location);
   url.searchParams.set('session_id', id);
   window.history.replaceState({}, '', url);
 }
 
-// 发送聊天消息 (non-streaming fallback)
+// Send chat message (non-streaming fallback)
 async function sendMessage(message, sessionId) {
   const body = { message };
   if (sessionId) body.session_id = sessionId;
@@ -127,7 +127,7 @@ function pollStatus(sessionId, taskType, onUpdate, onDone, interval = 2000) {
   return { stop: () => { stopped = true; } };
 }
 
-// 获取会话状态
+// Get session state
 async function getSessionState(sessionId) {
   const resp = await fetch(`${API_BASE}/chat/${sessionId}/state`);
   if (!resp.ok) throw new Error(`API error: ${resp.status}`);
@@ -159,7 +159,7 @@ async function submitReview(sessionId, answers) {
   return data.review_result;
 }
 
-// 导出会话
+// Export session
 async function exportSession(sessionId, format) {
   const state = await getSessionState(sessionId);
   let content, filename, mime;
@@ -212,75 +212,75 @@ async function setSessionMode(sessionId, mode) {
 }
 
 function buildMarkdownReport(state) {
-  const topic = state.topic || '未命名主题';
-  let md = `# 学习报告：${topic}\n\n`;
+  const topic = state.topic || 'Untitled Topic';
+  let md = `# Learning Report: ${topic}\n\n`;
 
-  // 对话记录
+  // Conversation Log
   const messages = state.messages || [];
   if (messages.length > 0) {
-    md += `## 对话记录\n\n`;
+    md += `## Conversation Log\n\n`;
     for (const m of messages) {
-      const role = m.role === 'ai' ? 'AI' : '学生';
-      // 截断过长的 AI 消息（教案等）
+      const role = m.role === 'ai' ? 'AI' : 'Student';
+      // Truncate very long AI messages (lesson plans etc.)
       const content = m.content.length > 200 ? m.content.substring(0, 200) + '...' : m.content;
-      md += `- **${role}：** ${content}\n`;
+      md += `- **${role}:** ${content}\n`;
     }
     md += '\n';
   }
 
-  // 知识图谱
+  // Knowledge Graph
   if (state.graph && state.graph.nodes) {
-    md += `## 知识图谱\n\n`;
-    md += `| 知识点 | 层级 | 描述 |\n|--------|------|------|\n`;
-    const levelMap = { prerequisite: '前置', core: '核心', extension: '拓展' };
+    md += `## Knowledge Graph\n\n`;
+    md += `| Knowledge Point | Tier | Description |\n|-----------------|------|-------------|\n`;
+    const levelMap = { prerequisite: 'prerequisite', core: 'core', extension: 'extension' };
     for (const n of state.graph.nodes) {
       md += `| ${n.name} | ${levelMap[n.level] || n.level} | ${n.description} |\n`;
     }
     md += '\n';
   }
 
-  // 诊断测验
+  // Diagnosis Quiz
   const questions = state.questions || [];
   const answers = state.answers || [];
   if (questions.length > 0) {
-    md += `## 诊断测验\n\n`;
+    md += `## Diagnosis Quiz\n\n`;
     const letters = ['A', 'B', 'C', 'D'];
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       const studentIdx = i < answers.length ? answers[i] : -1;
       const correctIdx = q.answer;
       const isCorrect = studentIdx === correctIdx;
-      const mark = studentIdx === -1 ? '未作答' : (isCorrect ? '✓' : '✗');
+      const mark = studentIdx === -1 ? 'Not answered' : (isCorrect ? '✓' : '✗');
 
-      md += `### 第 ${i + 1} 题（${q.knowledge_point}）${mark}\n\n`;
-      md += `**题目：** ${q.question}\n\n`;
+      md += `### Question ${i + 1} (${q.knowledge_point}) ${mark}\n\n`;
+      md += `**Question:** ${q.question}\n\n`;
       for (let j = 0; j < q.options.length; j++) {
         let prefix = `${letters[j]}) ${q.options[j]}`;
-        if (j === studentIdx && j === correctIdx) prefix += ' ← 学生答案 ✓';
-        else if (j === studentIdx) prefix += ' ← 学生答案 ✗';
-        else if (j === correctIdx) prefix += ' ← 正确答案';
+        if (j === studentIdx && j === correctIdx) prefix += ' ← Student answer ✓';
+        else if (j === studentIdx) prefix += ' ← Student answer ✗';
+        else if (j === correctIdx) prefix += ' ← Correct answer';
         md += `- ${prefix}\n`;
       }
       md += '\n';
     }
   }
 
-  // 诊断结果
+  // Diagnosis Result
   const r = state.diagnosis_result;
   if (r) {
-    md += `## 诊断结果\n\n`;
-    md += `**正确率：${r.score}%**（${r.correct}/${r.total}）\n\n`;
-    md += `| 知识点 | 状态 | 详情 |\n|--------|------|------|\n`;
-    const statusMap = { mastered: '已掌握 ✓', weak: '需复习 ✗', skipped: '已跳过 —' };
+    md += `## Diagnosis Result\n\n`;
+    md += `**Score: ${r.score}%** (${r.correct}/${r.total})\n\n`;
+    md += `| Knowledge Point | Status | Details |\n|-----------------|--------|--------|\n`;
+    const statusMap = { mastered: 'Mastered ✓', weak: 'Needs review ✗', skipped: 'Skipped —' };
     for (const b of r.breakdown) {
       md += `| ${b.name} | ${statusMap[b.status] || b.status} | ${b.detail} |\n`;
     }
     md += '\n';
   }
 
-  // 个性化教案
+  // Personalized Lesson
   if (state.lesson_content) {
-    md += `## 个性化教案\n\n${state.lesson_content}\n`;
+    md += `## Personalized Lesson\n\n${state.lesson_content}\n`;
   }
 
   return md;
