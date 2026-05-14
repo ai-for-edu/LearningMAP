@@ -184,7 +184,7 @@ def test_generate_kc_skill_renders_prompt_and_uses_schema():
     assert call["model"] == "test-model"
     assert call["response_model"] is KCSkill
     assert "root----A" in call["messages"][0]["content"]
-    assert "题目 1" in call["messages"][0]["content"]
+    assert "Question 1" in call["messages"][0]["content"]
 
 
 def test_build_leaf_to_ids_inverts_map():

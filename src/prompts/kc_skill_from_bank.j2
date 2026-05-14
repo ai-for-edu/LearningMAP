@@ -1,36 +1,36 @@
-你是一位数学教研专家。下面是题库中属于同一个知识点的若干真题，请基于这些真题总结该知识点的考察情况。
+You are a curriculum-design expert. Below are sample exam questions from the question bank that all belong to the same knowledge component. Analyze these questions and summarize the assessment profile of this knowledge component.
 
-## 知识点路径
+## Knowledge component path
 {{ route }}
 
-## 样本题目（共 {{ sample_count }} 道，从 {{ total_count }} 道中抽取）
+## Sample questions ({{ sample_count }} selected from {{ total_count }} total)
 {% for q in samples %}
-### 题目 {{ loop.index }}（{{ q.type }}）
-**题干**：{{ q.content }}
-{% if q.options %}**选项**：{{ q.options }}{% endif %}
-**答案**：{{ q.answer }}
-**解析**：{{ q.analysis }}
+### Question {{ loop.index }} ({{ q.type }})
+**Stem**: {{ q.content }}
+{% if q.options %}**Options**: {{ q.options }}{% endif %}
+**Answer**: {{ q.answer }}
+**Explanation**: {{ q.analysis }}
 {% endfor %}
 
-## 输出要求
+## Output requirements
 
-**只输出一个 JSON 对象**，恰好 5 个 key，不要任何其他文字、解释或 markdown 围栏：
+**Output exactly one JSON object** with exactly 5 keys. No other text, explanations, or markdown fences:
 
 ```json
 {
-  "description": "……（40-100 字，一句话索引 + 适用场景）",
-  "考察重点": "……（80-150 字）",
-  "考察形式": "……（80-150 字）",
-  "易错点": "……（50-120 字）",
-  "难度提示": "……（50-100 字）"
+  "description": "...(40-100 words: one-sentence index + applicable scenario)",
+  "考察重点": "...(80-150 words)",
+  "考察形式": "...(80-150 words)",
+  "易错点": "...(50-120 words)",
+  "难度提示": "...(50-100 words)"
 }
 ```
 
-字段语义：
-- description：一句话告诉下游模型"这个 skill 讲什么 + 什么时候应该调用它"。两层信息都要给：内容定位 + 触发场景。示例："当学生在多步骤计数问题中混淆分步与分类时使用。构建在乘法原理。"这个字段是未来检索 / 加载 skill 的入口，写得越精准越好。
-- 考察重点：核心概念 / 子技能 / 思维点
-- 考察形式：题型分布（填空/单选比例）+ 常见题干模式 + 典型情境
-- 易错点：从解析中提炼学生高频错误
-- 难度提示：数字量级、嵌套深度、多步性等难度线索
+Field semantics:
+- description: A single sentence telling downstream models "what this skill covers + when to invoke it." Include both content positioning and trigger scenario. Example: "Use when a student confuses step-based and category-based counting in multi-step problems. Builds on the multiplication principle." This field is the retrieval/loading entry point — the more precise, the better.
+- 考察重点: Core concepts / sub-skills / reasoning points assessed
+- 考察形式: Question-type distribution (fill-in / multiple-choice ratio) + common stem patterns + typical contexts
+- 易错点: High-frequency student errors distilled from the explanations
+- 难度提示: Difficulty signals such as numerical scale, nesting depth, and multi-step nature
 
-禁止事项：不要复述题目原文；不要加教学建议；不要写"本知识点"这类空话开头；不要输出 JSON 以外的任何内容。description 不要用"本知识点考察……"这种通用开头，直接描述场景。
+Prohibited: do not restate question text verbatim; do not add teaching recommendations; do not open with filler phrases like "This knowledge component tests..."; do not output anything outside the JSON. For description, skip generic openings like "This KC assesses..." — describe the scenario directly.
