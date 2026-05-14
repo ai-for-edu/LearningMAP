@@ -346,7 +346,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
   </div>
   <button class="new-session-btn" onclick="window.location.href='index.html'">
     <span class="material-symbols-outlined" style="font-size:16px;">add</span>
-    新对话
+    New Chat
   </button>
   <div style="flex:1;overflow-y:auto;" id="session-list"></div>
 </aside>
@@ -354,7 +354,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 <!-- Top Nav -->
 <nav id="topNav">
   <div class="topnav-left">
-    <span class="topnav-title" id="lessonTitle">课程</span>
+    <span class="topnav-title" id="lessonTitle">Lesson</span>
     <span id="topNavSkillPill" class="topnav-skill-pill" style="display:none;">
       <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;"></span>
       <span id="topNavSkillName"></span>
@@ -362,13 +362,13 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
   </div>
   <div class="topnav-actions">
     <button id="navStopBtn" onclick="stopLesson()" class="topnav-ghost-btn" style="display:none;">
-      <span class="material-symbols-outlined" style="font-size:15px;">stop_circle</span>停止
+      <span class="material-symbols-outlined" style="font-size:15px;">stop_circle</span>Stop
     </button>
     <button id="navRegenBtn" onclick="retryLesson()" class="topnav-ghost-btn" style="display:none;">
-      <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>重试
+      <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Retry
     </button>
     <button id="navSlidesBtn" onclick="goToSlides()" class="topnav-ghost-btn" style="display:none;">
-      <span class="material-symbols-outlined" style="font-size:15px;">slideshow</span>转为 PPT
+      <span class="material-symbols-outlined" style="font-size:15px;">slideshow</span>Export PPT
     </button>
     <a id="backLink" href="index.html" class="topnav-ghost-btn">
       <span class="material-symbols-outlined" style="font-size:15px;">close</span>
@@ -378,13 +378,13 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 
 <!-- Step Nav -->
 <div id="stepNav">
-  <div class="step-item done"><span class="step-num">✓</span>话题</div>
+  <div class="step-item done"><span class="step-num">✓</span>Topic</div>
   <span class="step-sep">›</span>
-  <div class="step-item done"><span class="step-num">✓</span>知识图谱</div>
+  <div class="step-item done"><span class="step-num">✓</span>Knowledge Graph</div>
   <span class="step-sep">›</span>
-  <div class="step-item done"><span class="step-num">✓</span>诊断</div>
+  <div class="step-item done"><span class="step-num">✓</span>Diagnosis</div>
   <span class="step-sep">›</span>
-  <div class="step-item active"><span class="step-num">4</span>课程</div>
+  <div class="step-item active"><span class="step-num">4</span>Lesson</div>
 </div>
 
 <!-- Three-column main content -->
@@ -392,43 +392,43 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 
   <!-- TOC Column -->
   <div id="tocPanel">
-    <div class="toc-header">目录</div>
+    <div class="toc-header">Contents</div>
     <nav id="tocList"></nav>
     <div id="weakPointBox" class="toc-weak-box" style="display:none;">
-      <div class="toc-weak-label">📌 薄弱点</div>
+      <div class="toc-weak-label">📌 Weak Points</div>
       <div id="weakPointList" class="toc-weak-item"></div>
     </div>
   </div>
 
-  <div class="pane-resizer" data-resize="toc" title="拖拽调整目录栏宽度"></div>
+  <div class="pane-resizer" data-resize="toc" title="Drag to resize contents panel"></div>
 
   <!-- Main Document Column -->
   <div id="docPanel">
     <div id="lessonContent">
     </div>
     <div id="lessonNav" style="display:none;padding-top:16px;border-top:1px solid var(--border);margin-top:32px;align-items:center;justify-content:flex-end;gap:12px;">
-      <button class="lesson-slides-btn" id="slidesBtn" onclick="goToSlides()" style="display:none;">转为 PPT</button>
-      <button class="lesson-finish-btn" id="finishLearningBtn" onclick="finishLearning()" style="display:none;">完成学习 →</button>
+      <button class="lesson-slides-btn" id="slidesBtn" onclick="goToSlides()" style="display:none;">Export PPT</button>
+      <button class="lesson-finish-btn" id="finishLearningBtn" onclick="finishLearning()" style="display:none;">Finish Learning →</button>
     </div>
   </div>
 
-  <div class="pane-resizer" data-resize="right" title="拖拽调整右栏宽度"></div>
+  <div class="pane-resizer" data-resize="right" title="Drag to resize right panel"></div>
 
   <!-- Right Panel -->
   <div id="rightPanel">
     <div class="right-panel-section" id="knowledgeSkillsSection">
       <div class="ks-toggle-row">
-        <span class="right-panel-title">💡 知识点技能</span>
+        <span class="right-panel-title">💡 Knowledge Point Skills</span>
         <button class="ks-toggle" id="ksToggleBtn" onclick="toggleKnowledgeSkills()"></button>
       </div>
       <div id="knowledgeSkillsPanel"></div>
     </div>
     <div class="right-panel-section">
-      <span class="right-panel-title">📊 薄弱点图谱</span>
+      <span class="right-panel-title">📊 Weak Point Graph</span>
       <div id="lessonGraph"></div>
       <div class="graph-legend-row">
-        <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#FECACA;border:1px solid #DC2626;"></div>薄弱</div>
-        <div class="graph-legend-item"><div class="graph-legend-dot" style="background:var(--accent);"></div>核心</div>
+        <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#FECACA;border:1px solid #DC2626;"></div>Weak</div>
+        <div class="graph-legend-item"><div class="graph-legend-dot" style="background:var(--accent);"></div>Core</div>
       </div>
     </div>
   </div>
@@ -437,7 +437,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 
 <!-- Sticky bottom chat -->
 <div id="lessonBottomBar">
-  <input type="text" id="lessonChatInput" placeholder="有问题？输入提问…"
+  <input type="text" id="lessonChatInput" placeholder="Have a question? Ask here…"
     onkeydown="if(event.key==='Enter') sendLessonChat()"/>
   <button class="lesson-send-btn" onclick="sendLessonChat()">
     <span class="material-symbols-outlined" style="font-size:18px;">arrow_upward</span>
@@ -473,8 +473,8 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
           <circle style="opacity:.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path style="opacity:.75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
         </svg>
-        <p style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">正在生成课程</p>
-        <p style="font-size:13px;color:var(--text-3);" id="generationProgress">AI 正在根据诊断结果生成个性化教案…</p>
+        <p style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">Generating lesson</p>
+        <p style="font-size:13px;color:var(--text-3);" id="generationProgress">AI is generating a personalized lesson based on your diagnosis…</p>
       </div>`;
 
     // Show stop button in nav during generation
@@ -496,12 +496,12 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
           var el = document.getElementById('generationProgress');
           if (!el || !s.progress) return;
           if (s.progress === 'retrieving skills') {
-            el.textContent = '正在检索教学技能...';
+            el.textContent = 'Retrieving teaching skills...';
           } else if (s.progress && s.progress.indexOf('/') !== -1) {
             var parts = s.progress.split('/');
-            el.textContent = '正在生成内容（' + parts[0] + '/' + parts[1] + ' 个知识点）...';
+            el.textContent = 'Generating content (' + parts[0] + '/' + parts[1] + ' knowledge points)...';
           } else {
-            el.textContent = '正在生成教案...';
+            el.textContent = 'Generating lesson...';
           }
         },
         async function onDone(s) {
@@ -512,8 +512,8 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
             document.getElementById('lessonContent').innerHTML = `
               <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 0;">
                 <span class="material-symbols-outlined" style="font-size:40px;color:var(--error);margin-bottom:16px;">error</span>
-                <p style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px;">生成失败</p>
-                <button onclick="window.location.reload()" style="font-size:13px;color:var(--accent);font-weight:600;background:none;border:none;cursor:pointer;">重试</button>
+                <p style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px;">Generation failed</p>
+                <button onclick="window.location.reload()" style="font-size:13px;color:var(--accent);font-weight:600;background:none;border:none;cursor:pointer;">Retry</button>
               </div>`;
           }
           resolve();
@@ -541,7 +541,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 
   // Render lesson as plain text (LLM returns markdown-like text)
   const weakPoints = state.diagnosis_result?.breakdown?.filter(b => b.status === 'weak').map(b => b.name) || [];
-  const weakDesc = weakPoints.map(n => '<strong style="color:var(--error);">' + escapeHtml(n) + '</strong>').join(' 和 ');
+  const weakDesc = weakPoints.map(n => '<strong style="color:var(--error);">' + escapeHtml(n) + '</strong>').join(' and ');
 
   // Show weak points in TOC panel
   if (weakPoints.length > 0) {
@@ -551,7 +551,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 
   // Update lesson title in top nav
   if (topic) {
-    document.getElementById('lessonTitle').textContent = topic + ' · 课程';
+    document.getElementById('lessonTitle').textContent = topic + ' · Lesson';
   }
 
   // Build pedagogy skill card for header (collapsible)
@@ -562,7 +562,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
     pedagogyCardHtml = `<details class="pedagogy-skill-card">
       <summary>
         <span class="material-symbols-outlined" style="font-size:16px;color:var(--accent);">psychology</span>
-        教学法：${escapeHtml(skillName)}
+        Teaching method: ${escapeHtml(skillName)}
       </summary>
       <div class="pedagogy-skill-card-body">${skillLessonSection ? safeMarkdown(skillLessonSection) : ''}</div>
     </details>`;
@@ -578,12 +578,12 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
   lessonContentEl.innerHTML =
     '<div id="annotationMargin" style="position:absolute;top:0;right:-230px;width:210px;pointer-events:auto;"></div>' +
     '<div id="lessonHeader">' +
-    '<div class="lesson-title">' + escapeHtml(topic) + '：薄弱知识点</div>' +
+    '<div class="lesson-title">' + escapeHtml(topic) + ': Weak Knowledge Points</div>' +
     '<div class="lesson-meta">' +
-    '<span>个性化教案</span>' +
+    '<span>Personalized Lesson</span>' +
     (skillName ? '<span class="lesson-skill-tag">' + escapeHtml(skillName) + '</span>' : '') +
     '</div>' +
-    '<p style="font-size:13px;color:var(--text-3);margin-bottom:16px;">本教案根据诊断结果生成，重点讲解 ' + (weakDesc || '相关知识点') + '。</p>' +
+    '<p style="font-size:13px;color:var(--text-3);margin-bottom:16px;">This lesson is generated based on your diagnosis results, focusing on ' + (weakDesc || 'related knowledge points') + '.</p>' +
     pedagogyCardHtml +
     '</div>' +
     '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0 20px;">' +
@@ -612,7 +612,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
         const card = document.createElement('div');
         card.innerHTML =
           '<details class="inline-ks-card">' +
-            '<summary>💡 知识点技能：' + escapeHtml(ksName) + '</summary>' +
+            '<summary>💡 Knowledge Point Skill: ' + escapeHtml(ksName) + '</summary>' +
             '<div class="inline-ks-card-body">' + safeMarkdown(ksContent) + '</div>' +
           '</details>';
         h2.parentNode.insertBefore(card, h2.nextSibling);
@@ -635,11 +635,11 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
       const card = document.createElement('div');
       card.innerHTML =
         '<details class="kc-skill-card">' +
-          '<summary>📘 出题考察提示：' + escapeHtml(matchedKey) + '</summary>' +
+          '<summary>📘 Quiz Hint: ' + escapeHtml(matchedKey) + '</summary>' +
           '<div class="kc-skill-card-body">' +
-            '<p><strong>考察重点：</strong>' + escapeHtml(kc['考察重点'] || '') + '</p>' +
-            '<p><strong>常见易错点：</strong>' + escapeHtml(kc['易错点'] || '') + '</p>' +
-            '<p><strong>难度提示：</strong>' + escapeHtml(kc['难度提示'] || '') + '</p>' +
+            '<p><strong>Key Focus: </strong>' + escapeHtml(kc['考察重点'] || '') + '</p>' +
+            '<p><strong>Common Mistakes: </strong>' + escapeHtml(kc['易错点'] || '') + '</p>' +
+            '<p><strong>Difficulty Note: </strong>' + escapeHtml(kc['难度提示'] || '') + '</p>' +
           '</div>' +
         '</details>';
       // Insert after any existing inline-ks-card that's already a sibling
@@ -665,7 +665,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
       escapeHtml(h.textContent) + '</div>';
   });
   if (!tocHtml) {
-    tocHtml = '<div class="toc-item active" data-section="section-1" onclick="document.getElementById(\'section-1\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">教案内容</div>';
+    tocHtml = '<div class="toc-item active" data-section="section-1" onclick="document.getElementById(\'section-1\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">Lesson Content</div>';
   }
   document.getElementById('tocList').innerHTML = tocHtml;
 
@@ -749,8 +749,8 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 
     function _masteryTooltip(m) {
       if (!m) return '';
-      const acc = (m.last_accuracy == null) ? '未测试' : `${Math.round(m.last_accuracy * 100)}%`;
-      return `\n上次正确率 ${acc} · ${m.last_seen_at || ''} · 状态 ${m.status}`;
+      const acc = (m.last_accuracy == null) ? 'Not tested' : `${Math.round(m.last_accuracy * 100)}%`;
+      return `\nLast accuracy ${acc} · ${m.last_seen_at || ''} · Status: ${m.status}`;
     }
 
     const visNodes = new vis.DataSet(allNodes.map(n => {
@@ -834,8 +834,8 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 <!-- Note Input Box -->
 <div id="noteInputBox">
   <div style="background:white;border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,.12);border-radius:10px;padding:12px;width:240px;">
-    <p style="font-size:10px;font-weight:700;color:var(--text-4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">添加笔记</p>
-    <input type="text" id="noteInput" style="width:100%;background:var(--bg);border:1.5px solid var(--border-input);border-radius:6px;padding:6px 10px;font-size:13px;color:var(--text);font-family:'Inter',sans-serif;outline:none;" placeholder="输入笔记，按 Enter 保存…"/>
+    <p style="font-size:10px;font-weight:700;color:var(--text-4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Add Note</p>
+    <input type="text" id="noteInput" style="width:100%;background:var(--bg);border:1.5px solid var(--border-input);border-radius:6px;padding:6px 10px;font-size:13px;color:var(--text);font-family:'Inter',sans-serif;outline:none;" placeholder="Type a note, press Enter to save…"/>
   </div>
 </div>
 
