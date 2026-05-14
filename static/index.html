@@ -331,6 +331,7 @@ let _chatMessages = [];         // chat-track message cache, hydrated from /stat
 let _learningMessages = [];     // learning-track message cache, hydrated from /state
 let _learningArtifacts = null;  // {graph, diagnosis_result, lesson_content, slide_contents} cache
 let _sendInFlight = false;      // SSE stream in progress — toggle disabled
+const _msgStore = [];           // copy/regen store; reset by clearChatHistory on each rebuild
 
 function _renderModeToggle(mode) {
   _sessionMode = mode;
@@ -614,6 +615,9 @@ function buildCtaCard(additionalKwargs) {
 
 function clearChatHistory() {
   document.getElementById('chatHistory').innerHTML = '';
+  // Reset _msgStore — copy-button indices in the wiped DOM are stale.
+  // Pushers (renderActiveView and the SSE done() handler) repopulate fresh.
+  _msgStore.length = 0;
 }
 
 function appendUserMessageDOM(content) {
@@ -627,11 +631,19 @@ function appendUserMessageDOM(content) {
 function appendAiMessageDOM(content, additionalKwargs) {
   const safe = safeMarkdown(content);
   const cta = buildCtaCard(additionalKwargs);
+  const msgIdx = _msgStore.length;
+  _msgStore.push({ text: content, raw: null });
   const html = `
     <div class="ai-msg msg-wrapper">
+      <div class="ai-avatar">A</div>
       <div class="ai-content">
         <div class="ai-name">EduAI</div>
         <div class="ai-text prose">${safe}</div>
+        <div class="msg-actions">
+          <button class="copy-btn" data-copy-idx="${msgIdx}" title="复制">
+            <span class="material-symbols-outlined" style="font-size:14px;">content_copy</span>
+          </button>
+        </div>
         ${cta}
       </div>
     </div>`;
@@ -755,8 +767,9 @@ function renderActiveView(mode) {
     }
   }
 
-  // Reinitialise vis.js graphs that were appended
-  setTimeout(initAllGraphs, 100);
+  // Reinitialise vis.js graphs that were appended — 500ms gives the DOM
+  // time to paint before vis.js measures container dimensions.
+  setTimeout(initAllGraphs, 500);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -803,11 +816,73 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// Copy + regenerate handlers (delegated)
+document.addEventListener('click', function(e) {
+  const copyBtn = e.target.closest('[data-copy-idx]');
+  if (copyBtn) {
+    const msg = _msgStore[+copyBtn.dataset.copyIdx];
+    if (msg) {
+      navigator.clipboard.writeText(msg.text).then(() => {
+        const icon = copyBtn.querySelector('.material-symbols-outlined');
+        icon.textContent = 'check';
+        setTimeout(() => { icon.textContent = 'content_copy'; }, 1500);
+      });
+    }
+    return;
+  }
+  const regenBtn = e.target.closest('[data-regen-idx]');
+  if (regenBtn) {
+    const idx = +regenBtn.dataset.regenIdx;
+    const msg = _msgStore[idx];
+    if (!msg || !msg.raw) return;
+
+    // Find the content element in the same message wrapper
+    const wrapper = regenBtn.closest('.msg-wrapper');
+    const contentEl = wrapper.querySelector('.prose');
+    if (!contentEl) return;
+
+    // Clear and re-stream in place
+    contentEl.innerHTML = '<span class="stream-cursor"></span>';
+    let newText = '';
+
+    const body = { message: msg.raw };
+    if (currentSessionId) body.session_id = currentSessionId;
+
+    streamSSE(`${API_BASE}/chat/stream`, body, {
+      token(d) {
+        newText += d.content;
+        contentEl.innerHTML = safeMarkdown(newText) + '<span class="stream-cursor"></span>';
+      },
+      done(d) {
+        contentEl.innerHTML = safeMarkdown(newText);
+        _msgStore[idx].text = newText;
+      },
+      complete(d) {
+        if (d.message) {
+          contentEl.innerHTML = safeMarkdown(d.message);
+          _msgStore[idx].text = d.message;
+        }
+      },
+      error(d) {
+        contentEl.innerHTML = `<span style="color:var(--error);">${escapeHtml(d.message || 'Regeneration failed')}</span>`;
+      },
+      skill() {},
+      start() {},
+    });
+    return;
+  }
+});
+
 async function handleSend(text) {
   const input = document.getElementById('chatInput');
   const rawMessage = text || input.value.trim();
   if (!rawMessage) return;
   if (_sendInFlight) return;
+
+  // Lock send immediately — before any DOM mutations or await calls.
+  _sendInFlight = true;
+  document.querySelectorAll('#modeToggle button').forEach(b => (b.disabled = true));
+
   input.value = '';
   input.style.height = 'auto'; // reset to single line
 
@@ -855,9 +930,6 @@ async function handleSend(text) {
       </div>
     </div>`);
   chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
-
-  _sendInFlight = true;
-  document.querySelectorAll('#modeToggle button').forEach(b => (b.disabled = true));
 
   try {
     messageCount++;
@@ -959,7 +1031,7 @@ async function handleSend(text) {
           currentSessionId = d.session_id;
           setSessionId(currentSessionId);
           renderKnowledgeGraph({ data: d.data, message: d.message, session_id: d.session_id, active_skill: _activeSkillInfo });
-          setTimeout(initAllGraphs, 100);
+          setTimeout(initAllGraphs, 500);
           // Auto-rename session with topic
           if (d.data.graph.topic && typeof renameCurrentSession === 'function') {
             renameCurrentSession(d.data.graph.topic);
@@ -1317,66 +1389,6 @@ async function showLessonFormatChoice(sid) {
 </script>
 
 <script>
-// Message store for copy/regenerate
-const _msgStore = [];
-
-// Copy + regenerate handlers (delegated)
-document.addEventListener('click', function(e) {
-  const copyBtn = e.target.closest('[data-copy-idx]');
-  if (copyBtn) {
-    const msg = _msgStore[+copyBtn.dataset.copyIdx];
-    if (msg) {
-      navigator.clipboard.writeText(msg.text).then(() => {
-        const icon = copyBtn.querySelector('.material-symbols-outlined');
-        icon.textContent = 'check';
-        setTimeout(() => { icon.textContent = 'content_copy'; }, 1500);
-      });
-    }
-    return;
-  }
-  const regenBtn = e.target.closest('[data-regen-idx]');
-  if (regenBtn) {
-    const idx = +regenBtn.dataset.regenIdx;
-    const msg = _msgStore[idx];
-    if (!msg || !msg.raw) return;
-
-    // Find the content element in the same message wrapper
-    const wrapper = regenBtn.closest('.msg-wrapper');
-    const contentEl = wrapper.querySelector('.prose');
-    if (!contentEl) return;
-
-    // Clear and re-stream in place
-    contentEl.innerHTML = '<span class="stream-cursor"></span>';
-    let newText = '';
-
-    const body = { message: msg.raw };
-    if (currentSessionId) body.session_id = currentSessionId;
-
-    streamSSE(`${API_BASE}/chat/stream`, body, {
-      token(d) {
-        newText += d.content;
-        contentEl.innerHTML = safeMarkdown(newText) + '<span class="stream-cursor"></span>';
-      },
-      done(d) {
-        contentEl.innerHTML = safeMarkdown(newText);
-        _msgStore[idx].text = newText;
-      },
-      complete(d) {
-        if (d.message) {
-          contentEl.innerHTML = safeMarkdown(d.message);
-          _msgStore[idx].text = d.message;
-        }
-      },
-      error(d) {
-        contentEl.innerHTML = `<span style="color:var(--error);">${escapeHtml(d.message || 'Regeneration failed')}</span>`;
-      },
-      skill() {},
-      start() {},
-    });
-    return;
-  }
-});
-
 // Close skill popup when clicking outside
 document.addEventListener('click', function(e) {
   const popup = document.getElementById('skillPopup');
