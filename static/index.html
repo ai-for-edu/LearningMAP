@@ -262,6 +262,7 @@ body.sidebar-collapsed #bottomBar { left: 0; }
   cursor: pointer; flex-shrink: 0;
 }
 .cta-btn:hover { background: var(--accent-dark); }
+.cta-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ── Hint chips ── */
 .hint-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 99px; border: 1px solid var(--border); background: white; font-size: 12px; color: var(--text-3); cursor: pointer; transition: all .15s; white-space: nowrap; }
@@ -617,12 +618,14 @@ document.addEventListener('click', function(e) {
   if (ctaBtn) {
     const topic = ctaBtn.dataset.ctaTopic;
     if (currentSessionId) {
+      ctaBtn.disabled = true;
       setSessionMode(currentSessionId, 'learning')
         .then(() => {
           _renderModeToggle('learning');
           handleSend(`学习 ${topic}`);
         })
-        .catch(err => console.error('Mode switch failed', err));
+        .catch(err => console.error('Mode switch failed', err))
+        .finally(() => { ctaBtn.disabled = false; });
     }
     return;
   }
