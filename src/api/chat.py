@@ -432,6 +432,8 @@ async def chat_stream(req: ChatRequest):
 
     # Stream chat tokens
     async def stream_sse():
+        from src.agent.nodes.chat import _cta_kwargs
+
         # Send skill info first
         skill_name = state.get("active_skill")
         if skill_name:
@@ -461,11 +463,8 @@ async def chat_stream(req: ChatRequest):
 
         # Attach CTA metadata if intent_node stashed a topic, then clear it.
         cta_topic = state.get("pending_cta_topic")
-        extra_kwargs: dict = {}
+        extra_kwargs = _cta_kwargs(cta_topic)
         if cta_topic:
-            extra_kwargs["additional_kwargs"] = {
-                "cta": {"type": "learn_topic", "topic": cta_topic}
-            }
             yield _sse_event({"type": "cta", "topic": cta_topic})
         state["messages"].append(AIMessage(content=full_text, **extra_kwargs))
         state["pending_cta_topic"] = None

@@ -75,6 +75,16 @@ def _build_context_summary(state: LearningState) -> str:
     return "## 当前学习上下文\n" + "\n".join(f"- {p}" for p in parts) + "\n\n基于以上上下文回答用户问题。如果用户问到诊断、知识点等，用上下文中的数据回答。"
 
 
+def _cta_kwargs(topic: str | None) -> dict:
+    """Return AIMessage extra-kwargs payload for a learn-topic CTA, or {} if no topic.
+
+    Centralizes the CTA shape so chat_node and the SSE handler can't drift.
+    """
+    if not topic:
+        return {}
+    return {"additional_kwargs": {"cta": {"type": "learn_topic", "topic": topic}}}
+
+
 def chat_node(state: LearningState) -> dict:
     """Handle general conversation with learning context awareness."""
     messages = state.get("messages", [])
@@ -124,12 +134,7 @@ def chat_node(state: LearningState) -> dict:
     except Exception:
         logger.exception("LLM call failed in chat_node")
         reply = "抱歉，AI 服务暂时不可用，请稍后再试。"
-    cta_topic = state.get("pending_cta_topic")
-    extra_kwargs: dict = {}
-    if cta_topic:
-        extra_kwargs["additional_kwargs"] = {
-            "cta": {"type": "learn_topic", "topic": cta_topic}
-        }
+    extra_kwargs = _cta_kwargs(state.get("pending_cta_topic"))
     return {
         "messages": [AIMessage(content=reply, **extra_kwargs)],
         "mode": "chat",
@@ -141,6 +146,8 @@ def chat_node_stream(state: dict):
     """Streaming version of chat_node. Yields token strings.
 
     Not called by LangGraph — used directly by the SSE endpoint.
+    The SSE caller owns: CTA attachment, state mutation, and persistence
+    (chat_node_stream is a pure token generator).
     """
     messages = state.get("messages", [])
 

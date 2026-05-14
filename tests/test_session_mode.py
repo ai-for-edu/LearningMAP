@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 from src.agent.nodes.intent import intent_node, IntentResult
 
@@ -95,10 +95,6 @@ class TestIntentNodeGateRemoved:
         assert "messages" not in result
 
 
-from unittest.mock import MagicMock, patch as _patch
-
-from langchain_core.messages import AIMessage as _AIMessage
-
 from src.agent.nodes.chat import chat_node
 
 
@@ -108,7 +104,7 @@ def _mock_chat_llm(reply: str):
     fake_response = MagicMock()
     fake_response.choices = [MagicMock(message=MagicMock(content=reply))]
     fake_client.chat.completions.create.return_value = fake_response
-    return _patch("src.agent.nodes.chat.get_raw_client", return_value=fake_client)
+    return patch("src.agent.nodes.chat.get_raw_client", return_value=fake_client)
 
 
 class TestChatNodeCTA:
@@ -118,12 +114,12 @@ class TestChatNodeCTA:
             "pending_cta_topic": "微积分",
         }
         with _mock_chat_llm("微积分是研究变化率的数学分支……"), \
-             _patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
+             patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
             result = chat_node(state)
 
         msgs = result["messages"]
         assert len(msgs) == 1
-        assert isinstance(msgs[0], _AIMessage)
+        assert isinstance(msgs[0], AIMessage)
         assert msgs[0].additional_kwargs == {
             "cta": {"type": "learn_topic", "topic": "微积分"}
         }
@@ -131,7 +127,7 @@ class TestChatNodeCTA:
     def test_no_pending_cta_topic_means_empty_kwargs(self) -> None:
         state = {"messages": [HumanMessage(content="hi")]}
         with _mock_chat_llm("hello"), \
-             _patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
+             patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
             result = chat_node(state)
         assert result["messages"][0].additional_kwargs == {}
 
@@ -141,8 +137,16 @@ class TestChatNodeCTA:
             "pending_cta_topic": "微积分",
         }
         with _mock_chat_llm("ok"), \
-             _patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
+             patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
             result = chat_node(state)
+        assert result["pending_cta_topic"] is None
+
+    def test_empty_string_pending_cta_topic_means_empty_kwargs(self) -> None:
+        state = {"messages": [HumanMessage(content="hi")], "pending_cta_topic": ""}
+        with _mock_chat_llm("hello"), \
+             patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
+            result = chat_node(state)
+        assert result["messages"][0].additional_kwargs == {}
         assert result["pending_cta_topic"] is None
 
 
