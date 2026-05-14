@@ -104,9 +104,12 @@ def chat_node(state: LearningState) -> dict:
         system_prompt += f"\n\n## 教学方法\n{skill_text}"
 
     # ③ Current session context
-    context = _build_context_summary(state)
-    if context:
-        system_prompt += f"\n\n{context}"
+    # Learning artifacts (topic, knowledge graph, diagnosis, lesson) belong to
+    # the learning track only — don't leak them into chat-mode LLM context.
+    if state.get("session_mode") != "chat":
+        context = _build_context_summary(state)
+        if context:
+            system_prompt += f"\n\n{context}"
 
     # Frozen snapshot (PR-4): cache-friendly, before retrieve_memory
     system_prompt += memory_snapshot_block(state)
@@ -167,9 +170,12 @@ def chat_node_stream(state: dict):
     if skill_text:
         system_prompt += f"\n\n## 教学方法\n{skill_text}"
 
-    context = _build_context_summary(state)
-    if context:
-        system_prompt += f"\n\n{context}"
+    # Learning artifacts (topic, knowledge graph, diagnosis, lesson) belong to
+    # the learning track only — don't leak them into chat-mode LLM context.
+    if state.get("session_mode") != "chat":
+        context = _build_context_summary(state)
+        if context:
+            system_prompt += f"\n\n{context}"
 
     # Frozen snapshot (PR-4) — same as chat_node
     system_prompt += memory_snapshot_block(state)

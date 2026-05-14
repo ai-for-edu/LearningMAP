@@ -257,6 +257,70 @@ class TestIntentNodeReadsActiveTrack:
         assert result == {"mode": "chat"}
 
 
+class TestChatNodeContextIsolation:
+    def test_chat_mode_does_not_inject_learning_artifacts(self) -> None:
+        """Chat mode LLM call must not see learning topic / graph / diagnosis."""
+        captured_system = []
+        fake_client = MagicMock()
+        fake_response = MagicMock()
+        fake_response.choices = [MagicMock(message=MagicMock(content="ok"))]
+
+        def capture_create(*, model, max_tokens, messages, **_):
+            for m in messages:
+                if m["role"] == "system":
+                    captured_system.append(m["content"])
+            return fake_response
+
+        fake_client.chat.completions.create.side_effect = capture_create
+
+        from src.llm.schemas import KnowledgeGraph
+        state = {
+            "session_mode": "chat",
+            "messages": [],
+            "chat_messages": [HumanMessage(content="今天天气怎么样")],
+            "topic": "微积分",
+            "knowledge_graph": None,  # full KG omitted for test simplicity
+        }
+        with patch("src.agent.nodes.chat.get_raw_client", return_value=fake_client), \
+             patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
+            chat_node(state)
+
+        assert len(captured_system) == 1
+        sys_prompt = captured_system[0]
+        # Learning artifacts must NOT leak into chat-mode system prompt
+        assert "微积分" not in sys_prompt
+        assert "学习主题" not in sys_prompt
+
+    def test_learning_mode_still_injects_learning_artifacts(self) -> None:
+        """Learning mode keeps the existing behavior — context is included."""
+        captured_system = []
+        fake_client = MagicMock()
+        fake_response = MagicMock()
+        fake_response.choices = [MagicMock(message=MagicMock(content="ok"))]
+
+        def capture_create(*, model, max_tokens, messages, **_):
+            for m in messages:
+                if m["role"] == "system":
+                    captured_system.append(m["content"])
+            return fake_response
+
+        fake_client.chat.completions.create.side_effect = capture_create
+
+        state = {
+            "session_mode": "learning",
+            "messages": [HumanMessage(content="再讲讲连续性")],
+            "chat_messages": [],
+            "topic": "微积分",
+        }
+        with patch("src.agent.nodes.chat.get_raw_client", return_value=fake_client), \
+             patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
+            chat_node(state)
+
+        sys_prompt = captured_system[0]
+        assert "微积分" in sys_prompt
+        assert "学习主题" in sys_prompt
+
+
 class TestIntentNodeFallback:
     def test_missing_session_mode_defaults_to_chat(self) -> None:
         # Defensive: state without session_mode field should not blow up.
