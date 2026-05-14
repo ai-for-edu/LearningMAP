@@ -201,6 +201,16 @@ async function setSkill(sessionId, skillName) {
   return resp.json();
 }
 
+async function setSessionMode(sessionId, mode) {
+  const resp = await fetch(`${API_BASE}/chat/${sessionId}/set-mode`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode }),
+  });
+  if (!resp.ok) throw new Error(`Set mode failed: ${resp.status}`);
+  return resp.json();
+}
+
 function buildMarkdownReport(state) {
   const topic = state.topic || '未命名主题';
   let md = `# 学习报告：${topic}\n\n`;
