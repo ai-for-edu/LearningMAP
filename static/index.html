@@ -248,6 +248,21 @@ body.sidebar-collapsed #bottomBar { left: 0; }
 .skill-badge { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-light); border: 1px solid var(--accent-border); color: var(--accent-dark); font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; cursor: pointer; transition: background .15s; }
 .skill-badge:hover { background: var(--accent-border); }
 
+/* ── CTA card ── */
+.cta-card {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 8px; padding: 10px 14px;
+  background: var(--accent-light); border: 1px solid var(--accent-border);
+  border-radius: 12px; font-size: 13px; color: var(--accent-dark);
+}
+.cta-card .cta-text { flex: 1; }
+.cta-btn {
+  background: var(--accent); color: white; border: none;
+  padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  cursor: pointer; flex-shrink: 0;
+}
+.cta-btn:hover { background: var(--accent-dark); }
+
 /* ── Hint chips ── */
 .hint-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 99px; border: 1px solid var(--border); background: white; font-size: 12px; color: var(--text-3); cursor: pointer; transition: all .15s; white-space: nowrap; }
 .hint-chip:hover { background: var(--bg-sidebar); border-color: var(--accent-border); color: var(--text-2); }
@@ -559,6 +574,20 @@ function buildKnowledgeSkillBadge(knowledgeSkills) {
     </div>`;
 }
 
+function buildCtaCard(additionalKwargs) {
+  const cta = additionalKwargs && additionalKwargs.cta;
+  if (!cta || cta.type !== 'learn_topic' || !cta.topic) return '';
+  const safeTopic = escapeHtml(cta.topic);
+  return `
+    <div class="cta-card">
+      <span class="material-symbols-outlined" style="font-size:18px;">school</span>
+      <div class="cta-text">想系统学习「<strong>${safeTopic}</strong>」吗？</div>
+      <button type="button" class="cta-btn" data-cta-topic="${safeTopic}">
+        进入学习模式 →
+      </button>
+    </div>`;
+}
+
 const _ksBadgeStore = [];
 const _badgeSkillStore = [];
 
@@ -582,6 +611,20 @@ document.addEventListener('click', function(e) {
   if (badge) {
     const info = _badgeSkillStore[+badge.dataset.badgeIdx];
     if (info) showSkillModal(info, info.current_section || null);
+    return;
+  }
+  const ctaBtn = e.target.closest('[data-cta-topic]');
+  if (ctaBtn) {
+    const topic = ctaBtn.dataset.ctaTopic;
+    if (currentSessionId) {
+      setSessionMode(currentSessionId, 'learning')
+        .then(() => {
+          _renderModeToggle('learning');
+          handleSend(`学习 ${topic}`);
+        })
+        .catch(err => console.error('Mode switch failed', err));
+    }
+    return;
   }
 });
 
@@ -648,6 +691,7 @@ async function handleSend(text) {
     let streamText = '';
     let streamBadge = '';
     let streamMode = 'chat';
+    let streamCtaTopic = null;
 
     chatHistory.innerHTML += `
       <div class="ai-msg msg-wrapper" id="${responseId}">
@@ -688,6 +732,10 @@ async function handleSend(text) {
         contentEl.innerHTML = safeMarkdown(streamText) + '<span class="stream-cursor"></span>';
         chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
       },
+      cta(d) {
+        // Store topic; card will be appended after msg-actions in done handler
+        if (d.topic) streamCtaTopic = d.topic;
+      },
       done(d) {
         if (d.session_id) {
           currentSessionId = d.session_id;
@@ -707,6 +755,14 @@ async function handleSend(text) {
               <span class="material-symbols-outlined" style="font-size:18px;">refresh</span>
             </button>
           </div>`);
+        // Append CTA card after msg-actions if cta event was received
+        if (streamCtaTopic) {
+          const aiContent = respEl.querySelector('.ai-content');
+          if (aiContent && !aiContent.querySelector('.cta-card')) {
+            aiContent.insertAdjacentHTML('beforeend',
+              buildCtaCard({ cta: { type: 'learn_topic', topic: streamCtaTopic } }));
+          }
+        }
       },
       complete(d) {
         // Non-chat mode (graph, quiz, etc.) — full response at once
@@ -1108,6 +1164,7 @@ async function showLessonFormatChoice(sid) {
                   <span class="material-symbols-outlined" style="font-size:18px;">content_copy</span>
                 </button>
               </div>
+              ${buildCtaCard(msg.additional_kwargs)}
             </div>
           </div>`;
       }
