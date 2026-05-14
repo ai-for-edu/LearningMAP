@@ -178,6 +178,7 @@ def _capture_chat_system_prompt(state, *, retrieve_return=""):
 def test_chat_node_appends_snapshot_when_present():
     """state has memory_snapshot → system prompt contains snapshot text."""
     state = {
+        "session_mode": "learning",
         "messages": [HumanMessage(content="解释勾股定理是什么意思")],  # ≥10 chars
         "memory_snapshot": SAMPLE_SNAPSHOT,
         "memory_snapshot_loaded_at": 1000,
@@ -189,6 +190,7 @@ def test_chat_node_appends_snapshot_when_present():
 def test_chat_node_no_snapshot_when_field_is_none():
     """state has memory_snapshot=None → system prompt does NOT contain snapshot."""
     state = {
+        "session_mode": "learning",
         "messages": [HumanMessage(content="解释勾股定理是什么意思")],
         "memory_snapshot": None,
     }
@@ -199,6 +201,7 @@ def test_chat_node_no_snapshot_when_field_is_none():
 def test_chat_node_skips_retrieve_for_short_message():
     """User msg <10 chars → retrieve_memory NOT called."""
     state = {
+        "session_mode": "learning",
         "messages": [HumanMessage(content="嗯")],   # 1 char
         "memory_snapshot": None,
     }
@@ -209,6 +212,7 @@ def test_chat_node_skips_retrieve_for_short_message():
 def test_chat_node_calls_retrieve_for_long_message():
     """User msg ≥10 chars → retrieve_memory called once."""
     state = {
+        "session_mode": "learning",
         "messages": [HumanMessage(content="解释一下勾股定理的证明")],  # ≥10 chars
         "memory_snapshot": None,
     }
@@ -251,6 +255,7 @@ def _capture_chat_stream_system_prompt(state, *, retrieve_return=""):
 def test_chat_node_stream_appends_snapshot_when_present():
     """chat_node_stream: state has memory_snapshot → system prompt contains snapshot."""
     state = {
+        "session_mode": "learning",
         "messages": [HumanMessage(content="解释勾股定理是什么意思")],  # ≥10 chars
         "memory_snapshot": SAMPLE_SNAPSHOT,
         "memory_snapshot_loaded_at": 1000,
@@ -262,6 +267,7 @@ def test_chat_node_stream_appends_snapshot_when_present():
 def test_chat_node_stream_skips_retrieve_for_short_message():
     """chat_node_stream: user msg <10 chars → retrieve_memory NOT called."""
     state = {
+        "session_mode": "learning",
         "messages": [HumanMessage(content="嗯")],  # 1 char
         "memory_snapshot": None,
     }
