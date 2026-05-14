@@ -9,13 +9,21 @@ from src.agent.nodes.intent import intent_node, IntentResult
 
 
 def _state(session_mode: str, user_msg: str = "什么是微积分", **extras) -> dict:
-    return {
+    """Build a minimal LearningState dict for intent_node tests.
+
+    Routes user_msg to the active track: chat_messages for chat mode,
+    messages for learning mode — matching intent_node's track selection.
+    """
+    msg = HumanMessage(content=user_msg)
+    base = {
         "session_mode": session_mode,
-        "messages": [HumanMessage(content=user_msg)],
+        "messages": [] if session_mode == "chat" else [msg],
+        "chat_messages": [msg] if session_mode == "chat" else [],
         "active_skill": None,
         "active_skill_content": None,
-        **extras,
     }
+    base.update(extras)
+    return base
 
 
 def _mock_llm_returning(intent_result: IntentResult):
@@ -150,10 +158,50 @@ class TestChatNodeCTA:
         assert result["pending_cta_topic"] is None
 
 
+class TestIntentNodeReadsActiveTrack:
+    def test_chat_mode_reads_from_chat_messages(self) -> None:
+        state = {
+            "session_mode": "chat",
+            "messages": [],  # learning track empty
+            "chat_messages": [HumanMessage(content="什么是积分")],
+        }
+        with _mock_llm_returning(
+            IntentResult(intent="learn_topic", topic="积分", skill=None)
+        ):
+            result = intent_node(state)
+        assert result["mode"] == "chat"
+        assert result["pending_cta_topic"] == "积分"
+
+    def test_learning_mode_reads_from_messages(self) -> None:
+        state = {
+            "session_mode": "learning",
+            "messages": [HumanMessage(content="学习 积分")],
+            "chat_messages": [],  # chat track empty
+        }
+        with _mock_llm_returning(
+            IntentResult(intent="learn_topic", topic="积分", skill=None)
+        ):
+            result = intent_node(state)
+        assert result["mode"] == "graph"
+        assert result["topic"] == "积分"
+
+    def test_chat_mode_with_only_learning_history_treats_chat_track_empty(self) -> None:
+        # User has a learning history but switches to chat with no chat messages yet —
+        # intent_node should return early (no message in active track).
+        state = {
+            "session_mode": "chat",
+            "messages": [HumanMessage(content="学习 积分"), AIMessage(content="知识图谱")],
+            "chat_messages": [],
+        }
+        result = intent_node(state)
+        assert result == {"mode": "chat"}
+
+
 class TestIntentNodeFallback:
     def test_missing_session_mode_defaults_to_chat(self) -> None:
         # Defensive: state without session_mode field should not blow up.
-        state = {"messages": [HumanMessage(content="什么是导数")]}
+        # Default mode is "chat", so message must be in chat_messages track.
+        state = {"chat_messages": [HumanMessage(content="什么是导数")]}
         with _mock_llm_returning(
             IntentResult(intent="learn_topic", topic="导数", skill=None)
         ):

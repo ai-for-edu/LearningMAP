@@ -27,11 +27,13 @@ def intent_node(state: LearningState) -> dict:
     if state.get("mode") == "quiz":
         return {"mode": "quiz"}
 
-    messages = state.get("messages", [])
-    if not messages:
+    session_mode = state.get("session_mode", "chat")
+    track_key = "chat_messages" if session_mode == "chat" else "messages"
+    track = state.get(track_key, [])
+    if not track:
         return {"mode": "chat"}
 
-    last_msg = messages[-1]
+    last_msg = track[-1]
     content = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
 
     available_skills = list_skills()
