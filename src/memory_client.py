@@ -164,7 +164,7 @@ def _build_ingest_payload(
     return {
         "user_id": user_id,
         "session_id": session_id,
-        "goal_text": f"学习 {topic}" if topic else None,
+        "goal_text": f"Learn {topic}" if topic else None,
         "topic": topic or None,
         "subtopics": subtopics,
     }
@@ -276,16 +276,16 @@ def _build_review_payloads(
         subtopics = []
         for kp, qs in by_kp.items():
             if kp in strong_set:
-                summary = "review-strong: 复习答对"
+                summary = "review-strong: answered correctly in review"
             elif kp in weak_set:
-                summary = "review-weak: 复习答错"
+                summary = "review-weak: answered incorrectly in review"
             else:
                 summary = "review"
             subtopics.append({"name": kp, "summary": summary, "questions": qs})
         payloads.append({
             "user_id": user_id,
             "session_id": f"{session_id}_review_{_re_slug(topic or 'notopic')}",
-            "goal_text": f"复习 {topic}" if topic else "复习",
+            "goal_text": f"Review {topic}" if topic else "Review",
             "topic": topic or None,
             "subtopics": subtopics,
         })

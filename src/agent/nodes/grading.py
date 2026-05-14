@@ -27,7 +27,7 @@ def grading_node(state: LearningState) -> dict:
 
     answer_idx = ANSWER_MAP.get(student_answer, -1)
     if answer_idx == -1:
-        return {"messages": [AIMessage(content="请输入 A、B、C 或 D 来作答。")], "mode": "quiz"}
+        return {"messages": [AIMessage(content="Please enter A, B, C, or D to answer.")], "mode": "quiz"}
 
     # Check correctness
     q = questions[current_idx]
@@ -38,10 +38,10 @@ def grading_node(state: LearningState) -> dict:
     next_idx = current_idx + 1
 
     if is_correct:
-        feedback = "✓ 回答正确！"
+        feedback = "✓ Correct!"
     else:
         correct_letter = chr(65 + correct_idx)
-        feedback = f"✗ 回答错误，正确答案是 {correct_letter}。"
+        feedback = f"✗ Incorrect. The correct answer is {correct_letter}."
 
     # Check if more questions
     if next_idx >= len(questions):
@@ -49,7 +49,7 @@ def grading_node(state: LearningState) -> dict:
             "answers": answers,
             "current_question_index": next_idx,
             "mode": "result",
-            "messages": [AIMessage(content=f"{feedback}\n\n所有题目作答完毕，正在生成诊断结果...")],
+            "messages": [AIMessage(content=f"{feedback}\n\nAll questions answered. Generating diagnosis results...")],
         }
 
     return {

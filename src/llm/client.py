@@ -60,5 +60,5 @@ def get_model_name() -> str:
 
 
 def get_reviewer_model_name() -> str:
-    """Reviewer (复习出题/评估) 用的便宜模型. 默认与主流程同 LLM_MODEL."""
+    """Reviewer model (for review quiz generation and evaluation). Defaults to LLM_MODEL."""
     return os.environ.get("REVIEWER_MODEL", get_model_name())

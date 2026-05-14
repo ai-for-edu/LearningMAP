@@ -101,7 +101,7 @@ def quiz_node(state: LearningState) -> dict:
         if not graph:
             return {
                 "mode": "chat",
-                "messages": [AIMessage(content="请先选择一个学习主题。")],
+                "messages": [AIMessage(content="Please select a learning topic first.")],
             }
 
         raw_nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
@@ -136,8 +136,8 @@ def quiz_node(state: LearningState) -> dict:
             )
             # Pin knowledge_point to the KG node name. The LLM has been
             # observed to paraphrase or append the description into this
-            # field (e.g. "乘法原理: 讲解分步计数..."), which then becomes
-            # the subtopic key in memory and breaks cross-session matching.
+            # field (e.g. "multiplication principle: explanation of step-by-step counting..."),
+            # which then becomes the subtopic key in memory and breaks cross-session matching.
             for q in batch:
                 q.knowledge_point = node.name
             all_generated.extend(batch)
@@ -148,7 +148,7 @@ def quiz_node(state: LearningState) -> dict:
             "answers": [],
             "mode": "quiz",
             "messages": [
-                AIMessage(content=f"共 {len(all_generated)} 道题，开始作答！")
+                AIMessage(content=f"{len(all_generated)} questions ready. Let's begin!")
             ],
         }
 
@@ -162,7 +162,7 @@ def quiz_node(state: LearningState) -> dict:
         options_text = "\n".join(
             f"  {chr(65 + i)}) {opt}" for i, opt in enumerate(opts)
         )
-        reply = f"[{q_name}] 第 {current_idx + 1}/{len(questions)} 题\n\n{q_text}\n\n{options_text}"
+        reply = f"[{q_name}] Question {current_idx + 1}/{len(questions)}\n\n{q_text}\n\n{options_text}"
         return {"mode": "quiz", "messages": [AIMessage(content=reply)]}
 
     return {"mode": "result"}
@@ -208,7 +208,7 @@ def quiz_generate_progressive(state: dict):
                 response_model=list[QuizQuestion],
             )
             # Pin knowledge_point to the KG node name — same reason as in
-            # quiz_node: stop LLM-paraphrase pollution from breaking memory match.
+            # quiz_node: prevent LLM-paraphrase pollution from breaking memory matching.
             for q in batch:
                 q.knowledge_point = node.name
             yield batch

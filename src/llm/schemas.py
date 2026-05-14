@@ -71,17 +71,23 @@ class KCSkill(BaseModel):
     description: str = Field(
         ...,
         description=(
-            "英文或中文皆可的一句话索引 + 适用场景，40-100 字。必须同时说明"
-            "『这个 skill 讲什么』和『什么时候该调用它』。示例：『当学生处理"
-            "多步骤计数问题且出现分步与分类混淆时使用。构建在乘法原理。』"
+            "One-sentence index + applicable scenario (40-100 chars, English or Chinese). "
+            "Must state both 'what this skill covers' and 'when to invoke it'. "
+            "Example: 'Use when a student confuses step-by-step counting with "
+            "classification counting in multi-step problems. Grounded in the "
+            "multiplication principle.'"
         ),
     )
-    考察重点: str = Field(..., description="核心概念 / 子技能 / 思维点，80-150 字")
+    # NOTE: Field names below are intentionally kept in Chinese — they match the
+    # XES3G5M kc_skills.json data file keys and are referenced by kc_skill_block.j2,
+    # kc_skill_from_bank.j2, and static/lesson.html. Renaming would require
+    # coordinating four sites for a feature that is off by default (USE_KC_SKILLS).
+    考察重点: str = Field(..., description="Core concepts / sub-skills / thinking points, 80-150 chars")
     考察形式: str = Field(
-        ..., description="题型分布 + 常见题干模式 + 情境套路，80-150 字"
+        ..., description="Question-type distribution + common stem patterns + scenario conventions, 80-150 chars"
     )
-    易错点: str = Field(..., description="从 analysis 归纳的高频错误，50-120 字")
-    难度提示: str = Field(..., description="数字量级 / 嵌套深度 / 多步性，50-100 字")
+    易错点: str = Field(..., description="High-frequency errors inferred from analysis, 50-120 chars")
+    难度提示: str = Field(..., description="Numeric magnitude / nesting depth / multi-step complexity, 50-100 chars")
 
 
 class ResolverMapping(BaseModel):
@@ -153,7 +159,7 @@ class ConsolidationDecision(BaseModel):
             raise ValueError("NOOP requires target_id")
         if a == "REJECT" and t is not None:
             raise ValueError("REJECT must have target_id=None")
-        # Spec §6.5: new_content "ADD/UPDATE 时填" — implied None for the rest.
+        # Spec §6.5: new_content required only for ADD/UPDATE — implied None for the rest.
         # Without this rule, a malformed LLM emitting DELETE with new_content
         # would slip past validation and pollute the audit trail with stray
         # content under a non-writing event.

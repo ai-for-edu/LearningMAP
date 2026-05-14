@@ -3,9 +3,9 @@
 Three-stage match between KG nodes and memory mastery rows:
 1. exact name match (case- and whitespace-sensitive)
 2. normalized name match — strip whitespace, lowercase ASCII, drop
-   common punctuation. Catches LLM drift like "判别式 (Δ)" vs "判别式".
+   common punctuation. Catches LLM drift like "discriminant (Δ)" vs "discriminant".
 3. prefix-before-colon match — recovers legacy memory rows where the
-   subtopic was stored as "节点名: 完整描述" because an older quiz LLM
+   subtopic was stored as "node_name: full description" because an older quiz LLM
    appended the description into QuizQuestion.knowledge_point. Modern
    quiz_node pins this field to the KG node name, but old data stays.
 
@@ -49,8 +49,8 @@ def _compute_status(retention: float) -> str:
 
 # Keep only CJK unified ideographs and ASCII alphanumeric [a-z0-9].
 # All whitespace, punctuation, symbols, and non-ASCII letters (e.g.
-# Greek Δ/δ) are dropped so that "判别式（Δ）" matches "判别式".
-_KEEP_RE = re.compile(r"[^一-鿿㐀-䶿a-z0-9豈-﫿]")
+# Greek Δ/δ) are dropped so that "discriminant（Δ）" matches "discriminant".
+_KEEP_RE = re.compile("[^\u4e00-\u9fff\u3400-\u4dbfa-z0-9\uf900-\ufaff]")
 
 
 def _normalize_name(name: str) -> str:

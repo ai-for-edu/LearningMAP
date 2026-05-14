@@ -130,7 +130,7 @@ def knowledge_graph_node(state: LearningState) -> dict:
 
     if graph is None:
         return {
-            "messages": [AIMessage(content="知识图谱生成失败，请稍后再试。")],
+            "messages": [AIMessage(content="Knowledge graph generation failed. Please try again later.")],
             "mode": "chat",
         }
 
@@ -144,8 +144,8 @@ def knowledge_graph_node(state: LearningState) -> dict:
     )
 
     reply = (
-        f"我已经为你梳理了「{topic}」的知识图谱，"
-        f"包含 {len(graph.nodes)} 个知识点。准备好了就点击开始诊断！"
+        f"I've mapped out the knowledge graph for \"{topic}\" — "
+        f"{len(graph.nodes)} knowledge points in total. Click 'Start Diagnosis' when you're ready!"
     )
     return {
         "messages": [AIMessage(content=reply)],

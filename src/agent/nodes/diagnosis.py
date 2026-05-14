@@ -56,12 +56,12 @@ def diagnosis_node(state: LearningState) -> dict:
     for kp in point_results:
         r = point_results[kp]
         if kp in mastered_points:
-            breakdown.append(DiagnosisBreakdown(name=kp, status="mastered", detail=f"{r['correct']}/{r['total']} 已掌握"))
+            breakdown.append(DiagnosisBreakdown(name=kp, status="mastered", detail=f"{r['correct']}/{r['total']} mastered"))
         else:
-            breakdown.append(DiagnosisBreakdown(name=kp, status="weak", detail=f"{r['correct']}/{r['total']} 需复习"))
+            breakdown.append(DiagnosisBreakdown(name=kp, status="weak", detail=f"{r['correct']}/{r['total']} needs review"))
 
     for kp in skipped_points:
-        breakdown.append(DiagnosisBreakdown(name=kp, status="skipped", detail="已跳过"))
+        breakdown.append(DiagnosisBreakdown(name=kp, status="skipped", detail="skipped"))
 
     score = round(total_correct / max(total_questions, 1) * 100)
     result = DiagnosisResult(
@@ -72,8 +72,8 @@ def diagnosis_node(state: LearningState) -> dict:
         breakdown=breakdown,
     )
 
-    weak_names = ", ".join(weak_points) if weak_points else "无"
-    reply = f"诊断完成！正确率 {score}%（{total_correct}/{total_questions}）\n\n薄弱知识点：{weak_names}"
+    weak_names = ", ".join(weak_points) if weak_points else "none"
+    reply = f"Diagnosis complete! Accuracy: {score}% ({total_correct}/{total_questions})\n\nWeak areas: {weak_names}"
 
     return {
         "diagnosis_result": result,

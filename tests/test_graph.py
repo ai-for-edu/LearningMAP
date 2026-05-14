@@ -107,4 +107,4 @@ def test_knowledge_graph_node_returns_failure_when_both_paths_miss():
         result = node_mod.knowledge_graph_node(state)
 
     assert result["mode"] == "chat"
-    assert "知识图谱生成失败" in result["messages"][0].content
+    assert "Knowledge graph generation failed" in result["messages"][0].content
