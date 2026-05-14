@@ -141,7 +141,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
   </div>
   <button class="new-session-btn" onclick="window.location.href='index.html'">
     <span class="material-symbols-outlined" style="font-size:16px;">add</span>
-    新对话
+    New Chat
   </button>
   <div style="flex:1;overflow-y:auto;" id="session-list"></div>
 </aside>
@@ -149,7 +149,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 <!-- Top Nav -->
 <nav id="topNav">
   <div style="display:flex;align-items:center;gap:8px;">
-    <span class="topnav-title">诊断结果</span>
+    <span class="topnav-title">Diagnosis Results</span>
   </div>
   <div class="topnav-actions">
     <a href="index.html" class="topnav-ghost-btn">
@@ -160,13 +160,13 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 
 <!-- Step Nav — all done -->
 <div id="stepNav">
-  <div class="step-item done"><span class="step-num">✓</span>话题</div>
+  <div class="step-item done"><span class="step-num">✓</span>Topic</div>
   <span class="step-sep">›</span>
-  <div class="step-item done"><span class="step-num">✓</span>知识图谱</div>
+  <div class="step-item done"><span class="step-num">✓</span>Knowledge Graph</div>
   <span class="step-sep">›</span>
-  <div class="step-item done"><span class="step-num">✓</span>诊断</div>
+  <div class="step-item done"><span class="step-num">✓</span>Diagnosis</div>
   <span class="step-sep">›</span>
-  <div class="step-item done"><span class="step-num">✓</span>课程</div>
+  <div class="step-item done"><span class="step-num">✓</span>Course</div>
 </div>
 
 <!-- Main content -->
@@ -191,7 +191,7 @@ function startLesson() {
   const state = await getSessionState(sessionId);
   const r = state.diagnosis_result;
   if (!r) {
-    document.getElementById('resultsContent').innerHTML = '<p style="color:var(--text-3);padding:32px;">暂无诊断结果，请先完成诊断。</p>';
+    document.getElementById('resultsContent').innerHTML = '<p style="color:var(--text-3);padding:32px;">No diagnosis results yet. Please complete the diagnosis first.</p>';
     return;
   }
 
@@ -204,31 +204,31 @@ function startLesson() {
   <div style="display:flex;align-items:center;gap:24px;margin-bottom:16px;">
     <div>
       <div class="score-num">${r.score}%</div>
-      <div class="score-label">正确率</div>
+      <div class="score-label">Accuracy</div>
     </div>
   </div>
   <div class="score-row">
     <span class="score-dot" style="background:var(--success);"></span>
-    <span>正确</span><span style="margin-left:auto;font-weight:600;color:var(--success);">${r.correct}</span>
+    <span>Correct</span><span style="margin-left:auto;font-weight:600;color:var(--success);">${r.correct}</span>
   </div>
   <div class="score-row">
     <span class="score-dot" style="background:var(--error);"></span>
-    <span>错误</span><span style="margin-left:auto;font-weight:600;color:var(--error);">${r.incorrect}</span>
+    <span>Incorrect</span><span style="margin-left:auto;font-weight:600;color:var(--error);">${r.incorrect}</span>
   </div>
   <div class="score-row">
     <span class="score-dot" style="background:var(--text-4);"></span>
-    <span>总题数</span><span style="margin-left:auto;color:var(--text-3);">${r.total}</span>
+    <span>Total Questions</span><span style="margin-left:auto;color:var(--text-3);">${r.total}</span>
   </div>
 </div>`;
 
   // Knowledge breakdown card
   html += `<div class="breakdown-card">
-  <div class="breakdown-title">知识点掌握情况</div>
+  <div class="breakdown-title">Knowledge Mastery</div>
   ${r.breakdown.map(item => {
     const iconClass = item.status === 'mastered' ? 'correct' : item.status === 'weak' ? 'incorrect' : 'skipped';
     const iconGlyph = item.status === 'mastered' ? '✓' : item.status === 'weak' ? '✗' : '–';
     const tagClass  = item.status === 'mastered' ? 'mastered' : item.status === 'weak' ? 'weak' : 'skipped';
-    const tagLabel  = item.status === 'mastered' ? '已掌握' : item.status === 'weak' ? '需加强' : '已跳过';
+    const tagLabel  = item.status === 'mastered' ? 'Mastered' : item.status === 'weak' ? 'Weak' : 'Skipped';
     return `<div class="breakdown-item">
       <div class="breakdown-icon ${iconClass}">${iconGlyph}</div>
       <span class="breakdown-name">${escapeHtml(item.name)}</span>
@@ -240,15 +240,15 @@ function startLesson() {
   // Weak-point callout
   if (weakPoints.length > 0) {
     html += `<div class="weak-callout">
-    <div class="weak-callout-title">⚠ 建议重点复习</div>
-    <div class="weak-callout-text">${weakPoints.map(w => escapeHtml(w)).join('、')}</div>
+    <div class="weak-callout-title">⚠ Focus Review Needed</div>
+    <div class="weak-callout-text">${weakPoints.map(w => escapeHtml(w)).join(', ')}</div>
   </div>`;
   }
 
   // CTA buttons
   html += `<div class="cta-row">
-  <button class="cta-primary" onclick="startLesson()">重新学习 →</button>
-  <button class="cta-ghost" onclick="window.location.href='index.html'">返回首页</button>
+  <button class="cta-primary" onclick="startLesson()">Start Learning →</button>
+  <button class="cta-ghost" onclick="window.location.href='index.html'">Back</button>
 </div>`;
 
   document.getElementById('resultsContent').innerHTML = html;
