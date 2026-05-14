@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from langchain_core.messages import HumanMessage
 
 from src.agent.nodes.intent import intent_node, IntentResult
@@ -21,7 +19,12 @@ def _state(session_mode: str, user_msg: str = "什么是微积分", **extras) ->
 
 
 def _mock_llm_returning(intent_result: IntentResult):
-    """Build a context manager that mocks intent_node's LLM call."""
+    """Build a context manager that mocks intent_node's LLM call.
+
+    instructor.Instructor.chat.completions.create() returns the Pydantic
+    model directly (not a ChatCompletion wrapper), so the mock returns
+    intent_result directly, not wrapped in choices[0].
+    """
     fake_client = MagicMock()
     fake_client.chat.completions.create.return_value = intent_result
     return patch("src.agent.nodes.intent.get_llm_client", return_value=fake_client)
@@ -34,7 +37,7 @@ class TestIntentNodeChatModeGating:
         ):
             result = intent_node(_state("chat"))
         assert result["mode"] == "chat"
-        assert result["_pending_cta_topic"] == "微积分"
+        assert result["pending_cta_topic"] == "微积分"
         assert "topic" not in result  # do NOT set top-level topic in chat mode
 
     def test_chat_mode_with_plain_chat_intent_no_cta(self) -> None:
@@ -43,7 +46,7 @@ class TestIntentNodeChatModeGating:
         ):
             result = intent_node(_state("chat", user_msg="今天天气怎么样"))
         assert result["mode"] == "chat"
-        assert "_pending_cta_topic" not in result
+        assert "pending_cta_topic" not in result
 
     def test_chat_mode_with_learn_topic_no_topic_no_cta(self) -> None:
         # Defensive: if classifier returned learn_topic without a topic, don't stash empty.
@@ -52,7 +55,7 @@ class TestIntentNodeChatModeGating:
         ):
             result = intent_node(_state("chat"))
         assert result["mode"] == "chat"
-        assert "_pending_cta_topic" not in result
+        assert "pending_cta_topic" not in result
 
 
 class TestIntentNodeLearningModeRouting:
@@ -101,4 +104,18 @@ class TestIntentNodeFallback:
         ):
             result = intent_node(state)
         assert result["mode"] == "chat"
-        assert result["_pending_cta_topic"] == "导数"
+        assert result["pending_cta_topic"] == "导数"
+
+    def test_llm_exception_falls_back_to_chat(self) -> None:
+        with patch("src.agent.nodes.intent.get_llm_client") as mock_get:
+            mock_get.return_value.chat.completions.create.side_effect = RuntimeError("timeout")
+            result = intent_node(_state("learning"))
+        assert result == {"mode": "chat"}
+
+    def test_quiz_mode_short_circuits_without_llm_call(self) -> None:
+        state = _state("learning")
+        state["mode"] = "quiz"
+        with patch("src.agent.nodes.intent.get_llm_client") as mock_get:
+            result = intent_node(state)
+            mock_get.assert_not_called()
+        assert result == {"mode": "quiz"}

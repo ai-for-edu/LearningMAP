@@ -45,6 +45,11 @@ class LearningState(MessagesState):
     # "learning" = full routing (graph / quiz / lesson) enabled.
     session_mode: str  # "chat" | "learning"
 
+    # Intra-turn key set by intent_node when chat-mode detects a learnable
+    # topic. Read by chat_node to attach a CTA card on the AI reply, then
+    # cleared in the same chat_node return (never persisted non-None).
+    pending_cta_topic: str | None
+
     # Pending topic waiting for skill selection
     pending_topic: str | None
 

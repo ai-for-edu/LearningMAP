@@ -20,7 +20,7 @@ def intent_node(state: LearningState) -> dict:
     """Classify user intent and route based on session_mode.
 
     chat mode  → always route to chat; if learn_topic detected, stash
-                 _pending_cta_topic so chat_node can attach a CTA card.
+                 pending_cta_topic so chat_node can attach a CTA card.
     learning mode → existing routing (chat / graph / quiz).
     """
     # If already in quiz step, treat as answer
@@ -72,7 +72,7 @@ def intent_node(state: LearningState) -> dict:
         # it via CTA in chat_node — do NOT enter the pipeline.
         updates["mode"] = "chat"
         if result.intent == "learn_topic" and result.topic:
-            updates["_pending_cta_topic"] = result.topic
+            updates["pending_cta_topic"] = result.topic
         return updates
 
     # session_mode == "learning" — full routing, no GATE.

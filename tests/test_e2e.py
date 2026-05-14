@@ -20,6 +20,11 @@ async def test_full_chat_flow():
         assert data1["mode"] == "chat"
         session_id = data1["session_id"]
 
+        # Enter learning mode before exercising the pipeline.
+        # (Task 6 will add a /set-mode endpoint; for now poke state directly.)
+        from src.api import chat as chat_api
+        chat_api._sessions[session_id]["session_mode"] = "learning"
+
         # Step 2: Learn topic
         r2 = await client.post("/api/chat", json={
             "session_id": session_id,
