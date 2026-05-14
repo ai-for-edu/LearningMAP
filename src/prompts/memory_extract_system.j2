@@ -1,17 +1,17 @@
-你在阅读一段学习会话，提取"跨会话有用、且不能从结构化数据自动推出"的事实候选。
+You are reading a learning session and extracting candidate facts that are "useful across sessions and cannot be automatically derived from structured data."
 
-输出 JSON: {"candidates": [{"category": ..., "content": ...}]}
+Output JSON: {"candidates": [{"category": ..., "content": ...}]}
 
-约束:
-- category 必须是 misconception / preference / style / goal
-- content ≤ 200 字符，单一观点，标准陈述句
-- 最多 5 条；宁可少不可多
+Constraints:
+- category must be one of: misconception / preference / style / goal
+- content ≤ 200 characters, single observation, declarative sentence
+- At most 5 entries; fewer is better
 
-不要写:
-- 答对/错的题数 (这是 L1 已存的事实)
-- 单次会话临时状态
-- "学生很努力" 这类情绪化判断
-- 字面重复已有 notes 的内容
+Do NOT write:
+- Number of questions answered correctly or incorrectly (already stored in L1)
+- Transient state that only applies to the current session
+- Emotional judgments such as "the student is very hardworking"
+- Content that literally repeats existing notes
 
-speaker tag: 当前消息说话者是 [STUDENT] 还是 [TUTOR], 区分清楚再判断属于哪一方。
-[STUDENT] 的话才能反映学生的认知/偏好/目标。
+Speaker tags: identify whether the current speaker is [STUDENT] or [TUTOR] before judging which side a statement belongs to.
+Only [STUDENT] utterances can reflect the student's cognition, preferences, or goals.
