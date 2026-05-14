@@ -149,7 +149,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
   </div>
   <button class="new-session-btn" onclick="window.location.href='index.html'">
     <span class="material-symbols-outlined" style="font-size:16px;">add</span>
-    新对话
+    New Chat
   </button>
   <div style="flex:1;overflow-y:auto;" id="session-list"></div>
 </aside>
@@ -157,14 +157,14 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 <!-- Top Nav -->
 <nav id="topNav">
   <div class="topnav-left">
-    <span class="topnav-title" id="topNavTitle">诊断</span>
+    <span class="topnav-title" id="topNavTitle">Diagnosis</span>
   </div>
   <div class="topnav-actions">
     <button id="navStopBtn" onclick="stopQuiz()" class="topnav-ghost-btn" style="display:none;">
-      <span class="material-symbols-outlined" style="font-size:15px;">stop_circle</span>停止
+      <span class="material-symbols-outlined" style="font-size:15px;">stop_circle</span>Stop
     </button>
     <button id="navRegenBtn" onclick="retryQuiz()" class="topnav-ghost-btn" style="display:none;">
-      <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>重试
+      <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Retry
     </button>
     <a id="navExitBtn" href="index.html" class="topnav-ghost-btn">
       <span class="material-symbols-outlined" style="font-size:15px;">close</span>
@@ -175,19 +175,19 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 <!-- Step Nav -->
 <div id="stepNav">
   <div class="step-item done" id="step1">
-    <span class="step-num">✓</span>话题
+    <span class="step-num">✓</span>Topic
   </div>
   <span class="step-sep">›</span>
   <div class="step-item done" id="step2">
-    <span class="step-num">✓</span>知识图谱
+    <span class="step-num">✓</span>Knowledge Graph
   </div>
   <span class="step-sep">›</span>
   <div class="step-item active" id="step3">
-    <span class="step-num">3</span>诊断
+    <span class="step-num">3</span>Diagnosis
   </div>
   <span class="step-sep">›</span>
   <div class="step-item" id="step4">
-    <span class="step-num">4</span>课程
+    <span class="step-num">4</span>Course
   </div>
 </div>
 
@@ -235,7 +235,7 @@ function buildQuizUI() {
     <div class="content-area">
       <div class="quiz-progress-wrap">
         <div class="quiz-progress-bar"><div class="quiz-progress-fill" id="quizProgressFill" style="width:10%"></div></div>
-        <div class="quiz-progress-label" id="quizProgressLabel">题目 1 / ?</div>
+        <div class="quiz-progress-label" id="quizProgressLabel">Question 1 / ?</div>
       </div>
       <div class="question-card">
         <div class="question-label" id="knowledgeTagText"></div>
@@ -259,9 +259,9 @@ function buildQuizUI() {
           </button>
         </div>
         <div class="quiz-nav">
-          <button class="quiz-prev-btn" id="prevBtn" disabled onclick="prevQuestion()">← 上一题</button>
+          <button class="quiz-prev-btn" id="prevBtn" disabled onclick="prevQuestion()">← Previous</button>
           <button class="quiz-next-btn" id="nextBtn" disabled onclick="nextQuestion()">
-            <span id="nextBtnText">下一题</span>
+            <span id="nextBtnText">Next</span>
           </button>
         </div>
       </div>
@@ -273,7 +273,7 @@ let _poller = null;
 
 async function initDiagnosis() {
   if (!sessionId) {
-    alert('请先从主页选择学习主题');
+    alert('Please select a learning topic from the home page first');
     window.location.href = '/';
     return;
   }
@@ -305,8 +305,8 @@ async function initDiagnosis() {
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
         </svg>
-        <p style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">正在生成题目</p>
-        <p class="status-text">AI 正在根据知识图谱生成诊断题目…</p>
+        <p style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">Generating Questions</p>
+        <p class="status-text">AI is generating diagnostic questions based on the knowledge graph…</p>
         <p class="status-text" id="loadingHint" style="margin-top:4px;font-size:11px;color:var(--text-4);"></p>
       </div>
     </div>`;
@@ -379,8 +379,8 @@ function startPolling() {
           <div class="content-area">
             <div class="status-card">
               <span class="material-symbols-outlined" style="font-size:36px;color:var(--error);margin-bottom:12px;display:block;">error</span>
-              <p style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:12px;">生成失败</p>
-              <button onclick="retryQuiz()" style="font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline;">重试</button>
+              <p style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:12px;">Generation Failed</p>
+              <button onclick="retryQuiz()" style="font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline;">Retry</button>
             </div>
           </div>`;
       }
@@ -416,7 +416,7 @@ function showQuestion() {
     document.getElementById('knowledgeTagText').textContent = '';
     document.querySelectorAll('.option-btn').forEach(b => { b.style.display = 'none'; });
     document.getElementById('nextBtn').disabled = true;
-    document.getElementById('nextBtnText').textContent = '等待出题...';
+    document.getElementById('nextBtnText').textContent = 'Waiting for questions...';
     // Retry when new questions arrive
     const check = setInterval(() => {
       if (currentIndex < allQuestions.length) { clearInterval(check); showQuestion(); }
@@ -433,7 +433,7 @@ function showQuestion() {
   const fill = document.getElementById('quizProgressFill');
   const label = document.getElementById('quizProgressLabel');
   if (fill) fill.style.width = `${((currentIndex + 1) / allQuestions.length) * 100}%`;
-  if (label) label.textContent = `题目 ${currentIndex + 1} / ${totalLabel}`;
+  if (label) label.textContent = `Question ${currentIndex + 1} / ${totalLabel}`;
 
   document.getElementById('knowledgeTagText').textContent = q.knowledge_point;
   document.getElementById('questionText').textContent = q.question;
@@ -442,7 +442,7 @@ function showQuestion() {
   document.getElementById('optC').textContent = q.options[2];
   document.getElementById('optD').textContent = q.options[3];
   const isLast = quizFullyLoaded && currentIndex >= allQuestions.length - 1;
-  document.getElementById('nextBtnText').textContent = isLast ? '完成' : '下一题';
+  document.getElementById('nextBtnText').textContent = isLast ? 'Complete' : 'Next';
 
   // Previous button
   const prevBtn = document.getElementById('prevBtn');
@@ -508,13 +508,13 @@ async function nextQuestion() {
       <div class="content-area">
         <div class="status-card">
           <span class="material-symbols-outlined" style="font-size:48px;color:var(--success);margin-bottom:12px;display:block;font-variation-settings:'FILL' 1;">check_circle</span>
-          <p style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px;">诊断完成</p>
-          <p class="status-text" style="margin-bottom:24px;">所有题目已作答完毕，点击下方查看诊断结果。</p>
-          <a href="/?session_id=${sessionId}&show=results" style="display:inline-block;background:var(--accent);color:white;padding:10px 28px;border-radius:99px;font-size:13px;font-weight:600;text-decoration:none;">查看结果</a>
+          <p style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px;">Diagnosis Complete</p>
+          <p class="status-text" style="margin-bottom:24px;">All questions answered. Click below to view diagnosis results.</p>
+          <a href="/?session_id=${sessionId}&show=results" style="display:inline-block;background:var(--accent);color:white;padding:10px 28px;border-radius:99px;font-size:13px;font-weight:600;text-decoration:none;">View Results</a>
         </div>
       </div>`;
   } catch (err) {
-    document.getElementById('nextBtnText').textContent = '完成';
+    document.getElementById('nextBtnText').textContent = 'Complete';
     document.getElementById('nextBtn').disabled = false;
     alert('Submit failed: ' + err.message);
   }
