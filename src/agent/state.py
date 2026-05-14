@@ -40,6 +40,11 @@ class LearningState(MessagesState):
     kc_skills: dict | None  # {kp_name: KCSkill.model_dump()}
     use_kc_skills: bool  # whether kc_skill_resolver should run + prompts inject
 
+    # User-facing session mode (chat vs learning) — gates whether intent_node
+    # is allowed to route to the pipeline. "chat" = pure chat + CTA only;
+    # "learning" = full routing (graph / quiz / lesson) enabled.
+    session_mode: str  # "chat" | "learning"
+
     # Pending topic waiting for skill selection
     pending_topic: str | None
 
