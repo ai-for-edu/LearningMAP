@@ -132,7 +132,7 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
   </div>
   <button class="new-session-btn" onclick="window.location.href='index.html'">
     <span class="material-symbols-outlined" style="font-size:16px;">add</span>
-    新对话
+    New Chat
   </button>
   <div style="flex:1;overflow-y:auto;" id="session-list"></div>
 </aside>
@@ -140,17 +140,17 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 <!-- Top Nav -->
 <nav id="topNav">
   <div class="topnav-left">
-    <span class="topnav-title" id="topNavTitle">课程 PPT</span>
+    <span class="topnav-title" id="topNavTitle">Course Slides</span>
   </div>
   <div class="topnav-actions">
     <button id="navStopBtn" onclick="cancelSlides()" class="topnav-ghost-btn" style="display:none;">
-      <span class="material-symbols-outlined" style="font-size:15px;">stop_circle</span>停止
+      <span class="material-symbols-outlined" style="font-size:15px;">stop_circle</span>Stop
     </button>
     <button id="navRegenBtn" onclick="regenSlides()" class="topnav-ghost-btn" style="display:none;">
-      <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>重试
+      <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Retry
     </button>
     <button id="navExportBtn" onclick="exportPptx()" class="topnav-ghost-btn" style="display:none;">
-      <span class="material-symbols-outlined" style="font-size:15px;">download</span>导出 PPTX
+      <span class="material-symbols-outlined" style="font-size:15px;">download</span>Export PPTX
     </button>
     <a id="backLink" href="/" class="topnav-ghost-btn">
       <span class="material-symbols-outlined" style="font-size:15px;">close</span>
@@ -160,13 +160,13 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
 
 <!-- Step Nav -->
 <div id="stepNav">
-  <div class="step-item done"><span class="step-num">✓</span>话题</div>
+  <div class="step-item done"><span class="step-num">✓</span>Topic</div>
   <span class="step-sep">›</span>
-  <div class="step-item done"><span class="step-num">✓</span>知识图谱</div>
+  <div class="step-item done"><span class="step-num">✓</span>Knowledge Graph</div>
   <span class="step-sep">›</span>
-  <div class="step-item done"><span class="step-num">✓</span>诊断</div>
+  <div class="step-item done"><span class="step-num">✓</span>Diagnosis</div>
   <span class="step-sep">›</span>
-  <div class="step-item active"><span class="step-num">4</span>课程</div>
+  <div class="step-item active"><span class="step-num">4</span>Lesson</div>
 </div>
 
 <!-- Main content -->
@@ -178,8 +178,8 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
       </svg>
-      <div class="slides-status-text">正在生成幻灯片</div>
-      <div class="slides-status-text" style="margin-top:6px;font-size:12px;color:var(--text-4);">AI 正在制作 PPT 教案，请稍候...</div>
+      <div class="slides-status-text">Generating slides…</div>
+      <div class="slides-status-text" style="margin-top:6px;font-size:12px;color:var(--text-4);">AI is creating slides, please wait…</div>
     </div>
 
     <!-- Slide Viewer (hidden until loaded) -->
@@ -197,11 +197,11 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
       <!-- Controls -->
       <div class="slide-nav-row" style="margin-top:16px;">
         <button id="prevBtn" onclick="goSlide(-1)" class="slide-nav-btn" disabled>
-          ← 上一页
+          ← Previous
         </button>
         <span id="pageIndicator" class="slide-counter">1 / 1</span>
         <button id="nextBtn" onclick="goSlide(1)" class="slide-nav-btn">
-          下一页 →
+          Next →
         </button>
       </div>
 
@@ -212,11 +212,11 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
       <div style="margin-top:24px;display:flex;gap:12px;">
         <button onclick="exportPptx()" class="topnav-ghost-btn" style="padding:8px 20px;font-size:13px;">
           <span class="material-symbols-outlined" style="font-size:16px;">download</span>
-          导出 PPTX
+          Export PPTX
         </button>
         <a id="finishBtn" href="/" class="topnav-ghost-btn" style="padding:8px 20px;font-size:13px;">
           <span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1;">check_circle</span>
-          完成学习
+          Finish Learning
         </a>
       </div>
     </div>
@@ -290,8 +290,8 @@ async function init() {
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
       </svg>
-      <div class="slides-status-text">正在生成幻灯片</div>
-      <div class="slides-status-text" style="margin-top:6px;font-size:12px;color:var(--text-4);">正在创建大纲和幻灯片...</div>
+      <div class="slides-status-text">Generating slides…</div>
+      <div class="slides-status-text" style="margin-top:6px;font-size:12px;color:var(--text-4);">Creating outline and slides…</div>
     </div>`;
 
   try { await startGeneration(sessionId, 'slides'); } catch(e) {}
@@ -424,7 +424,7 @@ function showSlide(index) {
     canvas.style.background = '#f8fafc';
     canvas.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">' +
       '<svg class="animate-spin" style="width:40px;height:40px;color:var(--accent);" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>' +
-      '<span style="font-size:14px;color:var(--text-3);">Slide ' + (index + 1) + ' generating...</span></div>';
+      '<span style="font-size:14px;color:var(--text-3);">Slide ' + (index + 1) + ' generating…</span></div>';
   } else {
     renderSlide(canvas, slide);
   }
@@ -522,7 +522,7 @@ function buildThumbnails() {
 function renderSlide(container, slideData) {
   container.innerHTML = '';
   if (!slideData) {
-    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-3);">此页生成失败</div>';
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-3);">This slide failed to generate</div>';
     return;
   }
 
