@@ -104,6 +104,23 @@ body.sidebar-collapsed #topNav { left: 0; }
   padding: 4px 10px; border-radius: 99px; cursor: pointer;
 }
 .topnav-skill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.mode-toggle {
+  display: inline-flex; align-items: center; gap: 0;
+  background: var(--user-bubble); border-radius: 99px;
+  padding: 2px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--border-input); user-select: none;
+}
+.mode-toggle button {
+  background: transparent; border: none; padding: 4px 12px;
+  border-radius: 99px; cursor: pointer; color: var(--text-3);
+  transition: background .15s, color .15s;
+}
+.mode-toggle button.active {
+  background: var(--accent-light); color: var(--accent-dark);
+}
+.mode-toggle button:disabled {
+  opacity: 0.5; cursor: wait;
+}
 
 /* ── Main Content ── */
 #mainContent {
@@ -240,6 +257,10 @@ body.sidebar-collapsed #bottomBar { left: 0; }
 <nav id="topNav">
   <div class="topnav-left">
     <span class="topnav-title" id="topNavTitle">EduAI</span>
+    <div class="mode-toggle" id="modeToggle" role="group" aria-label="会话模式">
+      <button type="button" id="modeToggleChat" data-mode="chat" class="active">对话</button>
+      <button type="button" id="modeToggleLearning" data-mode="learning">学习</button>
+    </div>
     <span id="topNavSkillPill" class="topnav-skill-pill" style="display:none;" onclick="showSkillModal(_activeSkillInfo?.name)">
       <span class="topnav-skill-dot"></span>
       <span id="topNavSkillName"></span>
@@ -288,6 +309,40 @@ let messageCount = 0;
 let _cachedSkills = null;
 let _activeSkillInfo = null; // {name, display_name, body, current_section}
 let _knowledgeSkills = null; // {knowledge_point_name: skill_text}
+let _sessionMode = 'chat';   // hydrated from /state on load
+let _pendingMode = null;      // chosen before session_id exists
+
+function _renderModeToggle(mode) {
+  _sessionMode = mode;
+  document.querySelectorAll('#modeToggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+}
+
+async function _handleModeToggleClick(targetMode) {
+  if (targetMode === _sessionMode) return;
+  const buttons = document.querySelectorAll('#modeToggle button');
+  buttons.forEach(b => (b.disabled = true));
+  const previous = _sessionMode;
+  _renderModeToggle(targetMode);  // optimistic
+  try {
+    if (currentSessionId) {
+      await setSessionMode(currentSessionId, targetMode);
+    } else {
+      _pendingMode = targetMode;  // applied on first /chat call
+    }
+  } catch (e) {
+    _renderModeToggle(previous);  // roll back
+    console.error('setSessionMode failed', e);
+  } finally {
+    buttons.forEach(b => (b.disabled = false));
+  }
+}
+
+document.getElementById('modeToggle')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-mode]');
+  if (btn) _handleModeToggleClick(btn.dataset.mode);
+});
 
 // Input handler: detect /skill and show popup
 function handleInputKeydown(e) {
@@ -610,6 +665,7 @@ async function handleSend(text) {
 
     const body = { message };
     if (currentSessionId) body.session_id = currentSessionId;
+    if (!currentSessionId && _pendingMode) body.mode = _pendingMode;
 
     await streamSSE(`${API_BASE}/chat/stream`, body, {
       skill(d) {
@@ -622,6 +678,7 @@ async function handleSend(text) {
         if (d.session_id) {
           currentSessionId = d.session_id;
           setSessionId(currentSessionId);
+          if (_pendingMode) _pendingMode = null;
         }
       },
       token(d) {
@@ -981,6 +1038,11 @@ async function showLessonFormatChoice(sid) {
   if (state.active_skill) {
     if (!_cachedSkills) _cachedSkills = await fetchSkills();
     _activeSkillInfo = (_cachedSkills || []).find(s => s.name === state.active_skill) || null;
+  }
+  if (state.session_mode) {
+    _renderModeToggle(state.session_mode);
+  } else {
+    _renderModeToggle('chat');  // safety fallback
   }
   if (state.knowledge_skills) {
     _knowledgeSkills = state.knowledge_skills;
