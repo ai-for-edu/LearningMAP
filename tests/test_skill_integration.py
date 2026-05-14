@@ -122,19 +122,19 @@ class TestSkillLoading:
         s = get_skill("feynman")
         assert s is not None
         assert set(s.affects) == {"chat", "quiz", "lesson"}
-        assert "类比" in s.sections["chat"]
-        assert "概念理解" in s.sections["quiz"]
+        assert "analogy" in s.sections["chat"].lower() or "analogies" in s.sections["chat"].lower()
+        assert "conceptual" in s.sections["quiz"].lower() or "understanding" in s.sections["quiz"].lower()
 
     def test_socratic_has_knowledge_graph(self) -> None:
         s = get_skill("socratic")
         assert s is not None
         assert "knowledge_graph" in s.sections
-        assert "问题" in s.sections["knowledge_graph"]
+        assert "question" in s.sections["knowledge_graph"].lower()
 
     def test_scaffolding_sections(self) -> None:
         s = get_skill("scaffolding")
         assert s is not None
-        assert "脚手架" in s.sections.get("chat", "") or "已知" in s.sections.get("chat", "")
+        assert "already know" in s.sections.get("chat", "").lower() or "extension" in s.sections.get("chat", "").lower()
 
 
 # ===================================================================
@@ -161,9 +161,9 @@ class TestSkillDifferentiation:
 
         # But skill-enhanced versions should contain their unique keywords
         assert "Teaching Method" not in no_skill
-        assert "概念理解" in feynman
-        assert "引导" in socratic or "追问" in socratic or "思维" in socratic
-        assert "难度" in scaffolding or "递增" in scaffolding or "基础" in scaffolding
+        assert "conceptual" in feynman.lower() or "understanding" in feynman.lower()
+        assert "reasoning" in socratic.lower() or "question" in socratic.lower() or "thinking" in socratic.lower()
+        assert "difficulty" in scaffolding.lower() or "increasing" in scaffolding.lower() or "foundational" in scaffolding.lower()
 
     def test_lesson_prompt_differs_by_skill(self) -> None:
         weak = [{"name": "暗反应", "description": "碳固定过程"}]
@@ -174,7 +174,7 @@ class TestSkillDifferentiation:
 
         assert "Teaching Method" not in no_skill
         assert "Teaching Method" in feynman
-        assert "类比" in feynman or "电梯演讲" in feynman or "你来试试" in feynman
+        assert "analogy" in feynman.lower() or "elevator" in feynman.lower() or "your turn" in feynman.lower()
 
     def test_knowledge_graph_prompt_with_socratic(self) -> None:
         """Only socratic has a knowledge_graph section."""
@@ -191,7 +191,7 @@ class TestSkillDifferentiation:
         assert feynman_kg == "", "Feynman should have no knowledge_graph instructions"
 
         prompt = render_prompt("knowledge_graph", topic="光合作用", max_nodes=8, skill_instructions=socratic_kg)
-        assert "问题" in prompt or "追问" in prompt
+        assert "question" in prompt.lower() or "understand" in prompt.lower()
 
     def test_chat_system_prompt_with_skill(self) -> None:
         state = _make_state(skill_name="feynman")
@@ -223,21 +223,22 @@ class TestComplexSessionFlows:
 
         # chat_node should inject socratic chat section
         skill_text = get_skill_section(state, "chat")
-        assert "永远不要直接给出答案" in skill_text
+        assert "never give the answer directly" in skill_text.lower() or "guide the student" in skill_text.lower()
 
     def test_switch_skill_mid_session(self) -> None:
         """Start with feynman, switch to scaffolding."""
         state = _make_state(skill_name="feynman")
         assert get_skill_section(state, "chat") != ""
-        assert "类比" in get_skill_section(state, "chat")
+        assert "analogy" in get_skill_section(state, "chat").lower() or "analogies" in get_skill_section(state, "chat").lower()
 
         # Switch to scaffolding
         scaffolding = get_skill("scaffolding")
         state["active_skill"] = scaffolding.name
         state["active_skill_content"] = scaffolding.sections
 
-        assert "类比" not in get_skill_section(state, "chat")
-        assert "脚手架" in get_skill_section(state, "chat") or "已知" in get_skill_section(state, "chat")
+        new_chat = get_skill_section(state, "chat").lower()
+        assert "analogy" not in new_chat and "analogies" not in new_chat
+        assert "already know" in new_chat or "extension" in new_chat
 
     def test_clear_skill(self) -> None:
         """User clears skill → prompts revert to default."""
@@ -263,7 +264,7 @@ class TestComplexSessionFlows:
 
         state["active_skill_content"] = deserialized
         skill_text = get_skill_section(state, "quiz")
-        assert "概念理解" in skill_text
+        assert "conceptual" in skill_text.lower() or "understanding" in skill_text.lower()
 
     def test_chat_first_then_learn_with_skill(self) -> None:
         """Session starts with casual chat, user later asks to learn with a skill."""

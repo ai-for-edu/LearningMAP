@@ -145,7 +145,7 @@ class TestLoadSkills:
         load_skills(skills_dir)
         feynman = get_skill("feynman")
         assert feynman is not None
-        assert feynman.display_name == "费曼学习法"
+        assert feynman.display_name == "Feynman Technique"
         assert "chat" in feynman.sections
         assert "quiz" in feynman.sections
         assert "lesson" in feynman.sections
