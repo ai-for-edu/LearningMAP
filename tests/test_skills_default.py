@@ -40,8 +40,11 @@ class TestDefaultSkill:
 class TestNewSessionDefaultsViaAPI:
     async def test_new_session_state_has_feynman(self, tmp_path, monkeypatch) -> None:
         # Isolate sessions DB so the test doesn't pollute dev data.
+        # store._DB_PATH is evaluated at import time, so reload after env change.
+        import importlib
         monkeypatch.setenv("SESSIONS_DB_PATH", str(tmp_path / "test.db"))
-        # Force _sessions cache reset so the new env var is picked up.
+        from src.api import store as store_module
+        importlib.reload(store_module)
         from src.api import chat as chat_api
         chat_api._sessions.clear()
 
