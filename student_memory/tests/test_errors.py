@@ -107,7 +107,7 @@ def test_list_errors_for_correlation_groups_chain(repo: SqliteRepo) -> None:
 
 
 def test_prune_op_errors_removes_old_rows(repo: SqliteRepo) -> None:
-    """ts 早于 cutoff 的行被删, 之后的保留."""
+    """Rows with ts before the cutoff are deleted; rows after the cutoff are kept."""
     repo.log_op_error(
         ts=1000,
         source="main_app",
@@ -178,7 +178,7 @@ def test_post_errors_log_returns_200_on_success(client: TestClient) -> None:
 def test_post_errors_log_returns_200_even_when_required_minimal(
     client: TestClient,
 ) -> None:
-    """用最小有效 body 也能成功."""
+    """Succeeds with the minimal valid body."""
     r = client.post(
         "/errors/log",
         json={
@@ -215,9 +215,10 @@ def test_get_errors_for_user(client: TestClient) -> None:
 def test_get_errors_for_user_op_filter_finds_matches_past_limit_window(
     repo: SqliteRepo,
 ) -> None:
-    """老 op=A 行 + 一堆新 op=B 行: 用 limit=5 + op=A 应仍能取回老的那行.
+    """Old op=A row + many newer op=B rows: limit=5 + op=A filter must still return the old row.
 
-    旧实现先取 latest limit=5 行 (全是 B), 再 Python 过滤 → 漏掉 A.
+    The previous implementation fetched the latest limit=5 rows (all B) then
+    filtered in Python, causing op=A to be silently dropped.
     """
     repo.log_op_error(
         ts=1000,

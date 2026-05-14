@@ -79,7 +79,7 @@ def test_list_active_notes_filters_by_category_and_archived(repo) -> None:
 
 
 def test_lru_eviction_archives_oldest_when_over_30(repo) -> None:
-    """超过 30 条 active 时, 最老的被 archived=1, 不物理删。"""
+    """When active count exceeds 30, the oldest is archived (archived=1), not physically deleted."""
     for i in range(31):
         repo.add_note(
             user_id="u1",
@@ -91,7 +91,7 @@ def test_lru_eviction_archives_oldest_when_over_30(repo) -> None:
             now_ts=1000 + i,
         )
 
-    # 总行数 31, active 30
+    # total rows 31, active 30
     total = repo._conn.execute(
         "SELECT COUNT(*) FROM notes WHERE user_id='u1'"
     ).fetchone()[0]
@@ -100,7 +100,7 @@ def test_lru_eviction_archives_oldest_when_over_30(repo) -> None:
     active = repo.list_active_notes(user_id="u1", category="misconception")
     assert len(active) == 30
     contents = {n.content for n in active}
-    assert "m0" not in contents  # 最老的被 archived
+    assert "m0" not in contents  # oldest row has been archived
     assert "m30" in contents
 
 
@@ -144,7 +144,7 @@ def test_update_note_changes_content_and_hash_and_timestamp(repo) -> None:
     assert note.content == "new content"
     assert note.content_hash == "newhash"
     assert note.updated_at == 2000
-    assert note.created_at == 1000  # 不动
+    assert note.created_at == 1000  # must not change
 
 
 def test_archive_note_sets_flag_softdel(repo) -> None:
@@ -160,7 +160,7 @@ def test_archive_note_sets_flag_softdel(repo) -> None:
     assert repo.archive_note(note_id) is True
 
     note = repo.get_note(note_id)
-    assert note is not None  # 不物理删
+    assert note is not None  # not physically deleted
     assert note.archived == 1
 
 
@@ -176,7 +176,7 @@ def test_hash_exists_active_only(repo) -> None:
     )
     assert repo.hash_exists_active("u1", "duphash") is True
 
-    # archived 后应不再算 dup
+    # once archived, must no longer be counted as a duplicate
     repo.archive_note(note_id)
     assert repo.hash_exists_active("u1", "duphash") is False
 
@@ -213,7 +213,7 @@ def test_add_history_records_add_event(repo) -> None:
 
 
 def test_add_history_records_reject_with_null_note_id(repo) -> None:
-    """REJECT 没有 note_id (候选被拒)。"""
+    """REJECT has no note_id (candidate was rejected before a row was created)."""
     hid = repo.add_history(
         note_id=None,
         event="REJECT",
@@ -232,7 +232,7 @@ def test_add_history_records_reject_with_null_note_id(repo) -> None:
 
 
 def test_history_event_check_constraint(repo) -> None:
-    """非白名单 event 必须被 SQL CHECK 拒。"""
+    """An event value not in the allowlist must be rejected by the SQL CHECK constraint."""
     with pytest.raises(sqlite3.IntegrityError):
         repo._conn.execute(
             "INSERT INTO notes_history (event, reason, ts) VALUES (?, ?, ?)",

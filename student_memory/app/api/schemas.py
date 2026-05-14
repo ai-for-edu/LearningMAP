@@ -111,7 +111,7 @@ class ErrorResponse(BaseModel):
 
 
 # ----------------------------------------------------------------------
-# /notes (L2 主观笔记)
+# /notes (L2 subjective notes)
 # ----------------------------------------------------------------------
 NoteCategory = Literal["misconception", "preference", "style", "goal"]
 SourceEvent = Literal["submit-quiz", "submit-review", "generate-lesson"]

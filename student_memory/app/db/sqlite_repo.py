@@ -362,7 +362,7 @@ class SqliteRepo:
             cur.execute("DELETE FROM memories WHERE memory_id = ?", (memory_id,))
 
     # ------------------------------------------------------------------
-    # notes (L2 主观笔记)
+    # notes (L2 subjective notes)
     # ------------------------------------------------------------------
     NOTES_ACTIVE_CAP = 30
 
@@ -377,10 +377,11 @@ class SqliteRepo:
         source_event: str,
         now_ts: int,
     ) -> int:
-        """插入一条 active note，触发 LRU 淘汰，返回新 note id。
+        """Insert an active note, trigger LRU eviction, and return the new note id.
 
-        category 必须是 'misconception'/'preference'/'style'/'goal' 之一
-        (SQL CHECK 强制). content/content_hash 由调用方校验长度与脱敏.
+        category must be one of 'misconception'/'preference'/'style'/'goal'
+        (enforced by SQL CHECK). content/content_hash length and sanitisation
+        are validated by the caller.
         """
         with self.transaction() as cur:
             cur.execute(
@@ -399,7 +400,7 @@ class SqliteRepo:
                 ),
             )
             new_id = int(cur.lastrowid)
-            # LRU: active 超过上限时 archived=1 所有最老的超额行
+            # LRU: when active count exceeds cap, archive the oldest excess rows
             cur.execute(
                 "SELECT id FROM notes "
                 "WHERE user_id = ? AND category = ? AND archived = 0 "
@@ -559,7 +560,7 @@ class SqliteRepo:
         mastery_overall: float,
         last_session_id: str | None,
     ) -> None:
-        """UPSERT by (user_id, topic). started_at 不被新值覆盖."""
+        """UPSERT by (user_id, topic). started_at is never overwritten."""
         with self.transaction() as cur:
             cur.execute(
                 "INSERT INTO progress_snapshots "
@@ -599,7 +600,7 @@ class SqliteRepo:
         return [_row_to_progress(r) for r in cur.fetchall()]
 
     # ------------------------------------------------------------------
-    # mastery_curve (KP 时间序列, 上限 10 采样/KP)
+    # mastery_curve (KP time series, cap 10 samples/KP)
     # ------------------------------------------------------------------
     MASTERY_SAMPLES_PER_KP = 10
 
@@ -620,7 +621,7 @@ class SqliteRepo:
                 "VALUES (?, ?, ?, ?, ?, ?)",
                 (user_id, topic, knowledge_point, score, ts, source),
             )
-            # 上限淘汰: 删最老的若干行让总数回到 cap
+            # Cap eviction: delete oldest rows until the total is back at cap
             cur.execute(
                 "SELECT id FROM mastery_curve "
                 "WHERE user_id = ? AND topic = ? AND knowledge_point = ? "
@@ -655,7 +656,7 @@ class SqliteRepo:
         user_id: str,
         threshold: float,
     ) -> list[MasteryRecord]:
-        """返回每个 (topic, KP) 的最新采样, 且 score < threshold.
+        """Return the most recent sample for each (topic, KP) where score < threshold.
 
         Tie-break by id when two samples for the same KP share a ts
         (timestamps are second-precision, so collisions are realistic).
@@ -681,7 +682,7 @@ class SqliteRepo:
         return [_row_to_mastery(r) for r in cur.fetchall()]
 
     # ------------------------------------------------------------------
-    # op_errors (错误追踪 + 30 天 prune)
+    # op_errors (error tracking + 30-day prune)
     # ------------------------------------------------------------------
     ERROR_FIELD_MAX = 500
 
@@ -760,7 +761,7 @@ class SqliteRepo:
         return [_row_to_error(r) for r in cur.fetchall()]
 
     def prune_op_errors(self, *, cutoff_ts: int) -> int:
-        """删除 ts < cutoff_ts 的行, 返回删除条数."""
+        """Delete rows where ts < cutoff_ts; return the number of rows deleted."""
         with self.transaction() as cur:
             cur.execute("DELETE FROM op_errors WHERE ts < ?", (cutoff_ts,))
             return int(cur.rowcount)

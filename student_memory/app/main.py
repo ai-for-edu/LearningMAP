@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     wire_app(app, settings)
 
-    # 30 天 retention prune (op_errors 启动时清理一次)
+    # 30-day retention prune for op_errors — runs once at startup
     import time as _time
 
     app.state.repo.prune_op_errors(cutoff_ts=int(_time.time()) - 30 * 86400)

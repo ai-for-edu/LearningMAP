@@ -86,6 +86,6 @@ def test_real_bge_embedder_smoke() -> None:  # pragma: no cover - opt-in
     from app.embedding.local_embedder import BgeEmbedder
 
     e = BgeEmbedder("BAAI/bge-small-zh-v1.5", dimension=512)
-    out = e.encode(["你好", "world"])
+    out = e.encode(["hello", "world"])
     assert out.shape == (2, 512)
     np.testing.assert_allclose(np.linalg.norm(out, axis=1), np.ones(2), atol=1e-4)

@@ -25,7 +25,7 @@ def now_ts() -> int:
 def _seed_minimal(repo: SqliteRepo, now_ts: int) -> None:
     repo.upsert_progress(
         user_id="u1",
-        topic="勾股定理",
+        topic="Pythagorean Theorem",
         status="in_progress",
         started_at=now_ts - 3 * 86400,
         last_seen_at=now_ts,
@@ -34,8 +34,8 @@ def _seed_minimal(repo: SqliteRepo, now_ts: int) -> None:
     )
     repo.add_mastery_sample(
         user_id="u1",
-        topic="勾股定理",
-        knowledge_point="坐标距离公式",
+        topic="Pythagorean Theorem",
+        knowledge_point="distance formula",
         score=0.0,
         ts=now_ts,
         source="quiz",
@@ -43,7 +43,7 @@ def _seed_minimal(repo: SqliteRepo, now_ts: int) -> None:
     repo.add_note(
         user_id="u1",
         category="misconception",
-        content="把'坐标两点距离'误用为'两点坐标差'",
+        content="confuses 'distance between two points' with 'difference of coordinates'",
         content_hash="h1",
         source_session_id="s1",
         source_event="submit-quiz",
@@ -56,21 +56,21 @@ def test_render_returns_progress_section_with_topic(
 ) -> None:
     _seed_minimal(repo, now_ts)
     resp = render_snapshot(repo, user_id="u1", now_ts=now_ts)
-    assert "## 该学生的学习进程" in resp.snapshot_md
-    assert "勾股定理" in resp.snapshot_md
+    assert "## Student Learning Progress" in resp.snapshot_md
+    assert "Pythagorean Theorem" in resp.snapshot_md
     assert "60%" in resp.snapshot_md
-    assert "3天前" in resp.snapshot_md
+    assert "3d ago" in resp.snapshot_md
 
 
 def test_render_returns_misconception_section(repo: SqliteRepo, now_ts: int) -> None:
     _seed_minimal(repo, now_ts)
     resp = render_snapshot(repo, user_id="u1", now_ts=now_ts)
-    assert "## 该学生的历史易混点" in resp.snapshot_md
-    assert "坐标两点距离" in resp.snapshot_md
+    assert "## Student Misconception History" in resp.snapshot_md
+    assert "distance between two points" in resp.snapshot_md
 
 
 def test_render_skips_empty_sections(repo: SqliteRepo, now_ts: int) -> None:
-    """无 progress、无 notes → 空字符串, char_count=0."""
+    """No progress, no notes → empty string, char_count=0."""
     resp = render_snapshot(repo, user_id="u_unknown", now_ts=now_ts)
     assert resp.snapshot_md == ""
     assert resp.char_count == 0
@@ -105,8 +105,8 @@ def test_render_priority_truncates_low_priority_when_over_budget(
 
     resp = render_snapshot(repo, user_id="u1", now_ts=now_ts, budget=2000)
     assert resp.truncated is True
-    assert "## 该学生的历史易混点" in resp.snapshot_md
-    assert "## 该学生的长期目标" not in resp.snapshot_md
+    assert "## Student Misconception History" in resp.snapshot_md
+    assert "## Student Long-Term Goals" not in resp.snapshot_md
 
 
 def test_render_respects_3500_default_budget(repo: SqliteRepo, now_ts: int) -> None:
@@ -116,12 +116,12 @@ def test_render_respects_3500_default_budget(repo: SqliteRepo, now_ts: int) -> N
 
 
 def test_elapsed_label_buckets() -> None:
-    """elapsed: <24h→今天, <7d→N天前, <30d→N周前, else→N月前."""
+    """elapsed: <24h→today, <7d→Nd ago, <30d→Nw ago, else→Nmo ago."""
     now = 1715000000
-    assert _elapsed_label(now - 3600, now) == "今天"
-    assert _elapsed_label(now - 3 * 86400, now) == "3天前"
-    assert _elapsed_label(now - 14 * 86400, now) == "2周前"
-    assert _elapsed_label(now - 90 * 86400, now) == "3月前"
+    assert _elapsed_label(now - 3600, now) == "today"
+    assert _elapsed_label(now - 3 * 86400, now) == "3d ago"
+    assert _elapsed_label(now - 14 * 86400, now) == "2w ago"
+    assert _elapsed_label(now - 90 * 86400, now) == "3mo ago"
 
 
 def test_trend_monotonic_up() -> None:
@@ -130,7 +130,7 @@ def test_trend_monotonic_up() -> None:
         type("S", (), {"score": 0.5})(),
         type("S", (), {"score": 0.7})(),
     ]
-    assert _trend_label(samples) == "上升中"
+    assert _trend_label(samples) == "improving"
 
 
 def test_trend_monotonic_down() -> None:
@@ -139,7 +139,7 @@ def test_trend_monotonic_down() -> None:
         type("S", (), {"score": 0.5})(),
         type("S", (), {"score": 0.3})(),
     ]
-    assert _trend_label(samples) == "退步中"
+    assert _trend_label(samples) == "declining"
 
 
 def test_trend_returns_none_when_fewer_than_3_samples() -> None:

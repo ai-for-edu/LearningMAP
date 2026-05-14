@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS ingested_sessions (
     PRIMARY KEY (user_id, session_id)
 );
 
--- L2 主观笔记 (4 category) ----------------------------------------------
+-- L2 subjective notes (4 categories) ----------------------------------------------
 CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -97,7 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_notes_user_hash
 CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_user_hash_active_unique
     ON notes(user_id, content_hash) WHERE archived = 0;
 
--- 审计: 每个 reviewer 决策 (含 NOOP/REJECT) 都留痕 -----------------------
+-- Audit log: every reviewer decision (including NOOP/REJECT) is recorded ---------
 CREATE TABLE IF NOT EXISTS notes_history (
     id INTEGER PRIMARY KEY,
     note_id INTEGER,
@@ -115,7 +115,7 @@ CREATE INDEX IF NOT EXISTS idx_history_note
 CREATE INDEX IF NOT EXISTS idx_history_event
     ON notes_history(event, ts);
 
--- 主题级里程碑 ----------------------------------------------------------
+-- Topic-level milestones -------------------------------------------------
 CREATE TABLE IF NOT EXISTS progress_snapshots (
     id INTEGER PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS progress_snapshots (
 CREATE INDEX IF NOT EXISTS idx_progress_user_recent
     ON progress_snapshots(user_id, last_seen_at DESC);
 
--- KP 级时间序列 (每 KP 上限 10 采样) ------------------------------------
+-- KP-level time series (cap 10 samples per KP) --------------------------
 CREATE TABLE IF NOT EXISTS mastery_curve (
     id INTEGER PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS mastery_curve (
 CREATE INDEX IF NOT EXISTS idx_curve_user_kp
     ON mastery_curve(user_id, topic, knowledge_point, ts);
 
--- 错误追踪 (30 天 retention, 启动时 prune) ------------------------------
+-- Error tracking (30-day retention, pruned at startup) -------------------
 CREATE TABLE IF NOT EXISTS op_errors (
     id INTEGER PRIMARY KEY,
     ts INTEGER NOT NULL,

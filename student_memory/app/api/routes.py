@@ -469,7 +469,7 @@ def neighbors(
     if not query_text.strip():
         return NeighborsResponse(neighbors=[])
 
-    # 召回足量后再筛 (user, category), 避免单次召回里全是其他用户的 hits
+    # Over-recall then filter by (user, category) to avoid a single recall being dominated by other users' hits
     raw = notes_index.search(query_text=query_text, top_k=top_k * 4)
 
     out: list[NeighborOut] = []
@@ -632,7 +632,7 @@ def errors_log(
     payload: ErrorLog,
     repo: SqliteRepo = Depends(get_repo),
 ) -> ErrorLogResponse:
-    """永不返回 5xx. 写库失败也返回 200 (logged=False) + server stderr warning."""
+    """Never returns 5xx. Even if the DB write fails, returns 200 (logged=False) + stderr warning."""
     try:
         repo.log_op_error(
             ts=_now_ts(),

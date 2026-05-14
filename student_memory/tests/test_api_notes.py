@@ -279,7 +279,7 @@ def test_delete_note_softdels(client: TestClient) -> None:
 
 
 def test_get_neighbors_returns_top_k_same_category(client: TestClient) -> None:
-    """同 category 内召回；不跨 category。"""
+    """Retrieval is within the same category; cross-category hits are excluded."""
     client.post(
         "/notes",
         json={
@@ -316,7 +316,7 @@ def test_get_neighbors_returns_top_k_same_category(client: TestClient) -> None:
     neighbors = r.json()["neighbors"]
     assert len(neighbors) <= 5
     contents = [n["content"] for n in neighbors]
-    # preference category 那条不应在结果里
+    # the preference-category note must not appear in the results
     assert all("different category" not in c for c in contents)
 
 

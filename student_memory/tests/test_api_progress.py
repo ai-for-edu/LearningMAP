@@ -25,18 +25,18 @@ def test_post_progress_inserts_with_in_progress_status(client: TestClient) -> No
         "/progress",
         json={
             "user_id": "u1",
-            "topic": "勾股定理",
+            "topic": "Pythagorean Theorem",
             "mastery_overall": 0.6,
             "last_session_id": "s1",
             "kp_samples": [
-                {"kp": "公式", "score": 0.5, "source": "quiz"},
-                {"kp": "坐标距离", "score": 0.0, "source": "quiz"},
+                {"kp": "formula", "score": 0.5, "source": "quiz"},
+                {"kp": "coordinate distance", "score": 0.0, "source": "quiz"},
             ],
         },
     )
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["topic"] == "勾股定理"
+    assert body["topic"] == "Pythagorean Theorem"
     assert body["new_status"] == "in_progress"
     assert body["sample_count"] == 2
 

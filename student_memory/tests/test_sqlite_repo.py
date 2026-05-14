@@ -411,7 +411,7 @@ class TestAggregateMastery:
 
 
 def test_init_db_creates_notes_tables(tmp_sqlite_path: Path) -> None:
-    """5 张新表都被 init_db 创建。"""
+    """All 5 new tables are created by init_db."""
     repo = SqliteRepo(tmp_sqlite_path)
     try:
         cur = repo._conn.execute(
@@ -455,7 +455,7 @@ def test_init_db_creates_notes_indexes(tmp_sqlite_path: Path) -> None:
 
 
 def test_notes_category_check_constraint(tmp_sqlite_path: Path) -> None:
-    """category 不在 4 个白名单值时 INSERT 必须失败。"""
+    """An INSERT with a category not in the 4-value allowlist must fail."""
     repo = SqliteRepo(tmp_sqlite_path)
     try:
         with pytest.raises(sqlite3.IntegrityError):
@@ -472,10 +472,10 @@ def test_notes_category_check_constraint(tmp_sqlite_path: Path) -> None:
 def test_list_weak_mastery_tiebreaks_by_id_when_ts_collides(
     tmp_sqlite_path: Path,
 ) -> None:
-    """两条同 ts 的样本: 高 id (后写入) 赢, 即使 score 不同."""
+    """Two samples with the same ts: the higher id (later insert) wins, even with a different score."""
     repo = SqliteRepo(tmp_sqlite_path)
     try:
-        # 同一 (user, topic, kp) 在同一秒内两次写入
+        # Two writes to the same (user, topic, kp) within the same second
         repo.add_mastery_sample(
             user_id="u1",
             topic="t1",
@@ -493,9 +493,9 @@ def test_list_weak_mastery_tiebreaks_by_id_when_ts_collides(
             source="quiz",
         )
         rows = repo.list_weak_mastery(user_id="u1", threshold=0.5)
-        # 阈值 0.5: 两条都低于阈值, 但 list_weak_mastery 应只返回最新一条
+        # threshold 0.5: both rows are below it, but list_weak_mastery should return only the latest
         assert len(rows) == 1
-        # 后写入(高 id)是 score=0.4
+        # The later insert (higher id) has score=0.4
         assert rows[0].score == 0.4
     finally:
         repo.close()

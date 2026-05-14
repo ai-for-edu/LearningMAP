@@ -30,33 +30,33 @@ _template = _env.get_template("snapshot.j2")
 
 
 _STATUS_LABELS = {
-    "in_progress": "已开始",
-    "mastered": "已掌握",
-    "abandoned": "长期未碰",
+    "in_progress": "In Progress",
+    "mastered": "Mastered",
+    "abandoned": "Long-term Inactive",
 }
 
 
 def _elapsed_label(then_ts: int, now_ts: int) -> str:
     age_h = max((now_ts - then_ts) / 3600, 0)
     if age_h < 24:
-        return "今天"
+        return "today"
     age_d = age_h / 24
     if age_d < 7:
-        return f"{int(age_d)}天前"
+        return f"{int(age_d)}d ago"
     if age_d < 30:
-        return f"{int(age_d / 7)}周前"
-    return f"{int(age_d / 30)}月前"
+        return f"{int(age_d / 7)}w ago"
+    return f"{int(age_d / 30)}mo ago"
 
 
 def _trend_label(samples: list) -> str | None:
-    """`samples` 必须按时间升序排好。监单调上升/下降。"""
+    """`samples` must be sorted in chronological ascending order. Detects strictly monotonic up/down trends."""
     pts = samples[-3:]
     if len(pts) < 3:
         return None
     if pts[0].score < pts[1].score < pts[2].score:
-        return "上升中"
+        return "improving"
     if pts[0].score > pts[1].score > pts[2].score:
-        return "退步中"
+        return "declining"
     return None
 
 

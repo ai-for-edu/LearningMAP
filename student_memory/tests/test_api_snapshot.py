@@ -36,16 +36,16 @@ def test_get_snapshot_after_progress_returns_progress_section(
         "/progress",
         json={
             "user_id": "u1",
-            "topic": "勾股定理",
+            "topic": "Pythagorean Theorem",
             "mastery_overall": 0.6,
             "last_session_id": "s1",
-            "kp_samples": [{"kp": "公式", "score": 0.5, "source": "quiz"}],
+            "kp_samples": [{"kp": "formula", "score": 0.5, "source": "quiz"}],
         },
     )
     r = client.get("/memory/snapshot/u1")
     assert r.status_code == 200
     md = r.json()["snapshot_md"]
-    assert "勾股定理" in md
+    assert "Pythagorean Theorem" in md
     assert "60%" in md
 
 
@@ -55,9 +55,9 @@ def test_get_snapshot_includes_misconceptions(client: TestClient) -> None:
         json={
             "user_id": "u1",
             "category": "misconception",
-            "content": "误用两点距离公式",
+            "content": "misapplies the distance formula between two points",
             "source_event": "submit-quiz",
         },
     )
     r = client.get("/memory/snapshot/u1")
-    assert "误用两点距离公式" in r.json()["snapshot_md"]
+    assert "misapplies the distance formula between two points" in r.json()["snapshot_md"]

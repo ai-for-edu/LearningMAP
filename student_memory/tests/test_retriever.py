@@ -200,7 +200,7 @@ def test_retrieve_unrelated_query_does_not_crash(stack) -> None:
             summary="study",
         )
     )
-    resp = retriever.retrieve("u_001", "完全不相关的查询", top_k=3)
+    resp = retriever.retrieve("u_001", "completely unrelated query", top_k=3)
     # The fake embedder hashes unknown text into orthogonal slots, so
     # similarity is 0 — but we still return the candidate (the v1
     # contract is "always return up to top_k", not "filter by min sim").

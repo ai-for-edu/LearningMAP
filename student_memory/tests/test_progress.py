@@ -19,7 +19,7 @@ def repo(tmp_sqlite_path: Path) -> SqliteRepo:
 def test_upsert_progress_inserts_new(repo: SqliteRepo) -> None:
     repo.upsert_progress(
         user_id="u1",
-        topic="勾股定理",
+        topic="Pythagorean Theorem",
         status="in_progress",
         started_at=1000,
         last_seen_at=1000,
@@ -27,7 +27,7 @@ def test_upsert_progress_inserts_new(repo: SqliteRepo) -> None:
         last_session_id="s1",
     )
     row = repo._conn.execute(
-        "SELECT * FROM progress_snapshots WHERE user_id='u1' AND topic='勾股定理'"
+        "SELECT * FROM progress_snapshots WHERE user_id='u1' AND topic='Pythagorean Theorem'"
     ).fetchone()
     assert row["status"] == "in_progress"
     assert row["mastery_overall"] == pytest.approx(0.6)
@@ -36,7 +36,7 @@ def test_upsert_progress_inserts_new(repo: SqliteRepo) -> None:
 def test_upsert_progress_updates_existing(repo: SqliteRepo) -> None:
     repo.upsert_progress(
         user_id="u1",
-        topic="勾股定理",
+        topic="Pythagorean Theorem",
         status="in_progress",
         started_at=1000,
         last_seen_at=1000,
@@ -45,7 +45,7 @@ def test_upsert_progress_updates_existing(repo: SqliteRepo) -> None:
     )
     repo.upsert_progress(
         user_id="u1",
-        topic="勾股定理",
+        topic="Pythagorean Theorem",
         status="mastered",
         started_at=1000,
         last_seen_at=2000,
@@ -59,7 +59,7 @@ def test_upsert_progress_updates_existing(repo: SqliteRepo) -> None:
     assert len(rows) == 1
     assert rows[0]["status"] == "mastered"
     assert rows[0]["mastery_overall"] == pytest.approx(0.9)
-    assert rows[0]["started_at"] == 1000  # 不被覆盖
+    assert rows[0]["started_at"] == 1000  # must not be overwritten
 
 
 def test_get_progress_returns_none_for_missing(repo: SqliteRepo) -> None:
@@ -107,7 +107,7 @@ def test_add_mastery_sample_inserts_row(repo: SqliteRepo) -> None:
 
 
 def test_mastery_curve_caps_at_10_samples_per_kp(repo: SqliteRepo) -> None:
-    """同一 (user, topic, kp) 最多保留 10 行。超出删最老。"""
+    """Same (user, topic, kp) keeps at most 10 rows; oldest are evicted when over the cap."""
     for i in range(15):
         repo.add_mastery_sample(
             user_id="u1",
@@ -123,7 +123,7 @@ def test_mastery_curve_caps_at_10_samples_per_kp(repo: SqliteRepo) -> None:
         "WHERE user_id='u1' AND knowledge_point='kp1' ORDER BY ts ASC"
     ).fetchall()
     assert len(rows) == 10
-    # 最老 5 条 (i=0..4) 被删, 留 i=5..14
+    # Oldest 5 rows (i=0..4) are deleted, leaving i=5..14
     assert rows[0]["ts"] == 1005
     assert rows[-1]["ts"] == 1014
 
@@ -144,7 +144,7 @@ def test_list_mastery_for_kp_returns_chronological(repo: SqliteRepo) -> None:
 
 
 def test_list_weak_mastery_filters_below_threshold(repo: SqliteRepo) -> None:
-    """list_weak_mastery 只返回当前 mastery (最新采样) < threshold 的 KP。"""
+    """list_weak_mastery returns only KPs whose latest sample score is < threshold."""
     repo.add_mastery_sample(
         user_id="u1",
         topic="A",
