@@ -233,6 +233,16 @@ def _new_session_state() -> dict[str, Any]:
     return state
 
 
+def _apply_initial_mode(state: dict[str, Any], req_mode: str | None) -> None:
+    """Honor request.mode only when the session has no messages yet.
+
+    Prevents reconnecting clients from accidentally overwriting an
+    established session's mode via a stale `mode` field on subsequent posts.
+    """
+    if req_mode in ("chat", "learning") and not state.get("messages"):
+        state["session_mode"] = req_mode
+
+
 def _get_session(session_id: str) -> dict[str, Any] | None:
     """Get session from memory cache, falling back to SQLite."""
     if session_id in _sessions:
@@ -282,8 +292,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
     # Get or init session state
     state = _get_session(session_id) or _new_session_state()
     # Only honor req.mode if this is a brand-new session.
-    if req.mode in ("chat", "learning") and not state.get("messages"):
-        state["session_mode"] = req.mode
+    _apply_initial_mode(state, req.mode)
     await _ensure_memory_snapshot(state)
 
     # Add user message
@@ -368,8 +377,7 @@ async def chat_stream(req: ChatRequest):
     session_id = req.session_id or str(uuid.uuid4())
     state = _get_session(session_id) or _new_session_state()
     # Only honor req.mode if this is a brand-new session.
-    if req.mode in ("chat", "learning") and not state.get("messages"):
-        state["session_mode"] = req.mode
+    _apply_initial_mode(state, req.mode)
     await _ensure_memory_snapshot(state)
 
     state["messages"] = list(state.get("messages", []))
@@ -785,7 +793,7 @@ async def get_state(session_id: str) -> dict:
     """Get current session state for frontend UI switching."""
     state = _get_session(session_id)
     if not state:
-        return {"mode": "chat", "session_id": session_id}
+        return {"mode": "chat", "session_mode": "chat", "session_id": session_id}
 
     result = {
         "session_id": session_id,
@@ -974,7 +982,12 @@ class SetModeRequest(BaseModel):
 
 @router.post("/chat/{session_id}/set-mode")
 async def set_mode(session_id: str, req: SetModeRequest) -> dict:
-    """Switch a session's user-facing mode (chat vs learning)."""
+    """Switch a session's user-facing mode (chat vs learning).
+
+    Requires an existing session; returns 404 if not found. Unlike
+    set-skill, this endpoint does NOT auto-create — pre-setting mode on
+    a non-existent session serves no real use case.
+    """
     if req.mode not in ("chat", "learning"):
         raise HTTPException(status_code=400, detail=f"Invalid mode '{req.mode}'")
     state = _get_session(session_id)

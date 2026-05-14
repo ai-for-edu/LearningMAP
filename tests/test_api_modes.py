@@ -9,7 +9,10 @@ from run.serve import app
 
 @pytest.fixture
 def isolated_db(tmp_path, monkeypatch):
+    import importlib
     monkeypatch.setenv("SESSIONS_DB_PATH", str(tmp_path / "test.db"))
+    from src.api import store as store_module
+    importlib.reload(store_module)
     from src.api import chat as chat_api
     chat_api._sessions.clear()
     yield
@@ -62,6 +65,13 @@ class TestStateExposesSessionMode:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await client.post("/api/chat/sess-4/set-skill", json={"skill": "feynman"})
             resp = await client.get("/api/chat/sess-4/state")
+            assert resp.json()["session_mode"] == "chat"
+
+    async def test_state_for_unknown_session_includes_session_mode(self, isolated_db) -> None:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/chat/never-created/state")
+            assert resp.status_code == 200
             assert resp.json()["session_mode"] == "chat"
 
 
