@@ -595,6 +595,40 @@ function buildCtaCard(additionalKwargs) {
     </div>`;
 }
 
+function clearChatHistory() {
+  document.getElementById('chatHistory').innerHTML = '';
+}
+
+function appendUserMessageDOM(content) {
+  const html = `
+    <div class="user-msg">
+      <div class="user-bubble">${escapeHtml(content)}</div>
+    </div>`;
+  document.getElementById('chatHistory').insertAdjacentHTML('beforeend', html);
+}
+
+function appendAiMessageDOM(content, additionalKwargs) {
+  const safe = safeMarkdown(content);
+  const cta = buildCtaCard(additionalKwargs);
+  const html = `
+    <div class="ai-msg msg-wrapper">
+      <div class="ai-content">
+        <div class="ai-name">EduAI</div>
+        <div class="ai-text prose">${safe}</div>
+        ${cta}
+      </div>
+    </div>`;
+  document.getElementById('chatHistory').insertAdjacentHTML('beforeend', html);
+}
+
+function renderEmptyState(mode) {
+  const text = mode === 'chat'
+    ? '开始一段对话吧 —— 我可以聊聊任何话题，也可以推荐你系统学习某个主题。'
+    : '输入一个你想学的主题，开始结构化学习。';
+  document.getElementById('chatHistory').innerHTML =
+    `<div style="color:var(--text-3);font-size:13px;padding:24px;text-align:center;">${escapeHtml(text)}</div>`;
+}
+
 const _ksBadgeStore = [];
 const _badgeSkillStore = [];
 
@@ -673,12 +707,7 @@ async function handleSend(text) {
   const chatHistory = document.getElementById('chatHistory');
 
   // Show user message as-is (no skill badge — skill info only on AI replies)
-  const userBubbleContent = escapeHtml(rawMessage);
-
-  chatHistory.innerHTML += `
-    <div class="user-msg">
-      <div class="user-bubble">${userBubbleContent}</div>
-    </div>`;
+  appendUserMessageDOM(rawMessage);
 
   // Show loading
   chatHistory.innerHTML += `
@@ -1090,7 +1119,7 @@ async function showLessonFormatChoice(sid) {
 // On load: always rebuild conversation from state when session_id exists
 (async function init() {
   const chatHistory = document.getElementById('chatHistory');
-  chatHistory.innerHTML = '';
+  clearChatHistory();
   document.getElementById('suggestBtns').innerHTML = '';
 
   const params = new URLSearchParams(window.location.search);
@@ -1153,10 +1182,7 @@ async function showLessonFormatChoice(sid) {
     for (let i = startIdx; i < state.messages.length; i++) {
       const msg = state.messages[i];
       if (msg.role === 'user') {
-        chatHistory.innerHTML += `
-          <div class="user-msg">
-            <div class="user-bubble">${escapeHtml(msg.content)}</div>
-          </div>`;
+        appendUserMessageDOM(msg.content);
       } else if (msg.role === 'ai') {
         const badge = buildSkillBadge(_activeSkillInfo ? {..._activeSkillInfo, current_section: 'chat'} : null);
         const msgIdx = _msgStore.length;
