@@ -459,8 +459,16 @@ async def chat_stream(req: ChatRequest):
             yield _sse_event({"type": "error", "message": "AI 服务暂时不可用"})
             return
 
-        # Save complete message to state
-        state["messages"].append(AIMessage(content=full_text))
+        # Attach CTA metadata if intent_node stashed a topic, then clear it.
+        cta_topic = state.get("pending_cta_topic")
+        extra_kwargs: dict = {}
+        if cta_topic:
+            extra_kwargs["additional_kwargs"] = {
+                "cta": {"type": "learn_topic", "topic": cta_topic}
+            }
+            yield _sse_event({"type": "cta", "topic": cta_topic})
+        state["messages"].append(AIMessage(content=full_text, **extra_kwargs))
+        state["pending_cta_topic"] = None
         state["mode"] = "chat"
         _save(session_id, state)
 

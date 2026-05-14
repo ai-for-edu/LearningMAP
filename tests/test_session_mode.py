@@ -95,6 +95,57 @@ class TestIntentNodeGateRemoved:
         assert "messages" not in result
 
 
+from unittest.mock import MagicMock, patch as _patch
+
+from langchain_core.messages import AIMessage as _AIMessage
+
+from src.agent.nodes.chat import chat_node
+
+
+def _mock_chat_llm(reply: str):
+    """Mock the raw OpenAI client used by chat_node so we don't need a real LLM."""
+    fake_client = MagicMock()
+    fake_response = MagicMock()
+    fake_response.choices = [MagicMock(message=MagicMock(content=reply))]
+    fake_client.chat.completions.create.return_value = fake_response
+    return _patch("src.agent.nodes.chat.get_raw_client", return_value=fake_client)
+
+
+class TestChatNodeCTA:
+    def test_pending_cta_topic_attaches_additional_kwargs(self) -> None:
+        state = {
+            "messages": [HumanMessage(content="什么是微积分")],
+            "pending_cta_topic": "微积分",
+        }
+        with _mock_chat_llm("微积分是研究变化率的数学分支……"), \
+             _patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
+            result = chat_node(state)
+
+        msgs = result["messages"]
+        assert len(msgs) == 1
+        assert isinstance(msgs[0], _AIMessage)
+        assert msgs[0].additional_kwargs == {
+            "cta": {"type": "learn_topic", "topic": "微积分"}
+        }
+
+    def test_no_pending_cta_topic_means_empty_kwargs(self) -> None:
+        state = {"messages": [HumanMessage(content="hi")]}
+        with _mock_chat_llm("hello"), \
+             _patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
+            result = chat_node(state)
+        assert result["messages"][0].additional_kwargs == {}
+
+    def test_chat_node_clears_pending_cta_topic(self) -> None:
+        state = {
+            "messages": [HumanMessage(content="什么是微积分")],
+            "pending_cta_topic": "微积分",
+        }
+        with _mock_chat_llm("ok"), \
+             _patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
+            result = chat_node(state)
+        assert result["pending_cta_topic"] is None
+
+
 class TestIntentNodeFallback:
     def test_missing_session_mode_defaults_to_chat(self) -> None:
         # Defensive: state without session_mode field should not blow up.

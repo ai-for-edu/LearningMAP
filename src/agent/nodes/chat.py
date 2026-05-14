@@ -124,7 +124,17 @@ def chat_node(state: LearningState) -> dict:
     except Exception:
         logger.exception("LLM call failed in chat_node")
         reply = "抱歉，AI 服务暂时不可用，请稍后再试。"
-    return {"messages": [AIMessage(content=reply)], "mode": "chat"}
+    cta_topic = state.get("pending_cta_topic")
+    extra_kwargs: dict = {}
+    if cta_topic:
+        extra_kwargs["additional_kwargs"] = {
+            "cta": {"type": "learn_topic", "topic": cta_topic}
+        }
+    return {
+        "messages": [AIMessage(content=reply, **extra_kwargs)],
+        "mode": "chat",
+        "pending_cta_topic": None,  # always clear, even if it wasn't set
+    }
 
 
 def chat_node_stream(state: dict):
