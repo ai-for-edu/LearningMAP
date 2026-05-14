@@ -289,7 +289,7 @@ class TestChatNodeContextIsolation:
         sys_prompt = captured_system[0]
         # Learning artifacts must NOT leak into chat-mode system prompt
         assert "calculus" not in sys_prompt
-        assert "学习主题" not in sys_prompt
+        assert "Learning topic" not in sys_prompt
 
     def test_learning_mode_still_injects_learning_artifacts(self) -> None:
         """Learning mode keeps the existing behavior — context is included."""
@@ -318,7 +318,7 @@ class TestChatNodeContextIsolation:
 
         sys_prompt = captured_system[0]
         assert "calculus" in sys_prompt
-        assert "学习主题" in sys_prompt
+        assert "Learning topic" in sys_prompt
 
 
 class TestIntentNodeFallback:

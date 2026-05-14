@@ -111,7 +111,7 @@ def retrieve_skills(state: dict) -> tuple[str, dict[str, str], list[dict]]:
 
         skill_meta = get_skill(active_skill)
 
-    pedagogy_method = skill_meta.display_name if skill_meta else "默认教学法"
+    pedagogy_method = skill_meta.display_name if skill_meta else "Default teaching method"
 
     knowledge_skills = {}
     for wp in weak_points:
@@ -120,7 +120,7 @@ def retrieve_skills(state: dict) -> tuple[str, dict[str, str], list[dict]]:
             knowledge_point_name=wp["name"],
             knowledge_point_description=wp["description"],
             pedagogy_method=pedagogy_method,
-            pedagogy_instructions=pedagogy_instructions or "无特定教学法要求",
+            pedagogy_instructions=pedagogy_instructions or "No specific teaching method",
         )
         knowledge_skills[wp["name"]] = skill_text
 
@@ -148,7 +148,7 @@ def generate_lesson_per_point(
             topic=topic,
             knowledge_point_name=wp["name"],
             knowledge_point_description=wp["description"],
-            pedagogy_instructions=pedagogy_instructions or "无特定教学法要求",
+            pedagogy_instructions=pedagogy_instructions or "No specific teaching method",
             knowledge_skill=knowledge_skills.get(wp["name"], "no additional teaching strategy"),
             point_index=i + 1,
             total_points=total,
@@ -205,7 +205,7 @@ def lesson_node(state: LearningState) -> dict:
     topic = state.get("topic", "")
 
     if not diagnosis:
-        return {"mode": "chat", "messages": [AIMessage(content="请先完成诊断。")]}
+        return {"mode": "chat", "messages": [AIMessage(content="Please complete the diagnosis first.")]}
 
     nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
 
@@ -306,7 +306,7 @@ def lesson_node_stream(state: dict):
     """Streaming version — generates per-point with section markers."""
     diagnosis = state.get("diagnosis_result")
     if not diagnosis:
-        yield "请先完成诊断。"
+        yield "Please complete the diagnosis first."
         return
 
     graph = state.get("knowledge_graph")
@@ -362,7 +362,7 @@ def lesson_node_stream(state: dict):
             topic=topic,
             knowledge_point_name=wp["name"],
             knowledge_point_description=wp["description"],
-            pedagogy_instructions=pedagogy_instructions or "无特定教学法要求",
+            pedagogy_instructions=pedagogy_instructions or "No specific teaching method",
             knowledge_skill=knowledge_skills.get(wp["name"], "no additional teaching strategy"),
             point_index=i + 1,
             total_points=total,

@@ -110,11 +110,11 @@ def _render_directive(*, weak_kps: list[str], strong_kps: list[str]) -> str:
     parts = []
     if weak_kps:
         parts.append(
-            f"学生在 {'、'.join(weak_kps)} 上仍薄弱，本次教案应优先衔接这些点。"
+            f"The student is still weak on {', '.join(weak_kps)}; this lesson should prioritize bridging these points."
         )
     if strong_kps:
         parts.append(
-            f"{'、'.join(strong_kps)} 已掌握，可以略过基础部分。"
+            f"{', '.join(strong_kps)} are mastered; the basics can be skipped."
         )
     return " ".join(parts)
 

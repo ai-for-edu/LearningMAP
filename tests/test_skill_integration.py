@@ -198,14 +198,14 @@ class TestSkillDifferentiation:
         skill_text = get_skill_section(state, "chat")
 
         system_prompt = _BASE_SYSTEM_PROMPT
-        system_prompt += f"\n\n## 教学方法\n{skill_text}"
+        system_prompt += f"\n\n## Teaching method\n{skill_text}"
         context = _build_context_summary(state)
         system_prompt += f"\n\n{context}"
 
         # Verify ordering: persona → skill → context
         persona_pos = system_prompt.index("friendly AI")
-        skill_pos = system_prompt.index("教学方法")
-        context_pos = system_prompt.index("当前学习上下文")
+        skill_pos = system_prompt.index("Teaching method")
+        context_pos = system_prompt.index("Current learning context")
         assert persona_pos < skill_pos < context_pos
 
 
@@ -334,7 +334,7 @@ class TestSkillMemoryCoexistence:
         # Skill injection
         skill_text = get_skill_section(state, "chat")
         if skill_text:
-            system_prompt += f"\n\n## 教学方法\n{skill_text}"
+            system_prompt += f"\n\n## Teaching method\n{skill_text}"
 
         # Context injection
         context = _build_context_summary(state)
@@ -343,17 +343,17 @@ class TestSkillMemoryCoexistence:
 
         # Memory injection (simulated)
         memory = "Relevant past learning records:\n1. photosynthesis dark reactions accuracy 30%"
-        system_prompt += f"\n\n## 历史学习记忆\n{memory}"
+        system_prompt += f"\n\n## Learning memory\n{memory}"
 
         # All three present
-        assert "教学方法" in system_prompt
-        assert "当前学习上下文" in system_prompt
-        assert "历史学习记忆" in system_prompt
+        assert "Teaching method" in system_prompt
+        assert "Current learning context" in system_prompt
+        assert "Learning memory" in system_prompt
 
         # Correct ordering
-        skill_pos = system_prompt.index("教学方法")
-        ctx_pos = system_prompt.index("当前学习上下文")
-        mem_pos = system_prompt.index("历史学习记忆")
+        skill_pos = system_prompt.index("Teaching method")
+        ctx_pos = system_prompt.index("Current learning context")
+        mem_pos = system_prompt.index("Learning memory")
         assert skill_pos < ctx_pos < mem_pos
 
     def test_no_skill_still_has_memory_slot(self) -> None:
@@ -368,8 +368,8 @@ class TestSkillMemoryCoexistence:
         system_prompt += f"\n\n{context}"
 
         # No skill section, but context works
-        assert "教学方法" not in system_prompt
-        assert "当前学习上下文" in system_prompt
+        assert "Teaching method" not in system_prompt
+        assert "Current learning context" in system_prompt
 
 
 # ===================================================================

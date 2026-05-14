@@ -26,19 +26,19 @@ def _build_context_summary(state: LearningState) -> str:
 
     topic = state.get("topic")
     if topic:
-        parts.append(f"学习主题：{topic}")
+        parts.append(f"Learning topic: {topic}")
 
     # Knowledge graph — node names + levels only
     graph = state.get("knowledge_graph")
     if graph:
         nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
-        level_map = {"prerequisite": "前置", "core": "核心", "extension": "拓展"}
+        level_map = {"prerequisite": "prerequisite", "core": "core", "extension": "extension"}
         node_strs = []
         for n in nodes:
             name = n.name if hasattr(n, "name") else n.get("name", "")
             level = n.level if hasattr(n, "level") else n.get("level", "")
             node_strs.append(f"{name}({level_map.get(level, level)})")
-        parts.append(f"知识图谱：{', '.join(node_strs)}")
+        parts.append(f"Knowledge graph: {', '.join(node_strs)}")
 
     # Diagnosis result — score + mastered/weak breakdown
     diagnosis = state.get("diagnosis_result")
@@ -58,21 +58,21 @@ def _build_context_summary(state: LearningState) -> str:
             elif status == "weak":
                 weak.append(name)
 
-        parts.append(f"诊断结果：{score}%（{correct}/{total}）")
+        parts.append(f"Diagnosis result: {score}% ({correct}/{total})")
         if mastered:
-            parts.append(f"  已掌握：{', '.join(mastered)}")
+            parts.append(f"  Mastered: {', '.join(mastered)}")
         if weak:
-            parts.append(f"  薄弱：{', '.join(weak)}")
+            parts.append(f"  Weak: {', '.join(weak)}")
 
     # Lesson status
     lesson = state.get("lesson_content")
     if lesson:
-        parts.append("教案：已生成")
+        parts.append("Lesson: generated")
 
     if not parts:
         return ""
 
-    return "## 当前学习上下文\n" + "\n".join(f"- {p}" for p in parts) + "\n\n基于以上上下文回答用户问题。如果用户问到诊断、知识点等，用上下文中的数据回答。"
+    return "## Current learning context\n" + "\n".join(f"- {p}" for p in parts) + "\n\nAnswer the user's question based on the context above. If they ask about the diagnosis, knowledge points, etc., use the data above."
 
 
 def _cta_kwargs(topic: str | None) -> dict:
@@ -101,7 +101,7 @@ def chat_node(state: LearningState) -> dict:
     # ② Skill teaching method
     skill_text = get_skill_section(state, "chat")
     if skill_text:
-        system_prompt += f"\n\n## 教学方法\n{skill_text}"
+        system_prompt += f"\n\n## Teaching method\n{skill_text}"
 
     # ③ Current session context
     # Learning artifacts (topic, knowledge graph, diagnosis, lesson) belong to
@@ -115,13 +115,13 @@ def chat_node(state: LearningState) -> dict:
     system_prompt += memory_snapshot_block(state)
 
     # Per-turn L1 retrieval (existing). PR-4 adds ≥10-char threshold to skip
-    # tiny utterances ("嗯"/"继续") that produce noisy embeddings. NOT env-gated:
+    # tiny utterances (e.g. "ok"/"go on") that produce noisy embeddings. NOT env-gated:
     # pre-PR-4 this was unconditional, so env=off keeps L1 retrieval enabled.
     user_msg = messages[-1].content if messages else ""
     if len(user_msg.strip()) >= 10:
         memory_context = retrieve_memory(DEFAULT_USER_ID, user_msg)
         if memory_context:
-            system_prompt += f"\n\n## 历史学习记忆\n{memory_context}\n\n参考以上历史记录回答，但不要直接复述。"
+            system_prompt += f"\n\n## Learning memory\n{memory_context}\n\nUse the records above as reference, but do not repeat them verbatim."
 
     # Convert to OpenAI format
     api_messages = [{"role": "system", "content": system_prompt}]
@@ -142,7 +142,7 @@ def chat_node(state: LearningState) -> dict:
         reply = response.choices[0].message.content
     except Exception:
         logger.exception("LLM call failed in chat_node")
-        reply = "抱歉，AI 服务暂时不可用，请稍后再试。"
+        reply = "Sorry, the AI service is temporarily unavailable. Please try again later."
     extra_kwargs = _cta_kwargs(state.get("pending_cta_topic"))
     return {
         track_key: [AIMessage(content=reply, **extra_kwargs)],
@@ -168,7 +168,7 @@ def chat_node_stream(state: dict):
 
     skill_text = get_skill_section(state, "chat")
     if skill_text:
-        system_prompt += f"\n\n## 教学方法\n{skill_text}"
+        system_prompt += f"\n\n## Teaching method\n{skill_text}"
 
     # Learning artifacts (topic, knowledge graph, diagnosis, lesson) belong to
     # the learning track only — don't leak them into chat-mode LLM context.
@@ -184,7 +184,7 @@ def chat_node_stream(state: dict):
     if len(user_msg.strip()) >= 10:
         memory_context = retrieve_memory(DEFAULT_USER_ID, user_msg)
         if memory_context:
-            system_prompt += f"\n\n## 历史学习记忆\n{memory_context}\n\n参考以上历史记录回答，但不要直接复述。"
+            system_prompt += f"\n\n## Learning memory\n{memory_context}\n\nUse the records above as reference, but do not repeat them verbatim."
 
     api_messages = [{"role": "system", "content": system_prompt}]
     for msg in messages:

@@ -101,13 +101,13 @@ class TestRenderDirective:
         from src.agent.nodes.review import _render_directive
         out = _render_directive(weak_kps=["distributive law", "commutative law"], strong_kps=[])
         assert "distributive law" in out and "commutative law" in out
-        assert "薄弱" in out or "巩固" in out
+        assert "weak" in out.lower() or "bridge" in out.lower()
 
     def test_only_strong_kps(self) -> None:
         from src.agent.nodes.review import _render_directive
         out = _render_directive(weak_kps=[], strong_kps=["quadratic formula"])
         assert "quadratic formula" in out
-        assert "已掌握" in out or "略" in out
+        assert "mastered" in out.lower() or "skip" in out.lower()
 
     def test_both_present(self) -> None:
         from src.agent.nodes.review import _render_directive

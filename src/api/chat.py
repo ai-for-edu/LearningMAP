@@ -64,7 +64,7 @@ async def _has_history(user_id: str) -> bool:
     """True if the user has any prior subtopic in L1.
 
     Returns False unconditionally when ENABLE_REVIEW_FLOW is off, so the
-    front-end "复习" button is hidden in that case.
+    front-end "Review" button is hidden in that case.
 
     Memoized for 60 s to avoid hammering the memory service on /state polls.
     Wraps the blocking httpx call in asyncio.to_thread to keep the event
@@ -510,7 +510,7 @@ async def chat_stream(req: ChatRequest):
                 yield _sse_event({"type": "token", "content": token})
         except Exception:
             logger.exception("Stream error in chat")
-            yield _sse_event({"type": "error", "message": "AI 服务暂时不可用"})
+            yield _sse_event({"type": "error", "message": "AI service is temporarily unavailable"})
             return
 
         # Attach CTA metadata if intent_node stashed a topic, then clear it.
@@ -562,7 +562,7 @@ async def generate_lesson_stream(session_id: str):
                 yield _sse_event({"type": "token", "content": token})
         except Exception:
             logger.exception("Stream error in lesson")
-            yield _sse_event({"type": "error", "message": "课程生成失败"})
+            yield _sse_event({"type": "error", "message": "Lesson generation failed"})
             return
 
         state["lesson_content"] = full_text
@@ -763,7 +763,7 @@ async def generate_slides_stream(session_id: str):
         # Stage 1: Generate outlines
         outlines = await asyncio.to_thread(generate_slide_outlines, state)
         if not outlines:
-            yield _sse_event({"type": "error", "message": "大纲生成失败"})
+            yield _sse_event({"type": "error", "message": "Outline generation failed"})
             return
 
         outlines_data = [o.model_dump() for o in outlines]

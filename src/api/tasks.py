@@ -241,7 +241,7 @@ async def run_lesson_generation(
                     topic=state_snapshot.get("topic", ""),
                     knowledge_point_name=wp["name"],
                     knowledge_point_description=wp["description"],
-                    pedagogy_instructions=pedagogy_instructions or "无特定教学法要求",
+                    pedagogy_instructions=pedagogy_instructions or "No specific teaching method",
                     knowledge_skill=knowledge_skills.get(wp["name"], "no additional teaching strategy"),
                     point_index=i + 1,
                     total_points=total,
