@@ -181,6 +181,7 @@ _DEFAULT_STATE = {
     "messages": [],
     "chat_messages": [],
     "mode": "chat",
+    "session_mode": "chat",
     "topic": None,
     "knowledge_graph": None,
     "current_question_index": 0,
@@ -301,9 +302,10 @@ async def chat(req: ChatRequest) -> ChatResponse:
     _apply_initial_mode(state, req.mode)
     await _ensure_memory_snapshot(state)
 
-    # Add user message
-    state["messages"] = list(state.get("messages", []))
-    state["messages"].append(HumanMessage(content=req.message))
+    # Add user message to the active track
+    track_key = "chat_messages" if state.get("session_mode") == "chat" else "messages"
+    state[track_key] = list(state.get(track_key, []))
+    state[track_key].append(HumanMessage(content=req.message))
 
     # Run graph (blocking call → run in thread to avoid blocking event loop)
     graph = _get_graph()
@@ -386,8 +388,10 @@ async def chat_stream(req: ChatRequest):
     _apply_initial_mode(state, req.mode)
     await _ensure_memory_snapshot(state)
 
-    state["messages"] = list(state.get("messages", []))
-    state["messages"].append(HumanMessage(content=req.message))
+    # Add user message to the active track
+    track_key = "chat_messages" if state.get("session_mode") == "chat" else "messages"
+    state[track_key] = list(state.get(track_key, []))
+    state[track_key].append(HumanMessage(content=req.message))
 
     # Run intent classification (non-streaming, fast)
     intent_result = await asyncio.to_thread(intent_node, state)
@@ -487,7 +491,9 @@ async def chat_stream(req: ChatRequest):
         extra_kwargs = _cta_kwargs(cta_topic)
         if cta_topic:
             yield _sse_event({"type": "cta", "topic": cta_topic})
-        state["messages"].append(AIMessage(content=full_text, **extra_kwargs))
+        track_key = "chat_messages" if state.get("session_mode") == "chat" else "messages"
+        state[track_key] = list(state.get(track_key, []))
+        state[track_key].append(AIMessage(content=full_text, **extra_kwargs))
         state["pending_cta_topic"] = None
         state["mode"] = "chat"
         _save(session_id, state)
@@ -875,6 +881,19 @@ async def get_state(session_id: str) -> dict:
             if hasattr(m, "content")
             else {"role": "user", "content": str(m), "additional_kwargs": {}}
             for m in messages
+        ]
+
+    chat_msgs = state.get("chat_messages", [])
+    if chat_msgs:
+        result["chat_messages"] = [
+            {
+                "role": "ai" if getattr(m, "type", "human") == "ai" else "user",
+                "content": m.content,
+                "additional_kwargs": getattr(m, "additional_kwargs", {}) or {},
+            }
+            if hasattr(m, "content")
+            else {"role": "user", "content": str(m), "additional_kwargs": {}}
+            for m in chat_msgs
         ]
 
     # Slide data
