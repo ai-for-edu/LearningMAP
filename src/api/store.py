@@ -22,21 +22,29 @@ _DB_PATH = Path(
 )
 
 
+def _serialize_message_list(msgs: list) -> list[dict]:
+    """Serialize a list of langchain messages to JSON-safe dicts.
+
+    Preserves type, content, and additional_kwargs round-trip.
+    """
+    return [
+        {
+            "type": getattr(m, "type", "human"),
+            "content": m.content,
+            "additional_kwargs": getattr(m, "additional_kwargs", {}) or {},
+        }
+        if hasattr(m, "content")
+        else {"type": "human", "content": str(m), "additional_kwargs": {}}
+        for m in msgs
+    ]
+
+
 def _serialize_state(state: dict[str, Any]) -> str:
     """Convert session state to JSON string."""
     out: dict[str, Any] = {}
     for k, v in state.items():
-        if k == "messages":
-            out[k] = [
-                {
-                    "type": getattr(m, "type", "human"),
-                    "content": m.content,
-                    "additional_kwargs": getattr(m, "additional_kwargs", {}) or {},
-                }
-                if hasattr(m, "content")
-                else {"type": "human", "content": str(m), "additional_kwargs": {}}
-                for m in v
-            ]
+        if k in ("messages", "chat_messages"):
+            out[k] = _serialize_message_list(v)
         elif hasattr(v, "model_dump"):
             out[k] = v.model_dump()
         elif isinstance(v, list) and v and hasattr(v[0], "model_dump"):
@@ -46,23 +54,29 @@ def _serialize_state(state: dict[str, Any]) -> str:
     return json.dumps(out, ensure_ascii=False, default=str)
 
 
+def _deserialize_message_list(raw_msgs: list) -> list:
+    """Reconstruct langchain message objects from JSON dicts."""
+    out = []
+    for m in raw_msgs:
+        if isinstance(m, dict):
+            kwargs = m.get("additional_kwargs", {}) or {}
+            if m.get("type") == "ai":
+                out.append(AIMessage(content=m["content"], additional_kwargs=kwargs))
+            else:
+                out.append(HumanMessage(content=m["content"], additional_kwargs=kwargs))
+        else:
+            out.append(HumanMessage(content=str(m)))
+    return out
+
+
 def _deserialize_state(data: str) -> dict[str, Any]:
     """Convert JSON string back to session state."""
     raw = json.loads(data)
 
     # Restore messages
-    if "messages" in raw and isinstance(raw["messages"], list):
-        msgs = []
-        for m in raw["messages"]:
-            if isinstance(m, dict):
-                kwargs = m.get("additional_kwargs", {}) or {}
-                if m.get("type") == "ai":
-                    msgs.append(AIMessage(content=m["content"], additional_kwargs=kwargs))
-                else:
-                    msgs.append(HumanMessage(content=m["content"], additional_kwargs=kwargs))
-            else:
-                msgs.append(HumanMessage(content=str(m)))
-        raw["messages"] = msgs
+    for key in ("messages", "chat_messages"):
+        if key in raw and isinstance(raw[key], list):
+            raw[key] = _deserialize_message_list(raw[key])
 
     # Restore Pydantic models
     if raw.get("knowledge_graph") and isinstance(raw["knowledge_graph"], dict):
