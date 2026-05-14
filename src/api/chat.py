@@ -190,7 +190,7 @@ _DEFAULT_STATE = {
     "slide_outlines": None,
     "slide_contents": None,
     "lesson_format": None,
-    "active_skill": None,
+    "active_skill": "feynman",
     "active_skill_content": None,
     "knowledge_skills": None,
     "use_knowledge_skills": True,
@@ -212,15 +212,39 @@ _DEFAULT_STATE = {
 }
 
 
+def _ensure_skill_content(state: dict[str, Any]) -> None:
+    """Lazily materialize active_skill_content from the skill registry.
+
+    _DEFAULT_STATE only stores the skill name (not its sections) because the
+    skill registry may not be loaded at module import time. This helper fills
+    in the content on first read.
+    """
+    name = state.get("active_skill")
+    if name and not state.get("active_skill_content"):
+        meta = get_skill(name)
+        if meta:
+            state["active_skill_content"] = dict(meta.sections)
+
+
+def _new_session_state() -> dict[str, Any]:
+    """Build a fresh session state with default skill content materialized."""
+    state = dict(_DEFAULT_STATE)
+    _ensure_skill_content(state)
+    return state
+
+
 def _get_session(session_id: str) -> dict[str, Any] | None:
     """Get session from memory cache, falling back to SQLite."""
     if session_id in _sessions:
-        return _sessions[session_id]
-    stored = load_session(session_id)
-    if stored:
+        state = _sessions[session_id]
+    else:
+        stored = load_session(session_id)
+        if not stored:
+            return None
         _sessions[session_id] = stored
-        return stored
-    return None
+        state = stored
+    _ensure_skill_content(state)
+    return state
 
 
 def _save(session_id: str, state: dict[str, Any]) -> None:
@@ -255,7 +279,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
     session_id = req.session_id or str(uuid.uuid4())
 
     # Get or init session state
-    state = _get_session(session_id) or dict(_DEFAULT_STATE)
+    state = _get_session(session_id) or _new_session_state()
     await _ensure_memory_snapshot(state)
 
     # Add user message
@@ -338,7 +362,7 @@ async def chat_stream(req: ChatRequest):
     from src.agent.nodes.intent import intent_node
 
     session_id = req.session_id or str(uuid.uuid4())
-    state = _get_session(session_id) or dict(_DEFAULT_STATE)
+    state = _get_session(session_id) or _new_session_state()
     await _ensure_memory_snapshot(state)
 
     state["messages"] = list(state.get("messages", []))
@@ -882,7 +906,7 @@ async def set_skill(session_id: str, req: SetSkillRequest) -> dict:
     state = _get_session(session_id)
     if not state:
         # Auto-create session (user may select skill before first message)
-        state = dict(_DEFAULT_STATE)
+        state = _new_session_state()
 
     if req.skill is None:
         # Clear skill
@@ -939,7 +963,7 @@ async def toggle_knowledge_skills(
     """Toggle knowledge point skill generation on/off for a session."""
     state = _get_session(session_id)
     if not state:
-        state = dict(_DEFAULT_STATE)
+        state = _new_session_state()
     state["use_knowledge_skills"] = req.enabled
     _save(session_id, state)
     return {"session_id": session_id, "use_knowledge_skills": req.enabled}
@@ -956,7 +980,7 @@ async def toggle_kc_skills(
     """Toggle KC skill resolver + prompt injection on/off for a session."""
     state = _get_session(session_id)
     if not state:
-        state = dict(_DEFAULT_STATE)
+        state = _new_session_state()
     state["use_kc_skills"] = req.enabled
     _save(session_id, state)
     return {"session_id": session_id, "use_kc_skills": req.enabled}
@@ -985,7 +1009,7 @@ async def start_generation(session_id: str, task_type: str) -> dict:
 
     state = _get_session(session_id)
     if not state:
-        state = dict(_DEFAULT_STATE)
+        state = _new_session_state()
         _save(session_id, state)
 
     # Snapshot state for the background task
