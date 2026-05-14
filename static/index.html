@@ -327,6 +327,10 @@ let _activeSkillInfo = null; // {name, display_name, body, current_section}
 let _knowledgeSkills = null; // {knowledge_point_name: skill_text}
 let _sessionMode = 'chat';   // hydrated from /state on load
 let _pendingMode = null;      // chosen before session_id exists
+let _chatMessages = [];         // chat-track message cache, hydrated from /state
+let _learningMessages = [];     // learning-track message cache, hydrated from /state
+let _learningArtifacts = null;  // {graph, diagnosis_result, lesson_content, slide_contents} cache
+let _sendInFlight = false;      // SSE stream in progress — toggle disabled
 
 function _renderModeToggle(mode) {
   _sessionMode = mode;
@@ -338,6 +342,7 @@ function _renderModeToggle(mode) {
 }
 
 async function _handleModeToggleClick(targetMode) {
+  if (_sendInFlight) return;
   if (targetMode === _sessionMode) return;
   const buttons = document.querySelectorAll('#modeToggle button');
   buttons.forEach(b => (b.disabled = true));
@@ -346,8 +351,20 @@ async function _handleModeToggleClick(targetMode) {
   try {
     if (currentSessionId) {
       await setSessionMode(currentSessionId, targetMode);
+      const fresh = await getSessionState(currentSessionId);
+      _chatMessages = fresh.chat_messages || [];
+      _learningMessages = fresh.messages || [];
+      _learningArtifacts = {
+        topic: fresh.topic,
+        graph: fresh.graph,
+        diagnosis_result: fresh.diagnosis_result,
+        lesson_content: fresh.lesson_content,
+        slide_contents: fresh.slide_contents,
+      };
+      renderActiveView(targetMode);
     } else {
-      _pendingMode = targetMode;  // applied on first /chat call
+      _pendingMode = targetMode;
+      renderActiveView(targetMode);  // local-only render (empty state likely)
     }
   } catch (e) {
     _renderModeToggle(previous);  // roll back
@@ -629,6 +646,121 @@ function renderEmptyState(mode) {
     `<div style="color:var(--text-3);font-size:13px;padding:24px;text-align:center;">${escapeHtml(text)}</div>`;
 }
 
+// ─── Per-track view helpers ───────────────────────────────────────────────────
+
+function _learningArtifactsEmpty() {
+  return !_learningArtifacts || (
+    !_learningArtifacts.graph &&
+    !_learningArtifacts.diagnosis_result &&
+    !_learningArtifacts.lesson_content &&
+    !_learningArtifacts.slide_contents
+  );
+}
+
+function renderArtifactsInline(artifacts, sid) {
+  // Re-use existing renderers for each artifact type.
+  // renderKnowledgeGraph and renderDiagnosisResults append directly to chatHistory.
+  // lesson_content / slide_contents: the "Start Learning" button on the diagnosis
+  // card handles navigation, so no extra button is needed here.
+  if (artifacts.graph && artifacts.topic) {
+    renderKnowledgeGraph({
+      data: { graph: artifacts.graph },
+      message: `我已经为你梳理了「${artifacts.topic}」的知识图谱。`,
+      session_id: sid,
+      active_skill: _activeSkillInfo,
+    });
+  }
+  if (artifacts.diagnosis_result) {
+    renderDiagnosisResults(artifacts.diagnosis_result, sid);
+  }
+}
+
+function renderActiveView(mode) {
+  clearChatHistory();
+  const sid = currentSessionId;
+  const chatHistory = document.getElementById('chatHistory');
+
+  if (mode === 'chat') {
+    if (_chatMessages.length === 0) {
+      renderEmptyState('chat');
+      return;
+    }
+    for (const msg of _chatMessages) {
+      if (msg.role === 'user') {
+        appendUserMessageDOM(msg.content);
+      } else {
+        appendAiMessageDOM(msg.content, msg.additional_kwargs || {});
+      }
+    }
+    return;
+  }
+
+  // learning mode — mirror the existing state-rebuild logic
+  const hasMessages = _learningMessages && _learningMessages.length > 0;
+  if (!hasMessages && _learningArtifactsEmpty()) {
+    renderEmptyState('learning');
+    return;
+  }
+
+  // Render topic + artifacts (graph → diagnosis) first
+  if (_learningArtifacts && _learningArtifacts.topic) {
+    chatHistory.insertAdjacentHTML('beforeend', `
+      <div class="user-msg">
+        <div class="user-bubble">我想学习${escapeHtml(_learningArtifacts.topic)}</div>
+      </div>`);
+  }
+  if (_learningArtifacts) {
+    renderArtifactsInline(_learningArtifacts, sid);
+  }
+
+  // Render remaining chat messages (same startIdx heuristic as the original loop)
+  if (hasMessages) {
+    let startIdx = 0;
+    for (let i = _learningMessages.length - 1; i >= 0; i--) {
+      const msg = _learningMessages[i];
+      if (msg.role === 'ai') {
+        const content = msg.content || '';
+        if (content.includes('知识图谱') || content.includes('开始作答') ||
+            content.includes('诊断完成') || content.includes('已掌握') ||
+            content.length > 1000) {
+          startIdx = i + 1;
+          break;
+        }
+      }
+    }
+    for (let i = startIdx; i < _learningMessages.length; i++) {
+      const msg = _learningMessages[i];
+      if (msg.role === 'user') {
+        appendUserMessageDOM(msg.content);
+      } else if (msg.role === 'ai') {
+        const badge = buildSkillBadge(_activeSkillInfo ? {..._activeSkillInfo, current_section: 'chat'} : null);
+        const msgIdx = _msgStore.length;
+        _msgStore.push({ text: msg.content, raw: null });
+        chatHistory.insertAdjacentHTML('beforeend', `
+          <div class="ai-msg msg-wrapper">
+            <div class="ai-avatar">A</div>
+            <div class="ai-content">
+              <div class="ai-name">EduAI</div>
+              ${badge}
+              <div class="ai-text prose">${safeMarkdown(msg.content)}</div>
+              <div class="msg-actions">
+                <button class="msg-action" data-copy-idx="${msgIdx}" title="Copy">
+                  <span class="material-symbols-outlined" style="font-size:18px;">content_copy</span>
+                </button>
+              </div>
+              ${buildCtaCard(msg.additional_kwargs || {})}
+            </div>
+          </div>`);
+      }
+    }
+  }
+
+  // Reinitialise vis.js graphs that were appended
+  setTimeout(initAllGraphs, 100);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const _ksBadgeStore = [];
 const _badgeSkillStore = [];
 
@@ -675,6 +807,7 @@ async function handleSend(text) {
   const input = document.getElementById('chatInput');
   const rawMessage = text || input.value.trim();
   if (!rawMessage) return;
+  if (_sendInFlight) return;
   input.value = '';
   input.style.height = 'auto'; // reset to single line
 
@@ -704,21 +837,27 @@ async function handleSend(text) {
     }
   }
 
+  // Capture user text for cache update after stream completes
+  const userText = rawMessage;
+
   const chatHistory = document.getElementById('chatHistory');
 
   // Show user message as-is (no skill badge — skill info only on AI replies)
   appendUserMessageDOM(rawMessage);
 
   // Show loading
-  chatHistory.innerHTML += `
+  chatHistory.insertAdjacentHTML('beforeend', `
     <div class="ai-msg" id="loading">
       <div class="ai-avatar">A</div>
       <div class="ai-content">
         <div class="ai-name">EduAI</div>
         <div class="ai-text" style="color:var(--text-4);">思考中…</div>
       </div>
-    </div>`;
+    </div>`);
   chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+  _sendInFlight = true;
+  document.querySelectorAll('#modeToggle button').forEach(b => (b.disabled = true));
 
   try {
     messageCount++;
@@ -731,7 +870,7 @@ async function handleSend(text) {
     let streamMode = 'chat';
     let streamCtaTopic = null;
 
-    chatHistory.innerHTML += `
+    chatHistory.insertAdjacentHTML('beforeend', `
       <div class="ai-msg msg-wrapper" id="${responseId}">
         <div class="ai-avatar">A</div>
         <div class="ai-content">
@@ -741,7 +880,7 @@ async function handleSend(text) {
             <span class="stream-cursor"></span>
           </div>
         </div>
-      </div>`;
+      </div>`);
 
     const respEl = document.getElementById(responseId);
     const contentEl = respEl.querySelector('.stream-content');
@@ -801,6 +940,16 @@ async function handleSend(text) {
               buildCtaCard({ cta: { type: 'learn_topic', topic: streamCtaTopic } }));
           }
         }
+        // Update active-track cache so a subsequent toggle re-renders correctly
+        const trackList = _sessionMode === 'chat' ? _chatMessages : _learningMessages;
+        trackList.push({ role: 'user', content: userText });
+        trackList.push({
+          role: 'ai',
+          content: streamText,
+          additional_kwargs: streamCtaTopic
+            ? { cta: { type: 'learn_topic', topic: streamCtaTopic } }
+            : {},
+        });
       },
       complete(d) {
         // Non-chat mode (graph, quiz, etc.) — full response at once
@@ -815,15 +964,20 @@ async function handleSend(text) {
           if (d.data.graph.topic && typeof renameCurrentSession === 'function') {
             renameCurrentSession(d.data.graph.topic);
           }
+          // Update learning artifacts cache
+          if (_learningArtifacts) {
+            _learningArtifacts.graph = d.data.graph;
+            _learningArtifacts.topic = d.data.graph.topic;
+          }
         } else {
-          chatHistory.innerHTML += `
+          chatHistory.insertAdjacentHTML('beforeend', `
             <div class="ai-msg">
               <div class="ai-avatar">A</div>
               <div class="ai-content">
                 <div class="ai-name">EduAI</div>
                 <div class="ai-text prose">${safeMarkdown(d.message || '')}</div>
               </div>
-            </div>`;
+            </div>`);
         }
       },
       error(d) {
@@ -852,7 +1006,10 @@ async function handleSend(text) {
     }
   } catch (err) {
     document.getElementById('loading')?.remove();
-    chatHistory.innerHTML += `<div style="color:var(--error);font-size:13px;padding:12px;">请求失败: ${escapeHtml(err.message)}</div>`;
+    chatHistory.insertAdjacentHTML('beforeend', `<div style="color:var(--error);font-size:13px;padding:12px;">请求失败: ${escapeHtml(err.message)}</div>`);
+  } finally {
+    _sendInFlight = false;
+    document.querySelectorAll('#modeToggle button').forEach(b => (b.disabled = false));
   }
 }
 
@@ -1118,7 +1275,6 @@ async function showLessonFormatChoice(sid) {
 
 // On load: always rebuild conversation from state when session_id exists
 (async function init() {
-  const chatHistory = document.getElementById('chatHistory');
   clearChatHistory();
   document.getElementById('suggestBtns').innerHTML = '';
 
@@ -1135,81 +1291,23 @@ async function showLessonFormatChoice(sid) {
     if (!_cachedSkills) _cachedSkills = await fetchSkills();
     _activeSkillInfo = (_cachedSkills || []).find(s => s.name === state.active_skill) || null;
   }
-  if (state.session_mode) {
-    _renderModeToggle(state.session_mode);
-  } else {
-    _renderModeToggle('chat');  // safety fallback
-  }
   if (state.knowledge_skills) {
     _knowledgeSkills = state.knowledge_skills;
   }
 
-  // Rebuild conversation: topic → graph → diagnosis → lesson button
-  if (state.topic) {
-    // User message with skill badge if active
-    chatHistory.innerHTML += `
-      <div class="user-msg">
-        <div class="user-bubble">我想学习${escapeHtml(state.topic)}</div>
-      </div>`;
+  // Populate per-track caches
+  _chatMessages = state.chat_messages || [];
+  _learningMessages = state.messages || [];
+  _learningArtifacts = {
+    topic: state.topic,
+    graph: state.graph,
+    diagnosis_result: state.diagnosis_result,
+    lesson_content: state.lesson_content,
+    slide_contents: state.slide_contents,
+  };
 
-    if (state.graph) {
-      renderKnowledgeGraph({ data: { graph: state.graph }, message: `我已经为你梳理了「${state.topic}」的知识图谱。`, session_id: sid });
-    }
-  }
-
-  if (state.diagnosis_result) {
-    renderDiagnosisResults(state.diagnosis_result, sid);
-  }
-
-  // No lesson card — Start Learning button on diagnosis card handles both formats
-
-  // Render remaining chat messages
-  if (state.messages && state.messages.length > 0) {
-    let startIdx = 0;
-    for (let i = state.messages.length - 1; i >= 0; i--) {
-      const msg = state.messages[i];
-      if (msg.role === 'ai') {
-        const content = msg.content || '';
-        if (content.includes('知识图谱') || content.includes('开始作答') ||
-            content.includes('诊断完成') || content.includes('已掌握') ||
-            content.length > 1000) {
-          startIdx = i + 1;
-          break;
-        }
-      }
-    }
-
-    for (let i = startIdx; i < state.messages.length; i++) {
-      const msg = state.messages[i];
-      if (msg.role === 'user') {
-        appendUserMessageDOM(msg.content);
-      } else if (msg.role === 'ai') {
-        const badge = buildSkillBadge(_activeSkillInfo ? {..._activeSkillInfo, current_section: 'chat'} : null);
-        const msgIdx = _msgStore.length;
-        _msgStore.push({ text: msg.content, raw: null });
-        chatHistory.innerHTML += `
-          <div class="ai-msg msg-wrapper">
-            <div class="ai-avatar">A</div>
-            <div class="ai-content">
-              <div class="ai-name">EduAI</div>
-              ${badge}
-              <div class="ai-text prose">${safeMarkdown(msg.content)}</div>
-              <div class="msg-actions">
-                <button class="msg-action" data-copy-idx="${msgIdx}" title="Copy">
-                  <span class="material-symbols-outlined" style="font-size:18px;">content_copy</span>
-                </button>
-              </div>
-              ${buildCtaCard(msg.additional_kwargs)}
-            </div>
-          </div>`;
-      }
-    }
-  }
-
-  // Initialize all knowledge graph vis.js instances AFTER all innerHTML is done
-  // Use setTimeout to ensure DOM has fully updated after innerHTML operations
-  // 500ms ensures all async state fetches and DOM updates are complete
-  setTimeout(initAllGraphs, 500);
+  _renderModeToggle(state.session_mode || 'chat');
+  renderActiveView(_sessionMode);
 
   // Show review banner if backend reports has_history (review-flow PR-3)
   if (state.has_history) {
