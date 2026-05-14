@@ -46,6 +46,9 @@ class TestUserMessageDispatch:
             )
             assert resp.status_code == 200
             sess_id = resp.json()["session_id"]
+            # Guard against the bug where chat-mode non-streaming responses
+            # returned an empty message because chat() read from the learning track.
+            assert resp.json()["message"] == "hi back"
 
             state_resp = await client.get(f"/api/chat/{sess_id}/state")
             data = state_resp.json()

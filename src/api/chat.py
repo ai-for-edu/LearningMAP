@@ -235,6 +235,31 @@ def _new_session_state() -> dict[str, Any]:
     return state
 
 
+def _active_track(state: dict[str, Any]) -> str:
+    """Return the message-list key for the session's current mode.
+
+    chat mode → "chat_messages"; learning mode → "messages".
+    """
+    return "chat_messages" if state.get("session_mode") == "chat" else "messages"
+
+
+def _serialize_messages_for_state(msgs: list) -> list[dict]:
+    """Serialize a list of langchain messages for the GET /state response.
+
+    Mirrors the wire format used by both `messages` and `chat_messages` blocks.
+    """
+    return [
+        {
+            "role": "ai" if getattr(m, "type", "human") == "ai" else "user",
+            "content": m.content,
+            "additional_kwargs": getattr(m, "additional_kwargs", {}) or {},
+        }
+        if hasattr(m, "content")
+        else {"role": "user", "content": str(m), "additional_kwargs": {}}
+        for m in msgs
+    ]
+
+
 def _apply_initial_mode(state: dict[str, Any], req_mode: str | None) -> None:
     """Honor request.mode only when the session has no messages yet.
 
@@ -259,6 +284,7 @@ def _get_session(session_id: str) -> dict[str, Any] | None:
             return None
         _sessions[session_id] = stored
         state = stored
+    state.setdefault("session_mode", "chat")
     state.setdefault("chat_messages", [])
     _ensure_skill_content(state)
     return state
@@ -303,7 +329,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
     await _ensure_memory_snapshot(state)
 
     # Add user message to the active track
-    track_key = "chat_messages" if state.get("session_mode") == "chat" else "messages"
+    track_key = _active_track(state)
     state[track_key] = list(state.get(track_key, []))
     state[track_key].append(HumanMessage(content=req.message))
 
@@ -314,10 +340,11 @@ async def chat(req: ChatRequest) -> ChatResponse:
     # Save state
     _save(session_id, result)
 
-    # Extract response
-    messages = result.get("messages", [])
+    # Extract response from the active track
+    track_key = _active_track(result)
+    track = result.get(track_key, [])
     last_ai_msg = ""
-    for msg in reversed(messages):
+    for msg in reversed(track):
         if hasattr(msg, "type") and msg.type == "ai":
             last_ai_msg = msg.content
             break
@@ -389,7 +416,7 @@ async def chat_stream(req: ChatRequest):
     await _ensure_memory_snapshot(state)
 
     # Add user message to the active track
-    track_key = "chat_messages" if state.get("session_mode") == "chat" else "messages"
+    track_key = _active_track(state)
     state[track_key] = list(state.get(track_key, []))
     state[track_key].append(HumanMessage(content=req.message))
 
@@ -491,8 +518,7 @@ async def chat_stream(req: ChatRequest):
         extra_kwargs = _cta_kwargs(cta_topic)
         if cta_topic:
             yield _sse_event({"type": "cta", "topic": cta_topic})
-        track_key = "chat_messages" if state.get("session_mode") == "chat" else "messages"
-        state[track_key] = list(state.get(track_key, []))
+        track_key = _active_track(state)
         state[track_key].append(AIMessage(content=full_text, **extra_kwargs))
         state["pending_cta_topic"] = None
         state["mode"] = "chat"
@@ -872,29 +898,11 @@ async def get_state(session_id: str) -> dict:
     # Messages for export
     messages = state.get("messages", [])
     if messages:
-        result["messages"] = [
-            {
-                "role": "ai" if getattr(m, "type", "human") == "ai" else "user",
-                "content": m.content,
-                "additional_kwargs": getattr(m, "additional_kwargs", {}) or {},
-            }
-            if hasattr(m, "content")
-            else {"role": "user", "content": str(m), "additional_kwargs": {}}
-            for m in messages
-        ]
+        result["messages"] = _serialize_messages_for_state(messages)
 
     chat_msgs = state.get("chat_messages", [])
     if chat_msgs:
-        result["chat_messages"] = [
-            {
-                "role": "ai" if getattr(m, "type", "human") == "ai" else "user",
-                "content": m.content,
-                "additional_kwargs": getattr(m, "additional_kwargs", {}) or {},
-            }
-            if hasattr(m, "content")
-            else {"role": "user", "content": str(m), "additional_kwargs": {}}
-            for m in chat_msgs
-        ]
+        result["chat_messages"] = _serialize_messages_for_state(chat_msgs)
 
     # Slide data
     if state.get("slide_contents"):
