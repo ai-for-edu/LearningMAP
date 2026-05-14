@@ -28,9 +28,13 @@ def _serialize_state(state: dict[str, Any]) -> str:
     for k, v in state.items():
         if k == "messages":
             out[k] = [
-                {"type": getattr(m, "type", "human"), "content": m.content}
+                {
+                    "type": getattr(m, "type", "human"),
+                    "content": m.content,
+                    "additional_kwargs": getattr(m, "additional_kwargs", {}) or {},
+                }
                 if hasattr(m, "content")
-                else {"type": "human", "content": str(m)}
+                else {"type": "human", "content": str(m), "additional_kwargs": {}}
                 for m in v
             ]
         elif hasattr(v, "model_dump"):
@@ -51,10 +55,11 @@ def _deserialize_state(data: str) -> dict[str, Any]:
         msgs = []
         for m in raw["messages"]:
             if isinstance(m, dict):
+                kwargs = m.get("additional_kwargs", {}) or {}
                 if m.get("type") == "ai":
-                    msgs.append(AIMessage(content=m["content"]))
+                    msgs.append(AIMessage(content=m["content"], additional_kwargs=kwargs))
                 else:
-                    msgs.append(HumanMessage(content=m["content"]))
+                    msgs.append(HumanMessage(content=m["content"], additional_kwargs=kwargs))
             else:
                 msgs.append(HumanMessage(content=str(m)))
         raw["messages"] = msgs
