@@ -21,10 +21,10 @@ UTC = timezone.utc
 
 def _fake_graph() -> KnowledgeGraph:
     return KnowledgeGraph(
-        topic="二次方程",
+        topic="quadratic equations",
         nodes=[
-            KnowledgeNode(id="n1", name="判别式", description="d", level="core"),
-            KnowledgeNode(id="n2", name="求根公式", description="d", level="core"),
+            KnowledgeNode(id="n1", name="discriminant", description="d", level="core"),
+            KnowledgeNode(id="n2", name="quadratic formula", description="d", level="core"),
         ],
         edges=[KnowledgeEdge(source="n1", target="n2", relation="prerequisite")],
     )
@@ -47,26 +47,26 @@ def test_kc_path_still_annotated(
     now = datetime(2026, 5, 7, 12, tzinfo=UTC)
     mock_fetch.return_value = [
         {
-            "subtopic": "判别式",
-            "topic": "二次方程",
+            "subtopic": "discriminant",
+            "topic": "quadratic equations",
             "last_accuracy": 0.9,
             "last_seen_at": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "session_count": 1,
         }
     ]
 
-    state = {"topic": "二次方程", "use_kc_skills": True}
+    state = {"topic": "quadratic equations", "use_kc_skills": True}
     out = knowledge_graph_node(state)
 
     graph = out["knowledge_graph"]
-    n1 = next(n for n in graph.nodes if n.name == "判别式")
+    n1 = next(n for n in graph.nodes if n.name == "discriminant")
     # Matched row → mastery attached, status is not the unmatched-sentinel.
     # Specific retention bucket is covered by mastery_annotator unit tests.
     assert n1.mastery is not None
     assert n1.mastery.status != "unseen"
     assert n1.mastery.forgetting_model == "ebbinghaus_v1"
     # Unmatched node remains None (not over-annotated).
-    n2 = next(n for n in graph.nodes if n.name == "求根公式")
+    n2 = next(n for n in graph.nodes if n.name == "quadratic formula")
     assert n2.mastery is None
 
 
@@ -83,22 +83,22 @@ def test_llm_path_receives_mastery_in_prompt(
     mock_llm.return_value = _fake_graph()
     mock_fetch.return_value = [
         {
-            "subtopic": "判别式",
-            "topic": "二次方程",
+            "subtopic": "discriminant",
+            "topic": "quadratic equations",
             "last_accuracy": 0.9,
             "last_seen_at": "2026-05-05T10:00:00Z",
             "session_count": 1,
         }
     ]
 
-    state = {"topic": "二次方程", "use_kc_skills": False}
+    state = {"topic": "quadratic equations", "use_kc_skills": False}
     knowledge_graph_node(state)
 
     args, kwargs = mock_llm.call_args
     # _llm_generate_graph must have received the mastery list
     assert "existing_mastery" in kwargs or len(args) >= 3
     mastery_arg = kwargs.get("existing_mastery") or args[2]
-    assert any(m.get("subtopic") == "判别式" for m in mastery_arg)
+    assert any(m.get("subtopic") == "discriminant" for m in mastery_arg)
 
 
 @patch("src.agent.nodes.knowledge_graph.fetch_mastery")
@@ -109,7 +109,7 @@ def test_no_mastery_means_unseen_nodes(
 ) -> None:
     mock_resolve.return_value = _fake_graph()
     mock_fetch.return_value = []
-    state = {"topic": "二次方程", "use_kc_skills": True}
+    state = {"topic": "quadratic equations", "use_kc_skills": True}
     out = knowledge_graph_node(state)
 
     graph = out["knowledge_graph"]
@@ -130,7 +130,7 @@ def test_fetch_mastery_failure_does_not_break_graph(
     """
     mock_resolve.return_value = _fake_graph()
     mock_fetch.side_effect = RuntimeError("synthetic memory service crash")
-    state = {"topic": "二次方程", "use_kc_skills": True}
+    state = {"topic": "quadratic equations", "use_kc_skills": True}
 
     # Should not raise. Should still produce a graph (with no mastery).
     out = knowledge_graph_node(state)

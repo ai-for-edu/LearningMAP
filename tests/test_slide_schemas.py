@@ -60,7 +60,7 @@ def test_slide_data():
 
 def test_slide_outline():
     outline = SlideOutline(
-        title="勾股定理概念", description="介绍勾股定理的定义",
-        keyPoints=["a²+b²=c²", "直角三角形"],
+        title="Pythagorean theorem concept", description="Introduction to the Pythagorean theorem",
+        keyPoints=["a²+b²=c²", "right triangle"],
     )
-    assert outline.title == "勾股定理概念"
+    assert outline.title == "Pythagorean theorem concept"

@@ -3,41 +3,41 @@ from src.prompts.loader import render_prompt
 
 def test_render_intent_prompt():
     result = render_prompt(
-        "intent", messages=[{"role": "user", "content": "我想学二元一次方程"}]
+        "intent", messages=[{"role": "user", "content": "I want to learn systems of linear equations"}]
     )
-    assert "二元一次方程" in result
+    assert "systems of linear equations" in result
     assert len(result) > 50
 
 
 def test_render_knowledge_graph_prompt():
-    result = render_prompt("knowledge_graph", topic="勾股定理", max_nodes=8)
-    assert "勾股定理" in result
+    result = render_prompt("knowledge_graph", topic="Pythagorean theorem", max_nodes=8)
+    assert "Pythagorean theorem" in result
     assert "8" in result
 
 
 def test_render_quiz_prompt():
-    nodes = [{"name": "一元一次方程", "description": "基础"}]
+    nodes = [{"name": "linear equations", "description": "basics"}]
     result = render_prompt(
         "quiz_generate", knowledge_points=nodes, questions_per_point=2
     )
-    assert "一元一次方程" in result
+    assert "linear equations" in result
 
 
 def test_render_kc_skill_from_bank_prompt():
     samples = [
         {
-            "type": "填空",
-            "content": "学校有舞蹈、唱歌、围棋、绘画四种兴趣班……一共有多少种不同的报名方法？",
+            "type": "fill-in",
+            "content": "A school offers 4 interest classes: dance, singing, chess, painting ... how many different ways can a student enroll?",
             "options": {},
             "answer": "$$24$$",
-            "analysis": "小宇先选，有 4 种……一共有 4×3×2=24（种）",
+            "analysis": "Xiao Yu selects first, 4 choices ... total 4×3×2=24 (ways)",
         },
         {
-            "type": "单选",
-            "content": "书架上有 2 本英语书、4 本语文书……",
+            "type": "single-choice",
+            "content": "A bookshelf has 2 English books and 4 Chinese books ...",
             "options": {"A": "6", "B": "8", "C": "14", "D": "26"},
             "answer": "D",
-            "analysis": "分三类：2×4+2×3+4×3=26。",
+            "analysis": "Three cases: 2×4+2×3+4×3=26.",
         },
     ]
     result = render_prompt(
@@ -52,17 +52,17 @@ def test_render_kc_skill_from_bank_prompt():
     assert "考察形式" in result
     assert "易错点" in result
     assert "难度提示" in result
-    assert "题目 1" in result and "题目 2" in result
-    assert "填空" in result
+    assert "Question 1" in result and "Question 2" in result
+    assert "fill-in" in result
     # both answers must appear
     assert "24" in result
     assert "26" in result
     # must instruct JSON-only output so the Classba backend returns parseable text
     assert "JSON" in result
-    assert "只输出一个 JSON 对象" in result
+    assert "Output exactly one JSON object" in result
     # must instruct the model to emit the new description field
     assert "description" in result
-    assert "适用场景" in result
+    assert "applicable scenario" in result
 
 
 def test_render_kc_skill_block_with_content():
@@ -71,16 +71,16 @@ def test_render_kc_skill_block_with_content():
     block = render_kc_skill_block(
         {
             "description": "desc",
-            "考察重点": "重点内容",
-            "考察形式": "形式内容",
-            "易错点": "易错内容",
-            "难度提示": "难度内容",
+            "考察重点": "focus content",
+            "考察形式": "format content",
+            "易错点": "mistake content",
+            "难度提示": "difficulty content",
         }
     )
-    assert "考察重点" in block
-    assert "重点内容" in block
-    assert "易错内容" in block
-    assert "难度内容" in block
+    assert "Assessment focus" in block
+    assert "focus content" in block
+    assert "mistake content" in block
+    assert "Difficulty cues" in block
 
 
 def test_render_kc_skill_block_empty_returns_empty_string():
@@ -91,58 +91,57 @@ def test_render_kc_skill_block_empty_returns_empty_string():
 
 
 def test_quiz_generate_renders_kc_skill_block():
-    block = "## KC 测试块\n- 易错点：示例"
+    block = "## KC test block\n- common mistakes: example"
     result = render_prompt(
         "quiz_generate",
-        knowledge_points=[{"name": "乘法原理", "description": "desc"}],
+        knowledge_points=[{"name": "multiplication principle", "description": "desc"}],
         questions_per_point=2,
         skill_instructions="",
         kc_skill_block=block,
     )
-    assert "KC 测试块" in result
-    assert "易错点：示例" in result
+    assert "KC test block" in result
+    assert "common mistakes: example" in result
 
 
 def test_quiz_generate_omits_kc_skill_block_when_empty():
     result = render_prompt(
         "quiz_generate",
-        knowledge_points=[{"name": "乘法原理", "description": "desc"}],
+        knowledge_points=[{"name": "multiplication principle", "description": "desc"}],
         questions_per_point=2,
         skill_instructions="",
         kc_skill_block="",
     )
     # The block would have a distinctive heading — verify it's absent
-    assert "当前知识点的出题" not in result
-    assert "KC 测试块" not in result
+    assert "KC test block" not in result
 
 
 def test_lesson_point_renders_kc_skill_block():
-    block = "## KC 课件块\n- 难度提示：示例"
+    block = "## KC lesson block\n- difficulty cues: example"
     result = render_prompt(
         "lesson_point",
-        topic="勾股定理",
-        knowledge_point_name="直角三角形",
+        topic="Pythagorean theorem",
+        knowledge_point_name="right triangle",
         knowledge_point_description="desc",
-        pedagogy_instructions="无特定教学法要求",
+        pedagogy_instructions="No specific pedagogical requirement",
         knowledge_skill="no additional teaching strategy",
         point_index=1,
         total_points=1,
         kc_skill_block=block,
     )
-    assert "KC 课件块" in result
-    assert "难度提示：示例" in result
+    assert "KC lesson block" in result
+    assert "difficulty cues: example" in result
 
 
 def test_slide_outline_renders_kc_skill_block():
-    block = "## KC 课件块\n- 难度提示：slide 测试"
+    block = "## KC lesson block\n- difficulty cues: slide test"
     result = render_prompt(
         "slide_outline",
-        topic="计数",
-        weak_points=[{"name": "乘法原理", "description": "desc"}],
+        topic="counting",
+        weak_points=[{"name": "multiplication principle", "description": "desc"}],
         kc_skill_block=block,
     )
-    assert "KC 课件块" in result
-    assert "slide 测试" in result
+    assert "KC lesson block" in result
+    assert "slide test" in result
 
 
 def test_knowledge_graph_prompt_omits_section_when_no_directive() -> None:
@@ -166,10 +165,10 @@ def test_knowledge_graph_prompt_includes_directive_when_provided() -> None:
         topic="X",
         max_nodes=8,
         skill_instructions="",
-        focus_directive="学生在 分配律 上仍薄弱.",
+        focus_directive="The student is still weak on distributive law.",
     )
     assert "Focus Directive" in out
-    assert "分配律" in out
+    assert "distributive law" in out
 
 
 def test_lesson_plan_prompt_omits_section_when_no_directive() -> None:
@@ -193,9 +192,9 @@ def test_lesson_plan_prompt_includes_directive_when_provided() -> None:
         topic="X",
         weak_points=[],
         skill_instructions="",
-        focus_directive="A 已掌握, B 仍薄弱.",
+        focus_directive="A is mastered, B is still weak.",
     )
-    assert "B 仍薄弱" in out
+    assert "B is still weak" in out
 
 
 def test_lesson_point_prompt_omits_directive_when_empty() -> None:
@@ -229,10 +228,10 @@ def test_lesson_point_prompt_includes_directive_when_provided() -> None:
         point_index=1,
         total_points=1,
         kc_skill_block="",
-        focus_directive="学生在 分配律 上薄弱，已掌握 求根公式。",
+        focus_directive="The student is weak on distributive law, has mastered quadratic formula.",
     )
     assert "Review Feedback Directive" in out
-    assert "分配律" in out
+    assert "distributive law" in out
 
 
 # ---- KG prompt: existing_mastery block ----
@@ -242,7 +241,7 @@ class TestKnowledgeGraphMasteryBlock:
     def test_no_mastery_no_block(self) -> None:
         text = render_prompt(
             "knowledge_graph",
-            topic="二次方程",
+            topic="quadratic equations",
             max_nodes=10,
             skill_instructions="",
             focus_directive="",
@@ -250,13 +249,12 @@ class TestKnowledgeGraphMasteryBlock:
             review_strong_kps=[],
             existing_mastery=[],
         )
-        assert "已有学习记录" not in text
         assert "Prior Mastery Hints" not in text
 
     def test_mastery_block_lists_subtopics(self) -> None:
         text = render_prompt(
             "knowledge_graph",
-            topic="二次方程",
+            topic="quadratic equations",
             max_nodes=10,
             skill_instructions="",
             focus_directive="",
@@ -264,28 +262,28 @@ class TestKnowledgeGraphMasteryBlock:
             review_strong_kps=[],
             existing_mastery=[
                 {
-                    "subtopic": "判别式",
+                    "subtopic": "discriminant",
                     "last_accuracy": 0.5,
                     "last_seen_at": "2026-04-30T10:00:00Z",
                     "status": "weak",
                 },
                 {
-                    "subtopic": "求根公式",
+                    "subtopic": "quadratic formula",
                     "last_accuracy": 1.0,
                     "last_seen_at": "2026-04-30T11:00:00Z",
                     "status": "mastered",
                 },
             ],
         )
-        assert "判别式" in text
-        assert "求根公式" in text
+        assert "discriminant" in text
+        assert "quadratic formula" in text
         # The block must instruct the LLM to reuse subtopic names as node names
-        assert "复用" in text or "reuse" in text.lower()
+        assert "reuse" in text.lower()
 
     def test_mastery_block_handles_null_accuracy(self) -> None:
         text = render_prompt(
             "knowledge_graph",
-            topic="二次方程",
+            topic="quadratic equations",
             max_nodes=10,
             skill_instructions="",
             focus_directive="",
@@ -293,7 +291,7 @@ class TestKnowledgeGraphMasteryBlock:
             review_strong_kps=[],
             existing_mastery=[
                 {
-                    "subtopic": "极坐标",
+                    "subtopic": "polar coordinates",
                     "last_accuracy": None,  # never tested
                     "last_seen_at": "2026-04-30T10:00:00Z",
                     "status": "unseen",
@@ -308,7 +306,7 @@ class TestKnowledgeGraphMasteryBlock:
     def test_mastery_block_formats_accuracy_as_percent(self) -> None:
         text = render_prompt(
             "knowledge_graph",
-            topic="二次方程",
+            topic="quadratic equations",
             max_nodes=10,
             skill_instructions="",
             focus_directive="",
@@ -316,7 +314,7 @@ class TestKnowledgeGraphMasteryBlock:
             review_strong_kps=[],
             existing_mastery=[
                 {
-                    "subtopic": "判别式",
+                    "subtopic": "discriminant",
                     "last_accuracy": 0.8,
                     "last_seen_at": "2026-04-30T10:00:00Z",
                     "status": "mastered",
@@ -325,4 +323,4 @@ class TestKnowledgeGraphMasteryBlock:
         )
         assert "80%" in text
         # Should NOT contain the raw 0.8 float
-        assert "0.8，" not in text
+        assert "0.8," not in text

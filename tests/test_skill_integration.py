@@ -48,7 +48,7 @@ def load_all_skills():
 
 
 def _make_state(
-    topic: str = "光合作用",
+    topic: str = "photosynthesis",
     skill_name: str | None = None,
 ) -> dict:
     """Build a full session state."""
@@ -57,10 +57,10 @@ def _make_state(
         "knowledge_graph": KnowledgeGraph(
             topic=topic,
             nodes=[
-                KnowledgeNode(id="n1", name="叶绿体", description="光合作用的场所", level="prerequisite"),
-                KnowledgeNode(id="n2", name="光反应", description="光能转化为化学能", level="core"),
-                KnowledgeNode(id="n3", name="暗反应", description="碳固定过程(Calvin循环)", level="core"),
-                KnowledgeNode(id="n4", name="光合色素", description="吸收光能的色��分子", level="prerequisite"),
+                KnowledgeNode(id="n1", name="chloroplast", description="site of photosynthesis", level="prerequisite"),
+                KnowledgeNode(id="n2", name="light reactions", description="light energy converted to chemical energy", level="core"),
+                KnowledgeNode(id="n3", name="dark reactions", description="carbon fixation process (Calvin cycle)", level="core"),
+                KnowledgeNode(id="n4", name="photosynthetic pigments", description="pigment molecules that absorb light energy", level="prerequisite"),
             ],
             edges=[
                 KnowledgeEdge(source="n1", target="n2", relation="prerequisite"),
@@ -69,19 +69,19 @@ def _make_state(
             ],
         ),
         "questions": [
-            QuizQuestion(id="q1", knowledge_point="叶绿体", question="光合作用发生在哪里?", options=["线粒体","叶绿体","细胞核","内质网"], answer=1),
-            QuizQuestion(id="q2", knowledge_point="光反应", question="光反应需要什么?", options=["CO2","O2","光","ATP"], answer=2),
-            QuizQuestion(id="q3", knowledge_point="暗反应", question="暗反应固定什么?", options=["O2","N2","CO2","H2O"], answer=2),
-            QuizQuestion(id="q4", knowledge_point="光合色素", question="叶绿素吸收什么颜色的光最多?", options=["绿色","红色和蓝色","黄色","紫色"], answer=1),
+            QuizQuestion(id="q1", knowledge_point="chloroplast", question="Where does photosynthesis occur?", options=["mitochondria","chloroplast","nucleus","endoplasmic reticulum"], answer=1),
+            QuizQuestion(id="q2", knowledge_point="light reactions", question="What do light reactions require?", options=["CO2","O2","light","ATP"], answer=2),
+            QuizQuestion(id="q3", knowledge_point="dark reactions", question="What do dark reactions fix?", options=["O2","N2","CO2","H2O"], answer=2),
+            QuizQuestion(id="q4", knowledge_point="photosynthetic pigments", question="Which color of light does chlorophyll absorb most?", options=["green","red and blue","yellow","purple"], answer=1),
         ],
         "answers": [1, 2, 0, 1],  # q1✓ q2✓ q3✗ q4✓
         "diagnosis_result": DiagnosisResult(
             score=75, total=4, correct=3, incorrect=1,
             breakdown=[
-                DiagnosisBreakdown(name="叶绿体", status="mastered", detail="1/1 已掌握"),
-                DiagnosisBreakdown(name="光反应", status="mastered", detail="1/1 已掌握"),
-                DiagnosisBreakdown(name="暗反应", status="weak", detail="0/1 需复习"),
-                DiagnosisBreakdown(name="光合色素", status="mastered", detail="1/1 已掌握"),
+                DiagnosisBreakdown(name="chloroplast", status="mastered", detail="1/1 mastered"),
+                DiagnosisBreakdown(name="light reactions", status="mastered", detail="1/1 mastered"),
+                DiagnosisBreakdown(name="dark reactions", status="weak", detail="0/1 needs review"),
+                DiagnosisBreakdown(name="photosynthetic pigments", status="mastered", detail="1/1 mastered"),
             ],
         ),
         "lesson_content": None,
@@ -145,7 +145,7 @@ class TestSkillDifferentiation:
     """Verify different skills produce meaningfully different prompts."""
 
     def test_quiz_prompt_differs_by_skill(self) -> None:
-        points = [{"name": "光反应", "description": "光能转化"}]
+        points = [{"name": "light reactions", "description": "light energy conversion"}]
 
         no_skill = render_prompt("quiz_generate", knowledge_points=points, questions_per_point=2, skill_instructions="")
         feynman = render_prompt("quiz_generate", knowledge_points=points, questions_per_point=2,
@@ -157,7 +157,7 @@ class TestSkillDifferentiation:
 
         # All should contain the knowledge point
         for p in [no_skill, feynman, socratic, scaffolding]:
-            assert "光反应" in p
+            assert "light reactions" in p
 
         # But skill-enhanced versions should contain their unique keywords
         assert "Teaching Method" not in no_skill
@@ -166,10 +166,10 @@ class TestSkillDifferentiation:
         assert "difficulty" in scaffolding.lower() or "increasing" in scaffolding.lower() or "foundational" in scaffolding.lower()
 
     def test_lesson_prompt_differs_by_skill(self) -> None:
-        weak = [{"name": "暗反应", "description": "碳固定过程"}]
+        weak = [{"name": "dark reactions", "description": "carbon fixation process"}]
 
-        no_skill = render_prompt("lesson_plan", topic="光合作用", weak_points=weak, skill_instructions="")
-        feynman = render_prompt("lesson_plan", topic="光合作用", weak_points=weak,
+        no_skill = render_prompt("lesson_plan", topic="photosynthesis", weak_points=weak, skill_instructions="")
+        feynman = render_prompt("lesson_plan", topic="photosynthesis", weak_points=weak,
                                 skill_instructions=get_skill("feynman").sections["lesson"])
 
         assert "Teaching Method" not in no_skill
@@ -190,7 +190,7 @@ class TestSkillDifferentiation:
         assert len(socratic_kg) > 0, "Socratic should have knowledge_graph instructions"
         assert feynman_kg == "", "Feynman should have no knowledge_graph instructions"
 
-        prompt = render_prompt("knowledge_graph", topic="光合作用", max_nodes=8, skill_instructions=socratic_kg)
+        prompt = render_prompt("knowledge_graph", topic="photosynthesis", max_nodes=8, skill_instructions=socratic_kg)
         assert "question" in prompt.lower() or "understand" in prompt.lower()
 
     def test_chat_system_prompt_with_skill(self) -> None:
@@ -277,9 +277,9 @@ class TestComplexSessionFlows:
         }
         assert get_skill_section(state, "chat") == ""
 
-        # Phase 2: user says "用费曼法学光合作用"
+        # Phase 2: user says "Learn photosynthesis using the Feynman Technique"
         feynman = get_skill("feynman")
-        state["topic"] = "光合作用"
+        state["topic"] = "photosynthesis"
         state["active_skill"] = feynman.name
         state["active_skill_content"] = feynman.sections
 
@@ -342,7 +342,7 @@ class TestSkillMemoryCoexistence:
             system_prompt += f"\n\n{context}"
 
         # Memory injection (simulated)
-        memory = "Relevant past learning records:\n1. 光合作用 暗反应 accuracy 30%"
+        memory = "Relevant past learning records:\n1. photosynthesis dark reactions accuracy 30%"
         system_prompt += f"\n\n## 历史学习记忆\n{memory}"
 
         # All three present

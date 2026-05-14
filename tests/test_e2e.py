@@ -14,7 +14,7 @@ async def test_full_chat_flow():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # Step 1: Greeting
-        r1 = await client.post("/api/chat", json={"message": "你好"}, timeout=30)
+        r1 = await client.post("/api/chat", json={"message": "Hello"}, timeout=30)
         assert r1.status_code == 200
         data1 = r1.json()
         assert data1["mode"] == "chat"
@@ -28,7 +28,7 @@ async def test_full_chat_flow():
         # Step 2: Learn topic
         r2 = await client.post("/api/chat", json={
             "session_id": session_id,
-            "message": "我想学习勾股定理",
+            "message": "I want to learn the Pythagorean theorem",
         }, timeout=60)
         assert r2.status_code == 200
         data2 = r2.json()

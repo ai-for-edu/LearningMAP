@@ -8,7 +8,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from src.agent.nodes.intent import intent_node, IntentResult
 
 
-def _state(session_mode: str, user_msg: str = "什么是微积分", **extras) -> dict:
+def _state(session_mode: str, user_msg: str = "What is calculus", **extras) -> dict:
     """Build a minimal LearningState dict for intent_node tests.
 
     Routes user_msg to the active track: chat_messages for chat mode,
@@ -41,18 +41,18 @@ def _mock_llm_returning(intent_result: IntentResult):
 class TestIntentNodeChatModeGating:
     def test_chat_mode_with_learn_topic_intent_stashes_cta(self) -> None:
         with _mock_llm_returning(
-            IntentResult(intent="learn_topic", topic="微积分", skill=None)
+            IntentResult(intent="learn_topic", topic="calculus", skill=None)
         ):
             result = intent_node(_state("chat"))
         assert result["mode"] == "chat"
-        assert result["pending_cta_topic"] == "微积分"
+        assert result["pending_cta_topic"] == "calculus"
         assert "topic" not in result  # do NOT set top-level topic in chat mode
 
     def test_chat_mode_with_plain_chat_intent_no_cta(self) -> None:
         with _mock_llm_returning(
             IntentResult(intent="chat", topic=None, skill=None)
         ):
-            result = intent_node(_state("chat", user_msg="今天天气怎么样"))
+            result = intent_node(_state("chat", user_msg="How is the weather today"))
         assert result["mode"] == "chat"
         assert "pending_cta_topic" not in result
 
@@ -69,17 +69,17 @@ class TestIntentNodeChatModeGating:
 class TestIntentNodeLearningModeRouting:
     def test_learning_mode_with_learn_topic_routes_to_graph(self) -> None:
         with _mock_llm_returning(
-            IntentResult(intent="learn_topic", topic="微积分", skill=None)
+            IntentResult(intent="learn_topic", topic="calculus", skill=None)
         ):
             result = intent_node(_state("learning"))
         assert result["mode"] == "graph"
-        assert result["topic"] == "微积分"
+        assert result["topic"] == "calculus"
 
     def test_learning_mode_with_start_diagnosis_routes_to_quiz(self) -> None:
         with _mock_llm_returning(
             IntentResult(intent="start_diagnosis", topic=None, skill=None)
         ):
-            result = intent_node(_state("learning", user_msg="开始测验"))
+            result = intent_node(_state("learning", user_msg="Start quiz"))
         assert result["mode"] == "quiz"
 
     def test_learning_mode_with_chat_intent_routes_to_chat(self) -> None:
@@ -94,12 +94,12 @@ class TestIntentNodeGateRemoved:
     def test_learning_mode_no_skill_no_longer_gates(self) -> None:
         """Pre-change behavior: emitted GATE message + mode=chat. New: routes to graph."""
         with _mock_llm_returning(
-            IntentResult(intent="learn_topic", topic="微积分", skill=None)
+            IntentResult(intent="learn_topic", topic="calculus", skill=None)
         ):
             result = intent_node(_state("learning", active_skill=None))
         assert result["mode"] == "graph"
-        assert result["topic"] == "微积分"
-        # No injected AI message that says "请先选择一种教学法"
+        assert result["topic"] == "calculus"
+        # No injected AI message that says "Please select a teaching method first"
         assert "messages" not in result
 
 
@@ -120,10 +120,10 @@ class TestChatNodeCTA:
         state = {
             "session_mode": "chat",
             "messages": [],
-            "chat_messages": [HumanMessage(content="什么是微积分")],
-            "pending_cta_topic": "微积分",
+            "chat_messages": [HumanMessage(content="What is calculus")],
+            "pending_cta_topic": "calculus",
         }
-        with _mock_chat_llm("微积分是研究变化率的数学分支……"), \
+        with _mock_chat_llm("Calculus is the mathematical study of change and rates..."), \
              patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
             result = chat_node(state)
 
@@ -132,7 +132,7 @@ class TestChatNodeCTA:
         assert len(result["chat_messages"]) == 1
         assert isinstance(result["chat_messages"][0], AIMessage)
         assert result["chat_messages"][0].additional_kwargs == {
-            "cta": {"type": "learn_topic", "topic": "微积分"}
+            "cta": {"type": "learn_topic", "topic": "calculus"}
         }
 
     def test_chat_mode_no_pending_cta_means_empty_kwargs(self) -> None:
@@ -150,8 +150,8 @@ class TestChatNodeCTA:
         state = {
             "session_mode": "chat",
             "messages": [],
-            "chat_messages": [HumanMessage(content="什么是微积分")],
-            "pending_cta_topic": "微积分",
+            "chat_messages": [HumanMessage(content="What is calculus")],
+            "pending_cta_topic": "calculus",
         }
         with _mock_chat_llm("ok"), \
              patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
@@ -174,10 +174,10 @@ class TestChatNodeCTA:
     def test_learning_mode_returns_to_messages_not_chat_messages(self) -> None:
         state = {
             "session_mode": "learning",
-            "messages": [HumanMessage(content="再讲讲连续性")],
+            "messages": [HumanMessage(content="Tell me more about continuity")],
             "chat_messages": [],
         }
-        with _mock_chat_llm("连续性的意思是……"), \
+        with _mock_chat_llm("Continuity means..."), \
              patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
             result = chat_node(state)
 
@@ -194,7 +194,7 @@ class TestChatNodeCTA:
 
         fake_client = MagicMock()
         fake_response = MagicMock()
-        fake_response.choices = [MagicMock(message=MagicMock(content="天气是大气层的状态"))]
+        fake_response.choices = [MagicMock(message=MagicMock(content="Weather is the state of the atmosphere"))]
 
         def capture_create(*, model, max_tokens, messages, **_):
             captured_messages.extend(messages)
@@ -204,18 +204,18 @@ class TestChatNodeCTA:
 
         state = {
             "session_mode": "chat",
-            "messages": [HumanMessage(content="学习 积分"), AIMessage(content="积分的图谱")],
-            "chat_messages": [HumanMessage(content="什么是天气")],
+            "messages": [HumanMessage(content="Learn integral"), AIMessage(content="Knowledge graph of integrals")],
+            "chat_messages": [HumanMessage(content="What is weather")],
         }
         with patch("src.agent.nodes.chat.get_raw_client", return_value=fake_client), \
              patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
             chat_node(state)
 
         # Find the user message in api_messages — should be from chat_messages,
-        # not the learning track's "学习 积分".
+        # not the learning track's "Learn integral".
         user_msgs = [m for m in captured_messages if m["role"] == "user"]
         assert len(user_msgs) == 1
-        assert user_msgs[0]["content"] == "什么是天气"
+        assert user_msgs[0]["content"] == "What is weather"
 
 
 class TestIntentNodeReadsActiveTrack:
@@ -223,34 +223,34 @@ class TestIntentNodeReadsActiveTrack:
         state = {
             "session_mode": "chat",
             "messages": [],  # learning track empty
-            "chat_messages": [HumanMessage(content="什么是积分")],
+            "chat_messages": [HumanMessage(content="What is integral")],
         }
         with _mock_llm_returning(
-            IntentResult(intent="learn_topic", topic="积分", skill=None)
+            IntentResult(intent="learn_topic", topic="integral", skill=None)
         ):
             result = intent_node(state)
         assert result["mode"] == "chat"
-        assert result["pending_cta_topic"] == "积分"
+        assert result["pending_cta_topic"] == "integral"
 
     def test_learning_mode_reads_from_messages(self) -> None:
         state = {
             "session_mode": "learning",
-            "messages": [HumanMessage(content="学习 积分")],
+            "messages": [HumanMessage(content="Learn integral")],
             "chat_messages": [],  # chat track empty
         }
         with _mock_llm_returning(
-            IntentResult(intent="learn_topic", topic="积分", skill=None)
+            IntentResult(intent="learn_topic", topic="integral", skill=None)
         ):
             result = intent_node(state)
         assert result["mode"] == "graph"
-        assert result["topic"] == "积分"
+        assert result["topic"] == "integral"
 
     def test_chat_mode_with_only_learning_history_treats_chat_track_empty(self) -> None:
         # User has a learning history but switches to chat with no chat messages yet —
         # intent_node should return early (no message in active track).
         state = {
             "session_mode": "chat",
-            "messages": [HumanMessage(content="学习 积分"), AIMessage(content="知识图谱")],
+            "messages": [HumanMessage(content="Learn integral"), AIMessage(content="Knowledge graph")],
             "chat_messages": [],
         }
         result = intent_node(state)
@@ -277,8 +277,8 @@ class TestChatNodeContextIsolation:
         state = {
             "session_mode": "chat",
             "messages": [],
-            "chat_messages": [HumanMessage(content="今天天气怎么样")],
-            "topic": "微积分",
+            "chat_messages": [HumanMessage(content="How is the weather today")],
+            "topic": "calculus",
             "knowledge_graph": None,  # full KG omitted for test simplicity
         }
         with patch("src.agent.nodes.chat.get_raw_client", return_value=fake_client), \
@@ -288,7 +288,7 @@ class TestChatNodeContextIsolation:
         assert len(captured_system) == 1
         sys_prompt = captured_system[0]
         # Learning artifacts must NOT leak into chat-mode system prompt
-        assert "微积分" not in sys_prompt
+        assert "calculus" not in sys_prompt
         assert "学习主题" not in sys_prompt
 
     def test_learning_mode_still_injects_learning_artifacts(self) -> None:
@@ -308,16 +308,16 @@ class TestChatNodeContextIsolation:
 
         state = {
             "session_mode": "learning",
-            "messages": [HumanMessage(content="再讲讲连续性")],
+            "messages": [HumanMessage(content="Tell me more about continuity")],
             "chat_messages": [],
-            "topic": "微积分",
+            "topic": "calculus",
         }
         with patch("src.agent.nodes.chat.get_raw_client", return_value=fake_client), \
              patch("src.agent.nodes.chat.retrieve_memory", return_value=""):
             chat_node(state)
 
         sys_prompt = captured_system[0]
-        assert "微积分" in sys_prompt
+        assert "calculus" in sys_prompt
         assert "学习主题" in sys_prompt
 
 
@@ -325,13 +325,13 @@ class TestIntentNodeFallback:
     def test_missing_session_mode_defaults_to_chat(self) -> None:
         # Defensive: state without session_mode field should not blow up.
         # Default mode is "chat", so message must be in chat_messages track.
-        state = {"chat_messages": [HumanMessage(content="什么是导数")]}
+        state = {"chat_messages": [HumanMessage(content="What is a derivative")]}
         with _mock_llm_returning(
-            IntentResult(intent="learn_topic", topic="导数", skill=None)
+            IntentResult(intent="learn_topic", topic="derivative", skill=None)
         ):
             result = intent_node(state)
         assert result["mode"] == "chat"
-        assert result["pending_cta_topic"] == "导数"
+        assert result["pending_cta_topic"] == "derivative"
 
     def test_llm_exception_falls_back_to_chat(self) -> None:
         with patch("src.agent.nodes.intent.get_llm_client") as mock_get:

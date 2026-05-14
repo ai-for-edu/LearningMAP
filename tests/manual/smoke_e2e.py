@@ -22,7 +22,7 @@ What it verifies:
   PR-2 (progress)      : submit-quiz dispatches progress → progress_snapshots / mastery_curve grow
   PR-3 (write path)    : 3 BG tasks fire, op_errors stays empty (no silent failures)
   PR-3 (snapshot)      : new session POST /api/chat populates state.memory_snapshot
-  PR-4 (read path)     : populated snapshot field contains "## 该学生" Markdown markers
+  PR-4 (read path)     : populated snapshot field contains "## Student" Markdown markers
 
 Exit codes:
     0 — all PR-1/2/3/4 acceptance checks passed
@@ -49,7 +49,7 @@ _STUDENT_MEMORY = "http://localhost:8090"
 _DB = Path("student_memory/data/memory.db")
 _SESSIONS_DB = Path("sessions.db")
 _USER_ID = "default_user"   # main app's DEFAULT_USER_ID
-_TOPIC = "勾股定理"
+_TOPIC = "Pythagorean theorem"
 
 
 # ---------------------------------------------------------------------------
@@ -130,9 +130,9 @@ def _drive_quiz_flow(client: httpx.Client) -> tuple[str, dict]:
     # The intent classifier is probabilistic (LLM-based); retry up to 3 times
     # with progressively more explicit phrasing if it lands in chat mode.
     messages_to_try = [
-        f"我想学{_TOPIC}",
-        f"请帮我学习{_TOPIC}",
-        f"用费曼学习法教我{_TOPIC}",
+        f"I want to learn {_TOPIC}",
+        f"Please help me study {_TOPIC}",
+        f"Teach me {_TOPIC} using the Feynman technique",
     ]
     state: dict = {}
     for attempt, msg in enumerate(messages_to_try, 1):
@@ -230,7 +230,7 @@ def _open_new_session_and_check_snapshot(client: httpx.Client) -> str:
     print("[E] POST /api/chat (NEW session — should fetch snapshot)")
     r = client.post(
         f"{_MAIN_APP}/api/chat",
-        json={"message": "你还记得我学过什么吗"},
+        json={"message": "Do you remember what I have studied before?"},
         timeout=120,
     )
     if r.status_code != 200:
@@ -336,9 +336,9 @@ def main() -> int:
         snap = _open_new_session_and_check_snapshot(client)
         if not snap:
             fails.append("new session has empty memory_snapshot — fetch_snapshot failed")
-        elif "## 该学生" not in snap:
+        elif "## Student" not in snap:
             fails.append(
-                f"snapshot doesn't contain '## 该学生' marker (got: {snap[:100]!r})"
+                f"snapshot doesn't contain '## Student' marker (got: {snap[:100]!r})"
             )
         else:
             print("[H] PR-3+4: new session correctly populated with snapshot ✓")

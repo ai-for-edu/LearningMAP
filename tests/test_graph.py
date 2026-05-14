@@ -38,12 +38,12 @@ def test_knowledge_graph_node_uses_kc_when_topic_matches():
     from src.agent.nodes import knowledge_graph as node_mod
 
     fake_graph = KnowledgeGraph(
-        topic="乘法原理",
-        nodes=[KnowledgeNode(id="r", name="乘法原理", description="d", level="core")],
+        topic="multiplication principle",
+        nodes=[KnowledgeNode(id="r", name="multiplication principle", description="d", level="core")],
         edges=[],
     )
 
-    state = {"topic": "乘法原理", "use_kc_skills": True}
+    state = {"topic": "multiplication principle", "use_kc_skills": True}
     with (
         patch.object(
             node_mod, "resolve_kc_graph", return_value=fake_graph
@@ -52,7 +52,7 @@ def test_knowledge_graph_node_uses_kc_when_topic_matches():
         patch.object(node_mod, "fetch_mastery", return_value=[]),
     ):
         result = node_mod.knowledge_graph_node(state)
-        mock_resolve.assert_called_once_with("乘法原理", max_nodes=node_mod.MAX_NODES)
+        mock_resolve.assert_called_once_with("multiplication principle", max_nodes=node_mod.MAX_NODES)
         mock_llm.assert_not_called()
 
     # annotate_graph_with_mastery returns a model_copy, so use equality not identity
@@ -64,7 +64,7 @@ def test_knowledge_graph_node_uses_kc_when_topic_matches():
 def test_knowledge_graph_node_falls_back_to_llm_on_miss():
     from src.agent.nodes import knowledge_graph as node_mod
 
-    state = {"topic": "完全无关的话题", "use_kc_skills": True}
+    state = {"topic": "completely unrelated topic", "use_kc_skills": True}
     with (
         patch.object(node_mod, "resolve_kc_graph", return_value=None),
         patch.object(
@@ -81,7 +81,7 @@ def test_knowledge_graph_node_falls_back_to_llm_on_miss():
 def test_knowledge_graph_node_skips_kc_when_flag_off():
     from src.agent.nodes import knowledge_graph as node_mod
 
-    state = {"topic": "乘法原理", "use_kc_skills": False}
+    state = {"topic": "multiplication principle", "use_kc_skills": False}
     with (
         patch.object(node_mod, "resolve_kc_graph") as mock_resolve,
         patch.object(

@@ -33,11 +33,11 @@ def now() -> datetime:
 @pytest.fixture
 def graph() -> KnowledgeGraph:
     return KnowledgeGraph(
-        topic="二次方程",
+        topic="quadratic equations",
         nodes=[
-            KnowledgeNode(id="n1", name="判别式", description="d1", level="core"),
-            KnowledgeNode(id="n2", name="求根公式", description="d2", level="core"),
-            KnowledgeNode(id="n3", name="配方法", description="d3", level="extension"),
+            KnowledgeNode(id="n1", name="discriminant", description="d1", level="core"),
+            KnowledgeNode(id="n2", name="quadratic formula", description="d2", level="core"),
+            KnowledgeNode(id="n3", name="completing the square", description="d3", level="extension"),
         ],
         edges=[KnowledgeEdge(source="n1", target="n2", relation="prerequisite")],
     )
@@ -45,13 +45,13 @@ def graph() -> KnowledgeGraph:
 
 class TestNormalizeName:
     def test_strips_whitespace(self) -> None:
-        assert _normalize_name("  判别式 ") == _normalize_name("判别式")
+        assert _normalize_name("  discriminant ") == _normalize_name("discriminant")
 
     def test_lowercases_ascii(self) -> None:
         assert _normalize_name("Quadratic") == _normalize_name("quadratic")
 
     def test_strips_common_punct(self) -> None:
-        assert _normalize_name("判别式（Δ）") == _normalize_name("判别式 Δ")
+        assert _normalize_name("discriminant（Δ）") == _normalize_name("discriminant Δ")
         assert _normalize_name("a, b, c") == _normalize_name("abc")
 
 
@@ -92,8 +92,8 @@ class TestAnnotateGraphWithMastery:
     ) -> None:
         rows = [
             {
-                "subtopic": "判别式",
-                "topic": "二次方程",
+                "subtopic": "discriminant",
+                "topic": "quadratic equations",
                 "last_accuracy": 1.0,
                 "last_seen_at": (now - timedelta(hours=1)).strftime(
                     "%Y-%m-%dT%H:%M:%SZ"
@@ -107,19 +107,19 @@ class TestAnnotateGraphWithMastery:
             model=EbbinghausV1(),
             now=now,
         )
-        n1 = next(n for n in out.nodes if n.name == "判别式")
+        n1 = next(n for n in out.nodes if n.name == "discriminant")
         assert n1.mastery is not None
         assert n1.mastery.status == "mastered"
         assert n1.mastery.forgetting_model == "ebbinghaus_v1"
         # other nodes still unseen
-        n3 = next(n for n in out.nodes if n.name == "配方法")
+        n3 = next(n for n in out.nodes if n.name == "completing the square")
         assert n3.mastery is None
 
     def test_normalized_match(self, graph: KnowledgeGraph, now: datetime) -> None:
         rows = [
             {
-                "subtopic": "判别式（Δ）",  # KG has "判别式" → match via normalization
-                "topic": "二次方程",
+                "subtopic": "discriminant（Δ）",  # KG has "discriminant" → match via normalization
+                "topic": "quadratic equations",
                 "last_accuracy": 0.5,
                 "last_seen_at": (now - timedelta(days=2)).strftime(
                     "%Y-%m-%dT%H:%M:%SZ"
@@ -133,7 +133,7 @@ class TestAnnotateGraphWithMastery:
             model=EbbinghausV1(),
             now=now,
         )
-        n1 = next(n for n in out.nodes if n.name == "判别式")
+        n1 = next(n for n in out.nodes if n.name == "discriminant")
         assert n1.mastery is not None
 
     def test_unmatched_row_does_not_crash(
@@ -141,8 +141,8 @@ class TestAnnotateGraphWithMastery:
     ) -> None:
         rows = [
             {
-                "subtopic": "完全无关的主题",
-                "topic": "其他",
+                "subtopic": "completely unrelated topic",
+                "topic": "other",
                 "last_accuracy": 0.9,
                 "last_seen_at": (now - timedelta(days=1)).strftime(
                     "%Y-%m-%dT%H:%M:%SZ"
@@ -162,10 +162,10 @@ class TestAnnotateGraphWithMastery:
 
     def test_malformed_row_skipped(self, graph: KnowledgeGraph, now: datetime) -> None:
         rows = [
-            {"subtopic": "判别式"},  # missing required keys
+            {"subtopic": "discriminant"},  # missing required keys
             {
-                "subtopic": "求根公式",
-                "topic": "二次方程",
+                "subtopic": "quadratic formula",
+                "topic": "quadratic equations",
                 "last_accuracy": 0.95,
                 "last_seen_at": (now - timedelta(hours=2)).strftime(
                     "%Y-%m-%dT%H:%M:%SZ"
@@ -179,11 +179,11 @@ class TestAnnotateGraphWithMastery:
             model=EbbinghausV1(),
             now=now,
         )
-        # 判别式 row malformed → unseen
-        n1 = next(n for n in out.nodes if n.name == "判别式")
+        # discriminant row malformed → unseen
+        n1 = next(n for n in out.nodes if n.name == "discriminant")
         assert n1.mastery is None
-        # 求根公式 row valid → annotated
-        n2 = next(n for n in out.nodes if n.name == "求根公式")
+        # quadratic formula row valid → annotated
+        n2 = next(n for n in out.nodes if n.name == "quadratic formula")
         assert n2.mastery is not None
 
     def test_returns_new_graph_does_not_mutate_input(
@@ -191,8 +191,8 @@ class TestAnnotateGraphWithMastery:
     ) -> None:
         rows = [
             {
-                "subtopic": "判别式",
-                "topic": "二次方程",
+                "subtopic": "discriminant",
+                "topic": "quadratic equations",
                 "last_accuracy": 0.9,
                 "last_seen_at": (now - timedelta(hours=2)).strftime(
                     "%Y-%m-%dT%H:%M:%SZ"
@@ -200,7 +200,7 @@ class TestAnnotateGraphWithMastery:
                 "session_count": 1,
             }
         ]
-        original_n1 = next(n for n in graph.nodes if n.name == "判别式")
+        original_n1 = next(n for n in graph.nodes if n.name == "discriminant")
         out = annotate_graph_with_mastery(
             graph,
             mastery_rows=rows,
@@ -208,7 +208,7 @@ class TestAnnotateGraphWithMastery:
             now=now,
         )
         assert original_n1.mastery is None  # original unchanged
-        out_n1 = next(n for n in out.nodes if n.name == "判别式")
+        out_n1 = next(n for n in out.nodes if n.name == "discriminant")
         assert out_n1.mastery is not None
 
     def test_matched_row_with_null_accuracy_yields_unseen_status(
@@ -219,8 +219,8 @@ class TestAnnotateGraphWithMastery:
         (truly unmatched)."""
         rows = [
             {
-                "subtopic": "判别式",
-                "topic": "二次方程",
+                "subtopic": "discriminant",
+                "topic": "quadratic equations",
                 "last_accuracy": None,
                 "last_seen_at": (now - timedelta(hours=1)).strftime(
                     "%Y-%m-%dT%H:%M:%SZ"
@@ -234,7 +234,7 @@ class TestAnnotateGraphWithMastery:
             model=EbbinghausV1(),
             now=now,
         )
-        n1 = next(n for n in out.nodes if n.name == "判别式")
+        n1 = next(n for n in out.nodes if n.name == "discriminant")
         assert n1.mastery is not None  # matched, not unseen-by-absence
         assert n1.mastery.status == "unseen"
         assert n1.mastery.retention == 0.0
@@ -247,8 +247,8 @@ class TestAnnotateGraphWithMastery:
         match a clean KG node name. This recovers data from before
         quiz_node started pinning knowledge_point to the KG node name."""
         rows = [{
-            "subtopic": "判别式: 讲解二次方程根的判别式 b²-4ac，区分根的情况",
-            "topic": "二次方程",
+            "subtopic": "discriminant: explains b²-4ac for quadratic equations, distinguishes root cases",
+            "topic": "quadratic equations",
             "last_accuracy": 0.8,
             "last_seen_at": (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "session_count": 1,
@@ -256,7 +256,7 @@ class TestAnnotateGraphWithMastery:
         out = annotate_graph_with_mastery(
             graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
         )
-        n1 = next(n for n in out.nodes if n.name == "判别式")
+        n1 = next(n for n in out.nodes if n.name == "discriminant")
         assert n1.mastery is not None
         assert n1.mastery.last_accuracy == 0.8
 
@@ -265,8 +265,8 @@ class TestAnnotateGraphWithMastery:
     ) -> None:
         """Both ASCII colon ': ' and full-width '：' separators recover."""
         rows = [{
-            "subtopic": "求根公式：完整推导加用例",
-            "topic": "二次方程",
+            "subtopic": "quadratic formula: complete derivation with examples",
+            "topic": "quadratic equations",
             "last_accuracy": 0.9,
             "last_seen_at": (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "session_count": 1,
@@ -274,7 +274,7 @@ class TestAnnotateGraphWithMastery:
         out = annotate_graph_with_mastery(
             graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
         )
-        n2 = next(n for n in out.nodes if n.name == "求根公式")
+        n2 = next(n for n in out.nodes if n.name == "quadratic formula")
         assert n2.mastery is not None
         assert n2.mastery.last_accuracy == 0.9
 
@@ -291,8 +291,8 @@ class TestWeightedAccuracyPreference:
         # weighted blend across history is 0.9 → annotator should treat
         # this as mastered, since the user has historically known it.
         rows = [{
-            "subtopic": "判别式",
-            "topic": "二次方程",
+            "subtopic": "discriminant",
+            "topic": "quadratic equations",
             "last_accuracy": 0.0,
             "weighted_accuracy": 0.9,
             "last_seen_at": (now - timedelta(seconds=10)).strftime(
@@ -303,7 +303,7 @@ class TestWeightedAccuracyPreference:
         out = annotate_graph_with_mastery(
             graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
         )
-        n1 = next(n for n in out.nodes if n.name == "判别式")
+        n1 = next(n for n in out.nodes if n.name == "discriminant")
         # retention ≈ 0.9 × exp(-tiny/S) ≈ 0.9 → mastered
         assert n1.mastery is not None
         assert n1.mastery.status == "mastered"
@@ -314,8 +314,8 @@ class TestWeightedAccuracyPreference:
         self, graph, now
     ) -> None:
         rows = [{
-            "subtopic": "判别式",
-            "topic": "二次方程",
+            "subtopic": "discriminant",
+            "topic": "quadratic equations",
             "last_accuracy": 0.9,
             # no weighted_accuracy key (legacy memory response)
             "last_seen_at": (now - timedelta(seconds=10)).strftime(
@@ -326,6 +326,6 @@ class TestWeightedAccuracyPreference:
         out = annotate_graph_with_mastery(
             graph, mastery_rows=rows, model=EbbinghausV1(), now=now,
         )
-        n1 = next(n for n in out.nodes if n.name == "判别式")
+        n1 = next(n for n in out.nodes if n.name == "discriminant")
         assert n1.mastery is not None
         assert n1.mastery.status == "mastered"

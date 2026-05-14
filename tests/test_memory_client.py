@@ -34,15 +34,15 @@ def _make_questions() -> list[QuizQuestion]:
     return [
         QuizQuestion(
             id="q1",
-            knowledge_point="判别式",
-            question="判别式 b²-4ac 的作用是？",
-            options=["判断根的个数", "求根", "因式分解", "配方"],
+            knowledge_point="discriminant",
+            question="What is the role of the discriminant b²-4ac?",
+            options=["determine the number of roots", "find roots", "factor", "complete the square"],
             answer=0,
         ),
         QuizQuestion(
             id="q2",
-            knowledge_point="求根公式",
-            question="x²-4x+4=0 的解是？",
+            knowledge_point="quadratic formula",
+            question="Solve x²-4x+4=0.",
             options=["x=1", "x=2", "x=3", "x=4"],
             answer=1,
         ),
@@ -56,8 +56,8 @@ def _make_diagnosis() -> DiagnosisResult:
         correct=1,
         incorrect=1,
         breakdown=[
-            DiagnosisBreakdown(name="判别式", status="weak", detail="0/1 需复习"),
-            DiagnosisBreakdown(name="求根公式", status="mastered", detail="1/1 已掌握"),
+            DiagnosisBreakdown(name="discriminant", status="weak", detail="0/1 needs review"),
+            DiagnosisBreakdown(name="quadratic formula", status="mastered", detail="1/1 mastered"),
         ],
     )
 
@@ -68,7 +68,7 @@ def _make_state(
 ) -> dict:
     """Build a realistic openail session state."""
     state = {
-        "topic": "勾股定理",
+        "topic": "Pythagorean theorem",
         "questions": _make_questions(),
         "answers": answers if answers is not None else [1, 1],  # q1 wrong, q2 correct
     }
@@ -89,14 +89,14 @@ class TestBuildIngestPayload:
 
         assert payload["user_id"] == "u1"
         assert payload["session_id"] == "s1"
-        assert payload["topic"] == "勾股定理"
-        assert payload["goal_text"] == "学习 勾股定理"
+        assert payload["topic"] == "Pythagorean theorem"
+        assert payload["goal_text"] == "Learn Pythagorean theorem"
         assert len(payload["subtopics"]) == 2
 
     def test_subtopics_grouped_by_knowledge_point(self) -> None:
         payload = _build_ingest_payload("u1", "s1", _make_state())
         names = {s["name"] for s in payload["subtopics"]}
-        assert names == {"判别式", "求根公式"}
+        assert names == {"discriminant", "quadratic formula"}
 
     def test_question_correctness_mapping(self) -> None:
         """answers=[1, 1] → q1(answer=0) wrong, q2(answer=1) correct."""
@@ -104,14 +104,14 @@ class TestBuildIngestPayload:
 
         subtopic_map = {s["name"]: s for s in payload["subtopics"]}
 
-        # 判别式: student answered 1, correct is 0 → wrong
-        q1 = subtopic_map["判别式"]["questions"][0]
+        # discriminant: student answered 1, correct is 0 → wrong
+        q1 = subtopic_map["discriminant"]["questions"][0]
         assert q1["is_correct"] is False
         assert q1["error_type"] == "wrong_answer"
         assert q1["student_answer"] == "1"
 
-        # 求根公式: student answered 1, correct is 1 → right
-        q2 = subtopic_map["求根公式"]["questions"][0]
+        # quadratic formula: student answered 1, correct is 1 → right
+        q2 = subtopic_map["quadratic formula"]["questions"][0]
         assert q2["is_correct"] is True
         assert q2["error_type"] is None
 
@@ -119,8 +119,8 @@ class TestBuildIngestPayload:
         payload = _build_ingest_payload("u1", "s1", _make_state())
         subtopic_map = {s["name"]: s for s in payload["subtopics"]}
 
-        assert "weak" in subtopic_map["判别式"]["summary"]
-        assert "mastered" in subtopic_map["求根公式"]["summary"]
+        assert "weak" in subtopic_map["discriminant"]["summary"]
+        assert "mastered" in subtopic_map["quadratic formula"]["summary"]
 
     def test_no_diagnosis_still_works(self) -> None:
         payload = _build_ingest_payload("u1", "s1", _make_state(with_diagnosis=False))
@@ -130,7 +130,7 @@ class TestBuildIngestPayload:
             assert st["summary"] == ""
 
     def test_empty_questions_returns_empty_subtopics(self) -> None:
-        state = {"topic": "勾股定理", "questions": [], "answers": []}
+        state = {"topic": "Pythagorean theorem", "questions": [], "answers": []}
         payload = _build_ingest_payload("u1", "s1", state)
         assert payload["subtopics"] == []
 
@@ -143,11 +143,11 @@ class TestBuildIngestPayload:
     def test_dict_format_questions(self) -> None:
         """State may contain dict-format questions (deserialized from JSON)."""
         state = {
-            "topic": "代数",
+            "topic": "algebra",
             "questions": [
                 {
                     "id": "q1",
-                    "knowledge_point": "方程",
+                    "knowledge_point": "equations",
                     "question": "1+1=?",
                     "options": ["1", "2", "3", "4"],
                     "answer": 1,
@@ -158,7 +158,7 @@ class TestBuildIngestPayload:
         }
         payload = _build_ingest_payload("u1", "s1", state)
         assert len(payload["subtopics"]) == 1
-        assert payload["subtopics"][0]["name"] == "方程"
+        assert payload["subtopics"][0]["name"] == "equations"
         assert payload["subtopics"][0]["questions"][0]["is_correct"] is True
 
     def test_fewer_answers_than_questions(self) -> None:
@@ -168,10 +168,10 @@ class TestBuildIngestPayload:
 
         subtopic_map = {s["name"]: s for s in payload["subtopics"]}
         # q1 answered (0 == correct 0) → correct
-        assert subtopic_map["判别式"]["questions"][0]["is_correct"] is True
+        assert subtopic_map["discriminant"]["questions"][0]["is_correct"] is True
         # q2 not answered (index -1 != 1) → wrong
-        assert subtopic_map["求根公式"]["questions"][0]["is_correct"] is False
-        assert subtopic_map["求根公式"]["questions"][0]["student_answer"] == "-1"
+        assert subtopic_map["quadratic formula"]["questions"][0]["is_correct"] is False
+        assert subtopic_map["quadratic formula"]["questions"][0]["student_answer"] == "-1"
 
 
 # ------------------------------------------------------------------
@@ -186,18 +186,18 @@ class TestRetrieveMemory:
         mock_resp.status_code = 200
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {
-            "query": "勾股定理",
+            "query": "Pythagorean theorem",
             "results": [],
-            "context_text": "历史记录：判别式 正确率50%",
+            "context_text": "History: discriminant accuracy 50%",
         }
         mock_get_client.return_value.post.return_value = mock_resp
 
-        result = retrieve_memory("u1", "勾股定理")
-        assert result == "历史记录：判别式 正确率50%"
+        result = retrieve_memory("u1", "Pythagorean theorem")
+        assert result == "History: discriminant accuracy 50%"
 
         mock_get_client.return_value.post.assert_called_once_with(
             "/retrieve",
-            json={"user_id": "u1", "query": "勾股定理", "top_k": 5},
+            json={"user_id": "u1", "query": "Pythagorean theorem", "top_k": 5},
         )
 
     @patch("src.memory_client._get_client")
@@ -208,14 +208,14 @@ class TestRetrieveMemory:
         )
         mock_get_client.return_value.post.return_value = mock_resp
 
-        result = retrieve_memory("u1", "勾股定理")
+        result = retrieve_memory("u1", "Pythagorean theorem")
         assert result == ""
 
     @patch("src.memory_client._get_client")
     def test_connection_error_returns_empty(self, mock_get_client: MagicMock) -> None:
         mock_get_client.return_value.post.side_effect = httpx.ConnectError("refused")
 
-        result = retrieve_memory("u1", "勾股定理")
+        result = retrieve_memory("u1", "Pythagorean theorem")
         assert result == ""
 
     @patch("src.memory_client._get_client")
@@ -316,7 +316,7 @@ class TestFetchMastery:
             "user_id": "u1",
             "items": [
                 {
-                    "subtopic": "判别式", "topic": "二次方程",
+                    "subtopic": "discriminant", "topic": "quadratic equations",
                     "last_seen_at": "2026-04-15T10:00:00Z",
                     "session_count": 2, "total_questions": 4,
                     "total_correct": 2, "last_accuracy": 0.5,
@@ -327,7 +327,7 @@ class TestFetchMastery:
 
         items = fetch_mastery("u1")
         assert len(items) == 1
-        assert items[0]["subtopic"] == "判别式"
+        assert items[0]["subtopic"] == "discriminant"
 
         mock_get_client.return_value.get.assert_called_once_with(
             "/mastery/u1", params={}
@@ -344,10 +344,10 @@ class TestFetchMastery:
         mock_resp.json.return_value = {"user_id": "u1", "items": []}
         mock_get_client.return_value.get.return_value = mock_resp
 
-        fetch_mastery("u1", topic="代数", since_days=14)
+        fetch_mastery("u1", topic="algebra", since_days=14)
 
         mock_get_client.return_value.get.assert_called_once_with(
-            "/mastery/u1", params={"topic": "代数", "since_days": 14}
+            "/mastery/u1", params={"topic": "algebra", "since_days": 14}
         )
 
     @patch("src.memory_client._get_client")
@@ -403,14 +403,14 @@ class TestIngestReviewSession:
             "review_questions": [
                 QuizQuestion(
                     id="rq1",
-                    knowledge_point="判别式",
-                    question="b²-4ac > 0?",
+                    knowledge_point="discriminant",
+                    question="Is b²-4ac > 0?",
                     options=["a", "b", "c", "d"],
                     answer=0,
                 ),
                 QuizQuestion(
                     id="rq2",
-                    knowledge_point="加乘原理",
+                    knowledge_point="addition-multiplication principle",
                     question="2×3=?",
                     options=["5", "6", "8", "9"],
                     answer=1,
@@ -418,8 +418,8 @@ class TestIngestReviewSession:
             ],
             "review_answers": [0, 0],  # rq1 right, rq2 wrong
             "review_result": {
-                "weak_kps": ["加乘原理"],
-                "strong_kps": ["判别式"],
+                "weak_kps": ["addition-multiplication principle"],
+                "strong_kps": ["discriminant"],
                 "score": 0.5,
                 "focus_directive": "...",
             },
@@ -439,8 +439,8 @@ class TestIngestReviewSession:
         mock_get_client.return_value.post.return_value = mock_resp
 
         snapshot = [
-            {"subtopic": "判别式", "topic": "二次方程"},
-            {"subtopic": "加乘原理", "topic": "乘法原理"},
+            {"subtopic": "discriminant", "topic": "quadratic equations"},
+            {"subtopic": "addition-multiplication principle", "topic": "multiplication principle"},
         ]
         ingest_review_session("u1", "s1", self._state_with_review(snapshot))
 
@@ -450,7 +450,7 @@ class TestIngestReviewSession:
             c.kwargs["json"]["topic"]
             for c in mock_get_client.return_value.post.call_args_list
         ]
-        assert set(call_topics) == {"二次方程", "乘法原理"}
+        assert set(call_topics) == {"quadratic equations", "multiplication principle"}
 
     @patch("src.memory_client._get_client")
     def test_session_id_suffixed_per_topic(
@@ -465,8 +465,8 @@ class TestIngestReviewSession:
         mock_get_client.return_value.post.return_value = mock_resp
 
         snapshot = [
-            {"subtopic": "判别式", "topic": "二次方程"},
-            {"subtopic": "加乘原理", "topic": "乘法原理"},
+            {"subtopic": "discriminant", "topic": "quadratic equations"},
+            {"subtopic": "addition-multiplication principle", "topic": "multiplication principle"},
         ]
         ingest_review_session("u1", "sess123", self._state_with_review(snapshot))
 
@@ -491,18 +491,18 @@ class TestIngestReviewSession:
         mock_get_client.return_value.post.return_value = mock_resp
 
         snapshot = [
-            {"subtopic": "判别式", "topic": "二次方程"},
-            {"subtopic": "加乘原理", "topic": "乘法原理"},
+            {"subtopic": "discriminant", "topic": "quadratic equations"},
+            {"subtopic": "addition-multiplication principle", "topic": "multiplication principle"},
         ]
         ingest_review_session("u1", "s1", self._state_with_review(snapshot))
 
-        # Find the call for "二次方程" and check its summary contains "strong"
+        # Find the call for "quadratic equations" and check its summary contains "strong"
         for c in mock_get_client.return_value.post.call_args_list:
             payload = c.kwargs["json"]
             sub = payload["subtopics"][0]
-            if payload["topic"] == "二次方程":
+            if payload["topic"] == "quadratic equations":
                 assert "strong" in sub["summary"]
-            elif payload["topic"] == "乘法原理":
+            elif payload["topic"] == "multiplication principle":
                 assert "weak" in sub["summary"]
 
     @patch("src.memory_client._get_client")
@@ -525,6 +525,6 @@ class TestIngestReviewSession:
         )
         mock_get_client.return_value.post.return_value = mock_resp
 
-        snapshot = [{"subtopic": "判别式", "topic": "二次方程"}]
+        snapshot = [{"subtopic": "discriminant", "topic": "quadratic equations"}]
         # Should not raise
         ingest_review_session("u1", "s1", self._state_with_review(snapshot))

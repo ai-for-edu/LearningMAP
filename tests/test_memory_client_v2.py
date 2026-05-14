@@ -305,14 +305,14 @@ def test_write_note_happy_path_returns_ok_and_id() -> None:
         )
         mk.return_value = client
         result = memory_client.write_note(
-            "u1", "misconception", "误把 A 当 B",
+            "u1", "misconception", "confused A with B",
             "s1", "submit-quiz",
         )
     assert result == ("ok", 42)
     body = client.post.call_args[1]["json"]
     assert body["user_id"] == "u1"
     assert body["category"] == "misconception"
-    assert body["content"] == "误把 A 当 B"
+    assert body["content"] == "confused A with B"
     assert body["source_session_id"] == "s1"
     assert body["source_event"] == "submit-quiz"
 
@@ -573,15 +573,15 @@ def test_upsert_progress_happy_path() -> None:
         )
         mk.return_value = client
         memory_client.upsert_progress(
-            user_id="u1", topic="勾股定理", mastery_overall=0.6,
+            user_id="u1", topic="Pythagorean theorem", mastery_overall=0.6,
             last_session_id="s1",
             kp_samples=[
-                {"kp": "公式", "score": 0.5, "source": "quiz"},
-                {"kp": "坐标距离", "score": 0.0, "source": "quiz"},
+                {"kp": "formula", "score": 0.5, "source": "quiz"},
+                {"kp": "coordinate distance", "score": 0.0, "source": "quiz"},
             ],
         )
     body = client.post.call_args[1]["json"]
-    assert body["topic"] == "勾股定理"
+    assert body["topic"] == "Pythagorean theorem"
     assert body["mastery_overall"] == 0.6
     assert len(body["kp_samples"]) == 2
 

@@ -40,13 +40,13 @@ def _diag(breakdown_pairs: list[tuple[str, str]]) -> DiagnosisResult:
 def test_extract_kp_samples_from_diagnosis_only() -> None:
     from src.progress_aggregator import _extract_kp_samples
 
-    state = {"diagnosis_result": _diag([("公式", "mastered"), ("距离", "weak")])}
+    state = {"diagnosis_result": _diag([("formula", "mastered"), ("distance", "weak")])}
     samples = _extract_kp_samples(state)
     by_kp = {s.kp: s for s in samples}
-    assert by_kp["公式"].score == 1.0
-    assert by_kp["公式"].source == "quiz"
-    assert by_kp["距离"].score == 0.2
-    assert by_kp["距离"].source == "quiz"
+    assert by_kp["formula"].score == 1.0
+    assert by_kp["formula"].source == "quiz"
+    assert by_kp["distance"].score == 0.2
+    assert by_kp["distance"].source == "quiz"
 
 
 def test_extract_kp_samples_combines_diagnosis_and_review() -> None:
@@ -56,19 +56,19 @@ def test_extract_kp_samples_combines_diagnosis_and_review() -> None:
     # using SimpleNamespace since we don't extend ReviewResult here.
     from types import SimpleNamespace
     rr2 = SimpleNamespace(kp_results=[
-        SimpleNamespace(kp="公式", accuracy=0.9),
-        SimpleNamespace(kp="距离", accuracy=0.3),
+        SimpleNamespace(kp="formula", accuracy=0.9),
+        SimpleNamespace(kp="distance", accuracy=0.3),
     ])
     state = {
-        "diagnosis_result": _diag([("公式", "weak")]),
+        "diagnosis_result": _diag([("formula", "weak")]),
         "review_result": rr2,
     }
     samples = _extract_kp_samples(state)
     sources = {(s.kp, s.source) for s in samples}
-    # one quiz sample for 公式, one review sample for 公式 + 距离
-    assert ("公式", "quiz") in sources
-    assert ("公式", "review") in sources
-    assert ("距离", "review") in sources
+    # one quiz sample for formula, one review sample for formula + distance
+    assert ("formula", "quiz") in sources
+    assert ("formula", "review") in sources
+    assert ("distance", "review") in sources
 
 
 def test_extract_kp_samples_review_fallback_uses_weak_strong_kps() -> None:
@@ -77,16 +77,16 @@ def test_extract_kp_samples_review_fallback_uses_weak_strong_kps() -> None:
     from src.progress_aggregator import _extract_kp_samples
 
     rr = ReviewResult(
-        weak_kps=["距离"], strong_kps=["公式"],
+        weak_kps=["distance"], strong_kps=["formula"],
         score=0.6, focus_directive="...",
     )
     state = {"review_result": rr}
     samples = _extract_kp_samples(state)
     by_kp_source = {(s.kp, s.source): s for s in samples}
-    assert ("公式", "review") in by_kp_source
-    assert by_kp_source[("公式", "review")].score == 1.0
-    assert ("距离", "review") in by_kp_source
-    assert by_kp_source[("距离", "review")].score == 0.2
+    assert ("formula", "review") in by_kp_source
+    assert by_kp_source[("formula", "review")].score == 1.0
+    assert ("distance", "review") in by_kp_source
+    assert by_kp_source[("distance", "review")].score == 0.2
 
 
 def test_extract_kp_samples_empty_state_returns_empty() -> None:
@@ -103,12 +103,12 @@ def test_extract_kp_samples_handles_non_pydantic_dicts() -> None:
     state = {
         "diagnosis_result": {
             "score": 0, "total": 1, "correct": 0, "incorrect": 1,
-            "breakdown": [{"name": "公式", "status": "weak", "detail": "x"}],
+            "breakdown": [{"name": "formula", "status": "weak", "detail": "x"}],
         },
     }
     samples = _extract_kp_samples(state)
     assert len(samples) == 1
-    assert samples[0].kp == "公式"
+    assert samples[0].kp == "formula"
     assert samples[0].score == 0.2
 
 
@@ -145,8 +145,8 @@ def test_refresh_progress_calls_upsert_with_aggregate_score() -> None:
     from src import progress_aggregator
 
     state = {
-        "topic": "勾股定理",
-        "diagnosis_result": _diag([("公式", "mastered"), ("距离", "weak")]),
+        "topic": "Pythagorean theorem",
+        "diagnosis_result": _diag([("formula", "mastered"), ("distance", "weak")]),
     }
     with patch("src.progress_aggregator.memory_client") as mc, \
          patch.dict("os.environ", {"ENABLE_MEMORY_REVIEW": "true"}):
@@ -154,7 +154,7 @@ def test_refresh_progress_calls_upsert_with_aggregate_score() -> None:
     mc.upsert_progress.assert_called_once()
     kwargs = mc.upsert_progress.call_args.kwargs
     assert kwargs["user_id"] == "u1"
-    assert kwargs["topic"] == "勾股定理"
+    assert kwargs["topic"] == "Pythagorean theorem"
     # (1.0 + 0.2) / 2 = 0.6
     assert abs(kwargs["mastery_overall"] - 0.6) < 1e-9
     assert kwargs["last_session_id"] == "s1"

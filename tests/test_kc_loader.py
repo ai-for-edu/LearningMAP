@@ -27,10 +27,10 @@ def _sample_json(tmp_path: Path) -> Path:
             "leaf": "乘法原理里的其他类型",
             "skill": {
                 "description": "desc A",
-                "考察重点": "重点 A",
-                "考察形式": "形式 A",
-                "易错点": "易错 A",
-                "难度提示": "难度 A",
+                "考察重点": "focus A",
+                "考察形式": "format A",
+                "易错点": "mistake A",
+                "难度提示": "difficulty A",
             },
         },
         "拓展思维----计数模块----加乘原理----乘法原理": {
@@ -38,10 +38,10 @@ def _sample_json(tmp_path: Path) -> Path:
             "leaf": "乘法原理",
             "skill": {
                 "description": "desc B",
-                "考察重点": "重点 B",
-                "考察形式": "形式 B",
-                "易错点": "易错 B",
-                "难度提示": "难度 B",
+                "考察重点": "focus B",
+                "考察形式": "format B",
+                "易错点": "mistake B",
+                "难度提示": "difficulty B",
             },
         },
     }
@@ -57,7 +57,7 @@ def test_load_kc_skills_parses_every_entry(tmp_path: Path):
     short_route = "拓展思维----计数模块----加乘原理----乘法原理"
     assert short_route in skills
     assert isinstance(skills[short_route], KCSkill)
-    assert skills[short_route].考察重点 == "重点 B"
+    assert skills[short_route].考察重点 == "focus B"
 
 
 def test_load_missing_file_returns_empty_no_raise(tmp_path: Path):
@@ -86,7 +86,7 @@ def test_resolve_by_leaf_exact_match(tmp_path: Path):
     kc_loader.load_kc_skills(path)
     hit = kc_loader.resolve_by_leaf("乘法原理里的其他类型")
     assert hit is not None
-    assert hit.考察重点 == "重点 A"
+    assert hit.考察重点 == "focus A"
 
 
 def test_resolve_by_leaf_containment(tmp_path: Path):
@@ -95,7 +95,7 @@ def test_resolve_by_leaf_containment(tmp_path: Path):
     # figure-node name is shorter and contained in leaf name → leaf side wins
     hit = kc_loader.resolve_by_leaf("乘法原理")
     assert hit is not None
-    assert hit.考察重点 == "重点 B"  # exact match to 乘法原理 leaf, deeper route wins
+    assert hit.考察重点 == "focus B"  # exact match to 乘法原理 leaf, deeper route wins
 
 
 def test_resolve_by_leaf_prefers_longer_route_on_containment(tmp_path: Path):
@@ -106,7 +106,7 @@ def test_resolve_by_leaf_prefers_longer_route_on_containment(tmp_path: Path):
             "leaf": "乘法原理",
             "skill": {
                 "description": "d",
-                "考察重点": "短 route",
+                "考察重点": "short route",
                 "考察形式": "f",
                 "易错点": "e",
                 "难度提示": "l",
@@ -117,7 +117,7 @@ def test_resolve_by_leaf_prefers_longer_route_on_containment(tmp_path: Path):
             "leaf": "乘法原理",
             "skill": {
                 "description": "d",
-                "考察重点": "长 route",
+                "考察重点": "long route",
                 "考察形式": "f",
                 "易错点": "e",
                 "难度提示": "l",
@@ -129,13 +129,13 @@ def test_resolve_by_leaf_prefers_longer_route_on_containment(tmp_path: Path):
     kc_loader.load_kc_skills(p)
     hit = kc_loader.resolve_by_leaf("乘法原理")
     assert hit is not None
-    assert hit.考察重点 == "长 route"
+    assert hit.考察重点 == "long route"
 
 
 def test_resolve_by_leaf_no_match_returns_none(tmp_path: Path):
     path = _sample_json(tmp_path)
     kc_loader.load_kc_skills(path)
-    assert kc_loader.resolve_by_leaf("完全无关的知识点") is None
+    assert kc_loader.resolve_by_leaf("completely unrelated knowledge point") is None
 
 
 def test_normalize_strips_whitespace_and_punctuation():
@@ -152,10 +152,10 @@ def test_flat_caches_are_full_bank(tmp_path):
             "leaf": "A",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "考察重点": "focus",
+                "考察形式": "format",
+                "易错点": "mistake",
+                "难度提示": "difficulty",
             },
         },
         "课内题型----B": {
@@ -163,10 +163,10 @@ def test_flat_caches_are_full_bank(tmp_path):
             "leaf": "B",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "考察重点": "focus",
+                "考察形式": "format",
+                "易错点": "mistake",
+                "难度提示": "difficulty",
             },
         },
     }
@@ -187,10 +187,10 @@ def test_default_tree_built_for_allowed_roots(tmp_path):
             "leaf": "X",
             "skill": {
                 "description": "dx",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "考察重点": "focus",
+                "考察形式": "format",
+                "易错点": "mistake",
+                "难度提示": "difficulty",
             },
         },
         "课内题型----B": {
@@ -198,10 +198,10 @@ def test_default_tree_built_for_allowed_roots(tmp_path):
             "leaf": "B",
             "skill": {
                 "description": "db",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "考察重点": "focus",
+                "考察形式": "format",
+                "易错点": "mistake",
+                "难度提示": "difficulty",
             },
         },
     }
@@ -227,10 +227,10 @@ def test_synthetic_prefix_node_desc_falls_back_to_leaf_segment(tmp_path):
             "leaf": "X",
             "skill": {
                 "description": "dx",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "考察重点": "focus",
+                "考察形式": "format",
+                "易错点": "mistake",
+                "难度提示": "difficulty",
             },
         },
     }
@@ -250,10 +250,10 @@ def test_tree_cache_keyed_by_allowed_roots(tmp_path):
             "leaf": "A",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "考察重点": "focus",
+                "考察形式": "format",
+                "易错点": "mistake",
+                "难度提示": "difficulty",
             },
         },
         "拓展思维----C": {
@@ -261,10 +261,10 @@ def test_tree_cache_keyed_by_allowed_roots(tmp_path):
             "leaf": "C",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "考察重点": "focus",
+                "考察形式": "format",
+                "易错点": "mistake",
+                "难度提示": "difficulty",
             },
         },
     }
@@ -287,10 +287,10 @@ def test_parent_child_invariants(tmp_path):
             "leaf": "X",
             "skill": {
                 "description": "dx",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "考察重点": "focus-x",
+                "考察形式": "format-x",
+                "易错点": "mistake-x",
+                "难度提示": "difficulty-x",
             },
         },
         "知识点----A----Y": {
@@ -298,10 +298,10 @@ def test_parent_child_invariants(tmp_path):
             "leaf": "Y",
             "skill": {
                 "description": "dy",
-                "考察重点": "y",
-                "考察形式": "y",
-                "易错点": "y",
-                "难度提示": "y",
+                "考察重点": "focus-y",
+                "考察形式": "format-y",
+                "易错点": "mistake-y",
+                "难度提示": "difficulty-y",
             },
         },
     }

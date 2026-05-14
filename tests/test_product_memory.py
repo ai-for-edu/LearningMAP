@@ -96,44 +96,44 @@ def _patch_to_service(service_client: httpx.Client):
 # State builders
 # ------------------------------------------------------------------
 
-def _make_diagnosis_state(topic: str = "勾股定理", session_id: str = "s1") -> dict:
+def _make_diagnosis_state(topic: str = "Pythagorean theorem", session_id: str = "s1") -> dict:
     return {
         "topic": topic,
         "knowledge_graph": KnowledgeGraph(
             topic=topic,
             nodes=[
-                KnowledgeNode(id="n1", name="直角三角形", description="直角三角形的定义", level="prerequisite"),
-                KnowledgeNode(id="n2", name="勾股定理公式", description="a²+b²=c²", level="core"),
-                KnowledgeNode(id="n3", name="逆定理", description="勾股定理的逆定理", level="extension"),
+                KnowledgeNode(id="n1", name="right triangle", description="definition of a right triangle", level="prerequisite"),
+                KnowledgeNode(id="n2", name="Pythagorean formula", description="a²+b²=c²", level="core"),
+                KnowledgeNode(id="n3", name="converse theorem", description="converse of the Pythagorean theorem", level="extension"),
             ],
             edges=[KnowledgeEdge(source="n1", target="n2", relation="prerequisite")],
         ),
         "questions": [
-            QuizQuestion(id="q1", knowledge_point="直角三角形", question="哪个是直角三角形?", options=["A","B","C","D"], answer=0),
-            QuizQuestion(id="q2", knowledge_point="勾股定理公式", question="3²+4²=?", options=["20","25","30","35"], answer=1),
-            QuizQuestion(id="q3", knowledge_point="勾股定理公式", question="求c", options=["13","14","15","16"], answer=0),
-            QuizQuestion(id="q4", knowledge_point="逆定理", question="能构成直角三角形吗?", options=["能","不能","不确定","缺"], answer=0),
+            QuizQuestion(id="q1", knowledge_point="right triangle", question="Which is a right triangle?", options=["A","B","C","D"], answer=0),
+            QuizQuestion(id="q2", knowledge_point="Pythagorean formula", question="3²+4²=?", options=["20","25","30","35"], answer=1),
+            QuizQuestion(id="q3", knowledge_point="Pythagorean formula", question="Find c", options=["13","14","15","16"], answer=0),
+            QuizQuestion(id="q4", knowledge_point="converse theorem", question="Can these form a right triangle?", options=["Yes","No","Uncertain","Missing info"], answer=0),
         ],
         "answers": [0, 1, 2, 0],  # q1✓ q2✓ q3✗ q4✓
         "diagnosis_result": DiagnosisResult(
             score=75, total=4, correct=3, incorrect=1,
             breakdown=[
-                DiagnosisBreakdown(name="直角三角形", status="mastered", detail="1/1 已掌握"),
-                DiagnosisBreakdown(name="勾股定理公式", status="weak", detail="1/2 需复习"),
-                DiagnosisBreakdown(name="逆定理", status="mastered", detail="1/1 已掌握"),
+                DiagnosisBreakdown(name="right triangle", status="mastered", detail="1/1 mastered"),
+                DiagnosisBreakdown(name="Pythagorean formula", status="weak", detail="1/2 needs review"),
+                DiagnosisBreakdown(name="converse theorem", status="mastered", detail="1/1 mastered"),
             ],
         ),
     }
 
 
-def _make_graph_only_state(topic: str = "二次方程") -> dict:
+def _make_graph_only_state(topic: str = "quadratic equations") -> dict:
     return {
         "topic": topic,
         "knowledge_graph": KnowledgeGraph(
             topic=topic,
             nodes=[
-                KnowledgeNode(id="n1", name="一元二次方程", description="ax²+bx+c=0", level="core"),
-                KnowledgeNode(id="n2", name="判别式", description="Δ=b²-4ac", level="core"),
+                KnowledgeNode(id="n1", name="quadratic equation in one variable", description="ax²+bx+c=0", level="core"),
+                KnowledgeNode(id="n2", name="discriminant", description="Δ=b²-4ac", level="core"),
             ],
             edges=[KnowledgeEdge(source="n1", target="n2", relation="prerequisite")],
         ),
@@ -143,9 +143,9 @@ def _make_graph_only_state(topic: str = "二次方程") -> dict:
     }
 
 
-def _make_lesson_state(topic: str = "勾股定理") -> dict:
+def _make_lesson_state(topic: str = "Pythagorean theorem") -> dict:
     state = _make_diagnosis_state(topic=topic)
-    state["lesson_content"] = "# 勾股定理复习\n\n## 重点：勾股定理公式\na²+b²=c²"
+    state["lesson_content"] = "# Pythagorean theorem review\n\n## Key: Pythagorean formula\na²+b²=c²"
     state["lesson_format"] = "markdown"
     return state
 
@@ -161,122 +161,122 @@ def _make_chat_only_state() -> dict:
 
 
 # ===================================================================
-# 1. MEMORY WRITE COVERAGE — 哪些事件应该产生记忆？
+# 1. MEMORY WRITE COVERAGE — which events should produce memories?
 # ===================================================================
 
 class TestWriteCoverage:
 
     def test_W1_write_after_diagnosis(self, memory_service: httpx.Client) -> None:
-        """[已有] 诊断完成后应写入记忆。"""
+        """[existing] memory should be written after diagnosis completion."""
         with _patch_to_service(memory_service):
             ingest_session("w1", "w1_diag", _make_diagnosis_state())
-        resp = memory_service.post("/retrieve", json={"user_id": "w1", "query": "勾股定理", "top_k": 10})
-        assert len(resp.json()["results"]) > 0, "诊断后应有记忆"
+        resp = memory_service.post("/retrieve", json={"user_id": "w1", "query": "Pythagorean theorem", "top_k": 10})
+        assert len(resp.json()["results"]) > 0, "memory should exist after diagnosis"
 
     def test_W2_write_after_knowledge_graph_only(self, memory_service: httpx.Client) -> None:
-        """[缺失] 只生成知识图谱（不做诊断）也应写入记忆。"""
-        payload = _build_ingest_payload("w2", "w2_graph", _make_graph_only_state("集合论"))
+        """[missing] knowledge graph only (no diagnosis) should also produce memory."""
+        payload = _build_ingest_payload("w2", "w2_graph", _make_graph_only_state("set theory"))
         assert len(payload["subtopics"]) > 0, \
-            "❌ 缺失：知识图谱 nodes 未转化为 subtopics，无诊断时记忆为空"
+            "❌ missing: knowledge graph nodes not converted to subtopics — memory empty without diagnosis"
 
     def test_W3_write_after_lesson_generation(self, memory_service: httpx.Client) -> None:
-        """[缺失] 课程生成后 payload 应包含课程信息。"""
+        """[missing] lesson generation payload should include lesson info."""
         payload = _build_ingest_payload("w3", "w3_lesson", _make_lesson_state())
         payload_str = str(payload).lower()
-        assert "lesson" in payload_str or "课程" in payload_str or "复习" in payload_str, \
-            "❌ 缺失：ingest payload 不含任何课程信息"
+        assert "lesson" in payload_str or "review" in payload_str, \
+            "❌ missing: ingest payload contains no lesson information"
 
     def test_W4_write_chat_only(self, memory_service: httpx.Client) -> None:
-        """[缺失] 纯聊天也应产生轻量记忆。"""
+        """[missing] chat-only sessions should also produce lightweight memory."""
         payload = _build_ingest_payload("w4", "w4_chat", _make_chat_only_state())
         assert len(payload["subtopics"]) > 0, \
-            "❌ 缺失：纯聊天（无诊断/无图谱）时 subtopics 为空，无法产生记忆"
+            "❌ missing: chat-only (no diagnosis/graph) yields empty subtopics — no memory produced"
 
     def test_W5_accuracy_recorded(self, memory_service: httpx.Client) -> None:
-        """[已有] 记忆应包含正确率信息。"""
+        """[existing] memory should include accuracy information."""
         with _patch_to_service(memory_service):
             ingest_session("w5", "w5_acc", _make_diagnosis_state())
-        resp = memory_service.post("/retrieve", json={"user_id": "w5", "query": "勾股定理", "top_k": 10})
+        resp = memory_service.post("/retrieve", json={"user_id": "w5", "query": "Pythagorean theorem", "top_k": 10})
         ctx = resp.json()["context_text"]
         has_accuracy = any(kw in ctx for kw in ["50", "100", "correct", "accuracy"])
-        assert has_accuracy, "记忆应包含正确率"
+        assert has_accuracy, "memory should include accuracy information"
 
     def test_W6_weak_points_in_memory(self, memory_service: httpx.Client) -> None:
-        """[已有] 记忆应包含薄弱知识点名称。"""
+        """[existing] memory should include weak knowledge point names."""
         with _patch_to_service(memory_service):
             ingest_session("w6", "w6_weak", _make_diagnosis_state())
-        resp = memory_service.post("/retrieve", json={"user_id": "w6", "query": "勾股定理", "top_k": 10})
+        resp = memory_service.post("/retrieve", json={"user_id": "w6", "query": "Pythagorean theorem", "top_k": 10})
         ctx = resp.json()["context_text"]
-        assert "勾股定理公式" in ctx, "记忆应包含知识点名称"
+        assert "Pythagorean formula" in ctx, "memory should include knowledge point name"
 
 
 # ===================================================================
-# 2. MEMORY READ COVERAGE — 哪些环节应该读取记忆？
+# 2. MEMORY READ COVERAGE — which stages should read memory?
 # ===================================================================
 
 class TestReadCoverage:
 
     def test_R1_chat_node_reads(self) -> None:
-        """[已有] chat_node 读取记忆。"""
+        """[existing] chat_node reads memory."""
         import inspect
         from src.agent.nodes.chat import chat_node
         assert "retrieve_memory" in inspect.getsource(chat_node)
 
     def test_R2_lesson_node_reads(self) -> None:
-        """[缺失] lesson_node 应读取历史薄弱点来个性化课程。"""
+        """[missing] lesson_node should read history weak points to personalize lesson."""
         import inspect
         from src.agent.nodes.lesson import lesson_node
         assert "retrieve_memory" in inspect.getsource(lesson_node), \
-            "❌ 缺失：lesson_node 未读取记忆，无法基于历史薄弱点生成个性化课程"
+            "❌ missing: lesson_node does not read memory — cannot personalize based on history weak points"
 
     def test_R3_knowledge_graph_node_reads(self) -> None:
-        """[缺失] knowledge_graph_node 应读取历史。"""
+        """[missing] knowledge_graph_node should read history."""
         import inspect
         from src.agent.nodes.knowledge_graph import knowledge_graph_node
         assert "retrieve_memory" in inspect.getsource(knowledge_graph_node), \
-            "❌ 缺失：knowledge_graph_node 未读取记忆"
+            "❌ missing: knowledge_graph_node does not read memory"
 
     def test_R4_quiz_node_reads(self) -> None:
-        """[缺失] quiz_node 应基于历史薄弱点侧重出题。"""
+        """[missing] quiz_node should focus on history weak points when generating questions."""
         import inspect
         from src.agent.nodes.quiz import quiz_node
         assert "retrieve_memory" in inspect.getsource(quiz_node), \
-            "❌ 缺失：quiz_node 未读取记忆，不能侧重历史薄弱点出题"
+            "❌ missing: quiz_node does not read memory — cannot emphasize history weak points"
 
 
 # ===================================================================
-# 3. API INGEST TRIGGERS — API 层 ingest 触发点
+# 3. API INGEST TRIGGERS — API layer ingest trigger points
 # ===================================================================
 
 class TestIngestTriggers:
 
     def test_T1_submit_quiz_triggers(self) -> None:
-        """[已有] submit_quiz 触发 ingest。"""
+        """[existing] submit_quiz triggers ingest."""
         import inspect
         from src.api.chat import submit_quiz
         assert "ingest_session" in inspect.getsource(submit_quiz)
 
     def test_T2_generate_lesson_triggers(self) -> None:
-        """[缺失] generate_lesson 应触发 ingest。"""
+        """[missing] generate_lesson should trigger ingest."""
         import inspect
         from src.api.chat import generate_lesson
         assert "ingest" in inspect.getsource(generate_lesson), \
-            "❌ 缺失：generate_lesson 未触发 ingest"
+            "❌ missing: generate_lesson does not trigger ingest"
 
     def test_T3_generate_slides_triggers(self) -> None:
-        """[缺失] generate_slides 应触发 ingest。"""
+        """[missing] generate_slides should trigger ingest."""
         import inspect
         from src.api.chat import generate_slides
         assert "ingest" in inspect.getsource(generate_slides), \
-            "❌ 缺失：generate_slides 未触发 ingest"
+            "❌ missing: generate_slides does not trigger ingest"
 
     def test_T4_chat_graph_mode_triggers(self) -> None:
-        """[缺失] /api/chat 在 mode=graph 时应触发 ingest。"""
+        """[missing] /api/chat in mode=graph should trigger ingest."""
         import inspect
         from src.api.chat import chat
         src = inspect.getsource(chat)
         assert "graph" in src and "ingest" in src, \
-            "❌ 缺失：/api/chat 在生成知识图谱后未触发 ingest"
+            "❌ missing: /api/chat does not trigger ingest after generating knowledge graph"
 
 
 # ===================================================================
@@ -286,55 +286,55 @@ class TestIngestTriggers:
 class TestUserJourneys:
 
     def test_J1_what_did_i_learn(self, memory_service: httpx.Client) -> None:
-        """Session A 学勾股定理 → Session B 问'我之前学了什么'。"""
+        """Session A learns Pythagorean theorem → Session B asks 'what did I learn before'."""
         with _patch_to_service(memory_service):
             ingest_session("j1", "j1_s", _make_diagnosis_state())
-            ctx = retrieve_memory("j1", "我之前学了什么")
-        assert ctx != "" and "勾股定理" in ctx
+            ctx = retrieve_memory("j1", "what did I learn before")
+        assert ctx != "" and "Pythagorean theorem" in ctx
 
     def test_J2_ask_weak_points(self, memory_service: httpx.Client) -> None:
-        """Session A 诊断薄弱 → Session B 问'哪里薄弱'。"""
+        """Session A diagnoses weak points → Session B asks 'where am I weak'."""
         with _patch_to_service(memory_service):
             ingest_session("j2", "j2_s", _make_diagnosis_state())
-            ctx = retrieve_memory("j2", "我哪些知识点薄弱")
-        has_info = any(kw in ctx for kw in ["weak", "wrong", "需复习", "incorrect"])
-        assert has_info, "应能检索到薄弱点信息"
+            ctx = retrieve_memory("j2", "which knowledge points am I weak on")
+        has_info = any(kw in ctx for kw in ["weak", "wrong", "needs review", "incorrect"])
+        assert has_info, "should be able to retrieve weak point information"
 
     def test_J3_multiple_sessions_accumulate(self, memory_service: httpx.Client) -> None:
-        """两个 session 的记忆应累积。"""
-        s1 = _make_diagnosis_state(topic="勾股定理")
-        s2 = _make_diagnosis_state(topic="二次函数")
+        """Memories from two sessions should accumulate."""
+        s1 = _make_diagnosis_state(topic="Pythagorean theorem")
+        s2 = _make_diagnosis_state(topic="quadratic functions")
         with _patch_to_service(memory_service):
             ingest_session("j3", "j3_a", s1)
             ingest_session("j3", "j3_b", s2)
-        resp = memory_service.post("/retrieve", json={"user_id": "j3", "query": "数学", "top_k": 20})
+        resp = memory_service.post("/retrieve", json={"user_id": "j3", "query": "mathematics", "top_k": 20})
         results = resp.json()["results"]
         topics = {r["topic"] for r in results}
-        assert len(topics) >= 2, "应有两个主题的记忆"
+        assert len(topics) >= 2, "should have memories for at least two topics"
 
     def test_J4_topic_relevance_ranking(self, memory_service: httpx.Client) -> None:
-        """查勾股定理时，勾股定理的记忆应排在物理记忆前面。"""
+        """When querying Pythagorean theorem, its memory should rank above physics."""
         with _patch_to_service(memory_service):
-            ingest_session("j4", "j4_math", _make_diagnosis_state("勾股定理"))
-            ingest_session("j4", "j4_phys", _make_diagnosis_state("牛顿运动定律"))
-        resp = memory_service.post("/retrieve", json={"user_id": "j4", "query": "勾股定理", "top_k": 5})
+            ingest_session("j4", "j4_math", _make_diagnosis_state("Pythagorean theorem"))
+            ingest_session("j4", "j4_phys", _make_diagnosis_state("Newton's laws of motion"))
+        resp = memory_service.post("/retrieve", json={"user_id": "j4", "query": "Pythagorean theorem", "top_k": 5})
         results = resp.json()["results"]
         if results:
-            assert results[0]["topic"] == "勾股定理", f"Top result should be 勾股定理, got {results[0]['topic']}"
+            assert results[0]["topic"] == "Pythagorean theorem", f"Top result should be Pythagorean theorem, got {results[0]['topic']}"
 
     def test_J5_user_isolation(self, memory_service: httpx.Client) -> None:
-        """用户 A 的记忆用户 B 看不到。"""
+        """User A's memories are not visible to user B."""
         with _patch_to_service(memory_service):
             ingest_session("j5_a", "j5_s", _make_diagnosis_state())
-        resp = memory_service.post("/retrieve", json={"user_id": "j5_b", "query": "勾股定理", "top_k": 5})
+        resp = memory_service.post("/retrieve", json={"user_id": "j5_b", "query": "Pythagorean theorem", "top_k": 5})
         assert len(resp.json()["results"]) == 0
 
     def test_J6_duplicate_ingest_idempotent(self, memory_service: httpx.Client) -> None:
-        """同一 session 重复 ingest 不会产生重复记忆。"""
+        """Ingesting the same session twice should not produce duplicate memories."""
         with _patch_to_service(memory_service):
             ingest_session("j6", "j6_dup", _make_diagnosis_state())
             ingest_session("j6", "j6_dup", _make_diagnosis_state())
-        resp = memory_service.post("/retrieve", json={"user_id": "j6", "query": "勾股定理", "top_k": 20})
+        resp = memory_service.post("/retrieve", json={"user_id": "j6", "query": "Pythagorean theorem", "top_k": 20})
         # 3 knowledge points, should have exactly 3 memories, not 6
         assert len(resp.json()["results"]) == 3
 
@@ -346,20 +346,20 @@ class TestUserJourneys:
 class TestGracefulDegradation:
 
     def test_G1_retrieve_when_down(self) -> None:
-        """记忆服务不可用时 retrieve 返回空。"""
+        """retrieve returns empty when memory service is unavailable."""
         with patch("src.memory_client._get_client") as m:
             m.return_value.post.side_effect = httpx.ConnectError("refused")
             assert retrieve_memory("u", "q") == ""
 
     def test_G2_ingest_when_down(self) -> None:
-        """记忆服务不可用时 ingest 不崩溃。"""
+        """ingest does not crash when memory service is unavailable."""
         with patch("src.memory_client._get_client") as m:
             m.return_value.post.side_effect = httpx.ConnectError("refused")
             ingest_session("u", "s", _make_diagnosis_state())  # should not raise
 
     def test_G3_empty_retrieve(self, memory_service: httpx.Client) -> None:
-        """无记忆时 retrieve 返回稳定空响应。"""
-        resp = memory_service.post("/retrieve", json={"user_id": "nobody", "query": "什么", "top_k": 5})
+        """retrieve returns stable empty response when no memories exist."""
+        resp = memory_service.post("/retrieve", json={"user_id": "nobody", "query": "nothing", "top_k": 5})
         assert resp.status_code == 200
         assert len(resp.json()["results"]) == 0
 
@@ -371,34 +371,34 @@ class TestGracefulDegradation:
 class TestDataQuality:
 
     def test_D1_all_knowledge_points_present(self) -> None:
-        """payload 包含所有被测试的知识点。"""
+        """payload contains all tested knowledge points."""
         payload = _build_ingest_payload("u", "s", _make_diagnosis_state())
         names = {s["name"] for s in payload["subtopics"]}
-        assert names == {"直角三角形", "勾股定理公式", "逆定理"}
+        assert names == {"right triangle", "Pythagorean formula", "converse theorem"}
 
     def test_D2_correct_count_matches(self) -> None:
-        """is_correct 与实际答案一致。"""
+        """is_correct matches actual answers."""
         payload = _build_ingest_payload("u", "s", _make_diagnosis_state())
         qs = [q for st in payload["subtopics"] for q in st["questions"]]
         assert sum(q["is_correct"] for q in qs) == 3
 
     def test_D3_topic_preserved(self) -> None:
-        payload = _build_ingest_payload("u", "s", _make_diagnosis_state("微积分"))
-        assert payload["topic"] == "微积分"
+        payload = _build_ingest_payload("u", "s", _make_diagnosis_state("calculus"))
+        assert payload["topic"] == "calculus"
 
     def test_D4_goal_text_has_topic(self) -> None:
-        payload = _build_ingest_payload("u", "s", _make_diagnosis_state("概率论"))
-        assert "概率论" in payload["goal_text"]
+        payload = _build_ingest_payload("u", "s", _make_diagnosis_state("probability theory"))
+        assert "probability theory" in payload["goal_text"]
 
     def test_D5_graph_nodes_as_subtopics(self) -> None:
-        """[缺失] 知识图谱 nodes 应能转为 subtopics。"""
-        payload = _build_ingest_payload("u", "s", _make_graph_only_state("集合论"))
+        """[missing] knowledge graph nodes should be convertible to subtopics."""
+        payload = _build_ingest_payload("u", "s", _make_graph_only_state("set theory"))
         assert len(payload["subtopics"]) > 0, \
-            "❌ 缺失：知识图谱 nodes 未转化为 subtopics"
+            "❌ missing: knowledge graph nodes not converted to subtopics"
 
     def test_D6_lesson_info_in_payload(self) -> None:
-        """[缺失] 课程信息应出现在 payload 中。"""
+        """[missing] lesson information should appear in payload."""
         payload = _build_ingest_payload("u", "s", _make_lesson_state())
         s = str(payload).lower()
-        assert any(kw in s for kw in ["lesson", "课程", "复习"]), \
-            "❌ 缺失：payload 中无课程信息"
+        assert any(kw in s for kw in ["lesson", "review"]), \
+            "❌ missing: payload contains no lesson information"

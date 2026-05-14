@@ -2,7 +2,7 @@
 
 Tests cover:
 - SKILL.md parsing (frontmatter + section splitting)
-- Missing/partial sections (缺省处理)
+- Missing/partial sections (missing-section handling)
 - Skill loader (directory scanning)
 - get_skill_section utility
 - Skill injection in prompt templates
@@ -40,17 +40,17 @@ class TestParseFrontmatter:
         text = textwrap.dedent("""\
             ---
             name: feynman
-            display_name: 费曼学习法
-            description: 用简单语言理解复杂概念
+            display_name: Feynman Technique
+            description: Understand complex concepts using simple language
             ---
 
             ## chat
-            对话指令
+            Chat instructions
         """)
         fm, body = _parse_frontmatter(text)
         assert fm["name"] == "feynman"
-        assert fm["display_name"] == "费曼学习法"
-        assert fm["description"] == "用简单语言理解复杂概念"
+        assert fm["display_name"] == "Feynman Technique"
+        assert fm["description"] == "Understand complex concepts using simple language"
         assert "## chat" in body
 
     def test_no_frontmatter(self) -> None:
@@ -89,33 +89,33 @@ class TestParseSections:
             Some intro text (ignored)
 
             ## chat
-            对话指令第一行
-            对话指令第二行
+            Chat instruction line one
+            Chat instruction line two
 
             ## quiz
-            出题指令
+            Quiz instruction
 
             ## lesson
-            课程指令
+            Lesson instruction
         """)
         sections = _parse_sections(body)
         assert set(sections.keys()) == {"chat", "quiz", "lesson"}
-        assert "对话指令第一行" in sections["chat"]
-        assert "对话指令第二行" in sections["chat"]
-        assert "出题指令" in sections["quiz"]
+        assert "Chat instruction line one" in sections["chat"]
+        assert "Chat instruction line two" in sections["chat"]
+        assert "Quiz instruction" in sections["quiz"]
 
     def test_single_section(self) -> None:
-        body = "## chat\n只有对话指令"
+        body = "## chat\nOnly chat instructions"
         sections = _parse_sections(body)
-        assert sections == {"chat": "只有对话指令"}
+        assert sections == {"chat": "Only chat instructions"}
 
     def test_no_sections(self) -> None:
-        body = "纯文本���没有任何 ## 标题"
+        body = "Plain text with no ## headings"
         sections = _parse_sections(body)
         assert sections == {}
 
     def test_section_names_lowercase(self) -> None:
-        body = "## Chat\n内容\n## QUIZ\n内容"
+        body = "## Chat\ncontent\n## QUIZ\ncontent"
         sections = _parse_sections(body)
         assert "chat" in sections
         assert "quiz" in sections
@@ -184,24 +184,24 @@ class TestLoadSkills:
         (skill_dir / "SKILL.md").write_text(textwrap.dedent("""\
             ---
             name: my_skill
-            display_name: 我的教学法
-            description: 测试用
+            display_name: My Teaching Method
+            description: For testing
             ---
 
             ## chat
-            自定义对话指令
+            Custom chat instructions
 
             ## lesson
-            自定义课程指令
+            Custom lesson instructions
         """), encoding="utf-8")
 
         skills = load_skills(tmp_path)
         assert "my_skill" in skills
         s = skills["my_skill"]
-        assert s.display_name == "我的教学法"
+        assert s.display_name == "My Teaching Method"
         assert s.affects == ("chat", "lesson")
-        assert "自定义对话指令" in s.sections["chat"]
-        assert "quiz" not in s.sections  # 缺省：没写就没有
+        assert "Custom chat instructions" in s.sections["chat"]
+        assert "quiz" not in s.sections  # not written, so absent
 
 
 # ------------------------------------------------------------------
@@ -213,15 +213,15 @@ class TestGetSkillSection:
     def test_returns_section_content(self) -> None:
         state = {
             "active_skill_content": {
-                "chat": "对话指令",
-                "quiz": "出题指令",
+                "chat": "Chat instructions",
+                "quiz": "Quiz instructions",
             }
         }
-        assert get_skill_section(state, "chat") == "对话指令"
-        assert get_skill_section(state, "quiz") == "出题指令"
+        assert get_skill_section(state, "chat") == "Chat instructions"
+        assert get_skill_section(state, "quiz") == "Quiz instructions"
 
     def test_missing_section_returns_empty(self) -> None:
-        state = {"active_skill_content": {"chat": "对话指令"}}
+        state = {"active_skill_content": {"chat": "Chat instructions"}}
         assert get_skill_section(state, "quiz") == ""
         assert get_skill_section(state, "knowledge_graph") == ""
 
@@ -242,38 +242,38 @@ class TestPromptInjection:
     def test_quiz_template_with_skill(self) -> None:
         result = render_prompt(
             "quiz_generate",
-            knowledge_points=[{"name": "光合作用", "description": "植物制造食物"}],
+            knowledge_points=[{"name": "photosynthesis", "description": "Plants produce food"}],
             questions_per_point=2,
-            skill_instructions="题目侧重概念理解",
+            skill_instructions="Focus on conceptual understanding",
         )
         assert "Teaching Method" in result
-        assert "题目侧重概念理解" in result
-        assert "光合作用" in result
+        assert "Focus on conceptual understanding" in result
+        assert "photosynthesis" in result
 
     def test_quiz_template_without_skill(self) -> None:
         result = render_prompt(
             "quiz_generate",
-            knowledge_points=[{"name": "光合作用", "description": "植物制造食物"}],
+            knowledge_points=[{"name": "photosynthesis", "description": "Plants produce food"}],
             questions_per_point=2,
             skill_instructions="",
         )
         assert "Teaching Method" not in result
-        assert "光合作用" in result
+        assert "photosynthesis" in result
 
     def test_knowledge_graph_template_with_skill(self) -> None:
         result = render_prompt(
             "knowledge_graph",
-            topic="光合作用",
+            topic="photosynthesis",
             max_nodes=8,
-            skill_instructions="按问题链组织节点",
+            skill_instructions="Organize nodes in question chains",
         )
         assert "Teaching Method" in result
-        assert "按问题链组织节点" in result
+        assert "Organize nodes in question chains" in result
 
     def test_knowledge_graph_template_without_skill(self) -> None:
         result = render_prompt(
             "knowledge_graph",
-            topic="光合作用",
+            topic="photosynthesis",
             max_nodes=8,
             skill_instructions="",
         )
@@ -282,18 +282,18 @@ class TestPromptInjection:
     def test_lesson_plan_template_with_skill(self) -> None:
         result = render_prompt(
             "lesson_plan",
-            topic="光合作用",
-            weak_points=[{"name": "暗反应", "description": "碳固定"}],
-            skill_instructions="每个概念先一句话总结",
+            topic="photosynthesis",
+            weak_points=[{"name": "dark reactions", "description": "carbon fixation"}],
+            skill_instructions="Summarize each concept in one sentence first",
         )
         assert "Teaching Method" in result
-        assert "每个概念先一句话总结" in result
+        assert "Summarize each concept in one sentence first" in result
 
     def test_lesson_plan_template_without_skill(self) -> None:
         result = render_prompt(
             "lesson_plan",
-            topic="光合作用",
-            weak_points=[{"name": "暗反应", "description": "碳固定"}],
+            topic="photosynthesis",
+            weak_points=[{"name": "dark reactions", "description": "carbon fixation"}],
             skill_instructions="",
         )
         assert "Teaching Method" not in result
@@ -301,20 +301,20 @@ class TestPromptInjection:
     def test_lesson_review_template_with_skill(self) -> None:
         result = render_prompt(
             "lesson_review",
-            topic="光合作用",
-            points=[{"name": "光反应", "description": "光能转化"}],
-            skill_instructions="全程用问题引导",
+            topic="photosynthesis",
+            points=[{"name": "light reactions", "description": "light energy conversion"}],
+            skill_instructions="Guide with questions throughout",
         )
         assert "Teaching Method" in result
-        assert "全程用问题引导" in result
+        assert "Guide with questions throughout" in result
 
     def test_intent_template_with_skills(self) -> None:
         result = render_prompt(
             "intent",
-            messages=[{"role": "user", "content": "用费曼法学光合作用"}],
+            messages=[{"role": "user", "content": "Learn photosynthesis using the Feynman Technique"}],
             available_skills=[
-                {"name": "feynman", "display_name": "费曼学习法", "description": "用简单语言理解概念"},
-                {"name": "socratic", "display_name": "苏格拉底提问法", "description": "通过提问引导"},
+                {"name": "feynman", "display_name": "Feynman Technique", "description": "Understand concepts using simple language"},
+                {"name": "socratic", "display_name": "Socratic Method", "description": "Guide through questioning"},
             ],
         )
         assert "Available Teaching Methods" in result
@@ -325,7 +325,7 @@ class TestPromptInjection:
     def test_intent_template_no_skills(self) -> None:
         result = render_prompt(
             "intent",
-            messages=[{"role": "user", "content": "我想学数学"}],
+            messages=[{"role": "user", "content": "I want to learn math"}],
             available_skills=[],
         )
         assert "Available Teaching Methods" not in result

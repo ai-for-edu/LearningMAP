@@ -16,13 +16,13 @@ from src.prompts.loader import render_prompt
 
 # Captured from pre-PR-4 knowledge_graph.j2 with empty var; regenerate if
 # the template content (other than {{- memory_snapshot_block }}) ever changes.
-EXPECTED_KG_BASELINE = 'You are an educational knowledge graph builder. Given a learning topic, generate a knowledge graph of related concepts.\n\n\n\n\n\nTopic: 勾股定理\nMaximum nodes: 8\n\nGenerate a knowledge graph with:\n1. The core topic and its prerequisite concepts\n2. Each node has: id, name, description, level (prerequisite/core/extension)\n3. Edges show prerequisite relationships (source → target means source is prerequisite of target)\n4. Include 4-8 nodes covering prerequisites and core concepts\n\nReturn a structured knowledge graph.\n'
+EXPECTED_KG_BASELINE = 'You are an educational knowledge graph builder. Given a learning topic, generate a knowledge graph of related concepts.\n\n\n\n\n\nTopic: Pythagorean theorem\nMaximum nodes: 8\n\nGenerate a knowledge graph with:\n1. The core topic and its prerequisite concepts\n2. Each node has: id, name, description, level (prerequisite/core/extension)\n3. Edges show prerequisite relationships (source → target means source is prerequisite of target)\n4. Include 4-8 nodes covering prerequisites and core concepts\n\nReturn a structured knowledge graph.\n'
 
 
 def test_knowledge_graph_baseline_env_off():
     out = render_prompt(
         "knowledge_graph",
-        topic="勾股定理",
+        topic="Pythagorean theorem",
         max_nodes=8,
         skill_instructions="",
         focus_directive="",
@@ -51,7 +51,7 @@ def test_quiz_generate_baseline_env_off():
 
 EXPECTED_LESSON_PLAN_BASELINE = "You are a personalized lesson plan generator. Create a lesson that addresses the student's weak knowledge areas.\n\n\n\nTopic: X\n\nWeak areas that need teaching:\n\n- WP1: d1\n\n\nCreate a comprehensive lesson covering each weak area with:\n1. Clear explanation of the concept\n2. Key formulas or rules (if applicable)\n3. Worked examples with step-by-step solutions\n4. Common mistakes to avoid\n\nUse clear, concise language appropriate for a middle school student. Respond in English.\n"
 EXPECTED_LESSON_POINT_BASELINE = 'You are a personalized lesson generator. Generate a teaching segment for the following knowledge point.\n\n## Pedagogical Requirements\n\n\n\n\n\n\n## Knowledge Point Information\nTopic: X\nKnowledge point (1 of 1): KP1\nDescription: d\n\n## Output Requirements\n\nGenerate the teaching content for this knowledge point, including:\n1. Concept explanation (following the pedagogical approach)\n2. Key formulas or rules (if applicable)\n3. A complete worked example with step-by-step solution\n4. Common mistakes and corrections\n\nWrite in clear, accessible English suitable for a secondary-school student.\nOutput in Markdown format, using `## KP1` as the section heading.\n'
-EXPECTED_LESSON_REVIEW_BASELINE = 'You are a personalized lesson plan generator. The student has mastered all knowledge points — create a review and consolidation lesson.\n\n\nTopic: X\n\nKnowledge points the student has mastered:\n\n- P1: d\n\n\nCreate a consolidation lesson with:\n1. Key concepts summary for each knowledge point\n2. Connections between the concepts\n3. Challenge problems that combine multiple knowledge points\n4. Tips for long-term retention\n\nUse clear, concise language appropriate for a middle school student. Write in Chinese.\n'
+EXPECTED_LESSON_REVIEW_BASELINE = 'You are a personalized lesson plan generator. The student has mastered all knowledge points — create a review and consolidation lesson.\n\n\nTopic: X\n\nKnowledge points the student has mastered:\n\n- P1: d\n\n\nCreate a consolidation lesson with:\n1. Key concepts summary for each knowledge point\n2. Connections between the concepts\n3. Challenge problems that combine multiple knowledge points\n4. Tips for long-term retention\n\nUse clear, concise language appropriate for a middle school student. Write in English.\n'
 
 
 def test_lesson_plan_baseline_env_off():

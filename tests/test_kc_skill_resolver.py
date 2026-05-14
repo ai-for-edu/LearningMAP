@@ -12,13 +12,13 @@ from src.llm.schemas import (
 from src.skills import kc_loader
 
 
-def _skill(mark: str = "重点") -> KCSkill:
+def _skill(mark: str = "focus") -> KCSkill:
     return KCSkill(
         description="d",
-        考察重点=f"{mark}-重点",
-        考察形式="形式",
-        易错点="易错",
-        难度提示="难度",
+        考察重点=f"{mark}-focus",
+        考察形式="format",
+        易错点="mistake",
+        难度提示="difficulty",
     )
 
 
@@ -42,7 +42,7 @@ def reset_kc_loader():
 def test_resolver_returns_empty_patch_when_disabled():
     from src.agent.nodes.kc_skill_resolver import kc_skill_resolver_node
 
-    state = {"use_kc_skills": False, "knowledge_graph": _graph(["乘法原理"])}
+    state = {"use_kc_skills": False, "knowledge_graph": _graph(["multiplication principle"])}
     patch_dict = kc_skill_resolver_node(state)
     assert patch_dict == {}
 
@@ -69,7 +69,7 @@ def test_resolver_rule_match_only_fills_kc_skills():
     mock_llm.assert_not_called()
     assert "kc_skills" in patch_dict
     assert "乘法原理" in patch_dict["kc_skills"]
-    assert patch_dict["kc_skills"]["乘法原理"]["考察重点"] == "A-重点"
+    assert patch_dict["kc_skills"]["乘法原理"]["考察重点"] == "A-focus"
     # stored as plain dict, not KCSkill instance
     assert isinstance(patch_dict["kc_skills"]["乘法原理"], dict)
 
@@ -87,21 +87,21 @@ def test_resolver_falls_back_to_llm_for_unmatched_nodes():
     }
 
     def fake_llm(unresolved, _candidates):
-        # Only "给地图涂色" should be in unresolved — map it to the 染色 route
-        return {"给地图涂色": "root----染色计数问题"}
+        # Only "color-the-map" should be in unresolved — map it to the coloring route
+        return {"color-the-map": "root----染色计数问题"}
 
     with patch.object(node_mod, "_llm_resolve", side_effect=fake_llm) as mock_llm:
         state = {
             "use_kc_skills": True,
-            "knowledge_graph": _graph(["乘法原理", "给地图涂色"]),
+            "knowledge_graph": _graph(["乘法原理", "color-the-map"]),
         }
         patch_dict = node_mod.kc_skill_resolver_node(state)
 
     mock_llm.assert_called_once()
     called_args = mock_llm.call_args
-    assert called_args.args[0] == ["给地图涂色"]  # only unresolved node passed
-    assert patch_dict["kc_skills"]["乘法原理"]["考察重点"] == "A-重点"
-    assert patch_dict["kc_skills"]["给地图涂色"]["考察重点"] == "B-重点"
+    assert called_args.args[0] == ["color-the-map"]  # only unresolved node passed
+    assert patch_dict["kc_skills"]["乘法原理"]["考察重点"] == "A-focus"
+    assert patch_dict["kc_skills"]["color-the-map"]["考察重点"] == "B-focus"
 
 
 def test_resolver_llm_error_preserves_rule_results():
@@ -113,14 +113,14 @@ def test_resolver_llm_error_preserves_rule_results():
     with patch.object(node_mod, "_llm_resolve", side_effect=RuntimeError("llm down")):
         state = {
             "use_kc_skills": True,
-            "knowledge_graph": _graph(["乘法原理", "未知节点"]),
+            "knowledge_graph": _graph(["乘法原理", "unknown-node"]),
         }
         patch_dict = node_mod.kc_skill_resolver_node(state)
 
     # Rule-matched survives
     assert "乘法原理" in patch_dict["kc_skills"]
     # Unmatched dropped silently
-    assert "未知节点" not in patch_dict["kc_skills"]
+    assert "unknown-node" not in patch_dict["kc_skills"]
 
 
 def test_resolver_skips_llm_when_leaf_index_empty():
@@ -131,7 +131,7 @@ def test_resolver_skips_llm_when_leaf_index_empty():
     kc_loader._LEAF_INDEX = {}
 
     with patch.object(node_mod, "_llm_resolve") as mock_llm:
-        state = {"use_kc_skills": True, "knowledge_graph": _graph(["任何节点"])}
+        state = {"use_kc_skills": True, "knowledge_graph": _graph(["any-node"])}
         patch_dict = node_mod.kc_skill_resolver_node(state)
 
     mock_llm.assert_not_called()
@@ -158,7 +158,7 @@ def test_resolver_id_fast_path_for_route_id():
         mock_leaf.assert_not_called()
 
     assert "乘法原理" in result["kc_skills"]
-    assert result["kc_skills"]["乘法原理"]["考察重点"] == "A-重点"
+    assert result["kc_skills"]["乘法原理"]["考察重点"] == "A-focus"
 
 
 def test_resolver_skips_synthetic_prefix_silently():

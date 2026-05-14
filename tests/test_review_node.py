@@ -99,14 +99,14 @@ class TestRenderDirective:
 
     def test_only_weak_kps(self) -> None:
         from src.agent.nodes.review import _render_directive
-        out = _render_directive(weak_kps=["分配律", "交换律"], strong_kps=[])
-        assert "分配律" in out and "交换律" in out
+        out = _render_directive(weak_kps=["distributive law", "commutative law"], strong_kps=[])
+        assert "distributive law" in out and "commutative law" in out
         assert "薄弱" in out or "巩固" in out
 
     def test_only_strong_kps(self) -> None:
         from src.agent.nodes.review import _render_directive
-        out = _render_directive(weak_kps=[], strong_kps=["求根公式"])
-        assert "求根公式" in out
+        out = _render_directive(weak_kps=[], strong_kps=["quadratic formula"])
+        assert "quadratic formula" in out
         assert "已掌握" in out or "略" in out
 
     def test_both_present(self) -> None:
@@ -278,7 +278,7 @@ class TestGenerateReviewQuestions:
 
     @patch("src.agent.nodes.review.get_llm_client")
     def test_recent_questions_none_omits_section(self, mock_get_client) -> None:
-        """No recent-questions input → no 已出过 block in prompt (default path)."""
+        """No recent-questions input → no previously-asked-questions block in prompt (default path)."""
         from src.agent.nodes.review import generate_review_questions
         from src.llm.schemas import QuizQuestion
 
@@ -293,7 +293,7 @@ class TestGenerateReviewQuestions:
         rendered = mock_client.chat.completions.create.call_args.kwargs[
             "messages"
         ][0]["content"]
-        assert "已出过" not in rendered
+        assert "used recently" not in rendered
 
     @patch("src.agent.nodes.review.get_llm_client")
     def test_none_last_accuracy_does_not_crash(self, mock_get_client) -> None:

@@ -8,7 +8,7 @@ Usage:
             uv run python -m tests.manual.smoke_pr2
 
 Verifies spec §11 PR-2 acceptance:
-  > fixture state 手工跑 run_memory_review + refresh_progress, 看 SQLite 多出条目.
+  > fixture state: manually run run_memory_review + refresh_progress, check SQLite row count increases.
 
 Prints SQLite row deltas + the correlation_id so the operator can manually
 grep notes_history / op_errors. NOT included in pytest collection — the file
@@ -102,10 +102,10 @@ def main() -> int:
     session_id = f"smoke_{int(time.time())}"
 
     state = {
-        "topic": "勾股定理",
+        "topic": "Pythagorean theorem",
         "messages": [
-            {"role": "user", "content": "我把'坐标两点距离'记成了'两点坐标差'，没平方再开方"},
-            {"role": "assistant", "content": "对的，你需要先平方再开方。"},
+            {"role": "user", "content": "I confused 'distance between two coordinate points' with 'difference of coordinates', forgetting to square then take the square root"},
+            {"role": "assistant", "content": "Right, you need to square first and then take the square root."},
         ],
         "questions": [],
         "answers": [],
@@ -116,9 +116,9 @@ def main() -> int:
             correct=2,
             incorrect=2,
             breakdown=[
-                DiagnosisBreakdown(name="勾股定理公式", status="mastered", detail="ok"),
+                DiagnosisBreakdown(name="Pythagorean formula", status="mastered", detail="ok"),
                 DiagnosisBreakdown(
-                    name="坐标两点距离",
+                    name="coordinate distance",
                     status="weak",
                     detail="distance error",
                 ),

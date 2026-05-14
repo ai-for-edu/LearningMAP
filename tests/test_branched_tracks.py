@@ -77,7 +77,7 @@ class TestUserMessageDispatch:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
-                "/api/chat", json={"message": "学习 积分", "mode": "learning"}
+                "/api/chat", json={"message": "Learn integral", "mode": "learning"}
             )
             sess_id = resp.json()["session_id"]
 
@@ -85,7 +85,7 @@ class TestUserMessageDispatch:
             data = state_resp.json()
             assert data["session_mode"] == "learning"
             assert len(data.get("messages", [])) == 2
-            assert data["messages"][0]["content"] == "学习 积分"
+            assert data["messages"][0]["content"] == "Learn integral"
             assert data.get("chat_messages") in (None, [])
 
     async def test_toggle_dispatch_keeps_prior_track_intact(
@@ -108,7 +108,7 @@ class TestUserMessageDispatch:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             # First message in chat mode
-            r1 = await client.post("/api/chat", json={"message": "什么是导数"})
+            r1 = await client.post("/api/chat", json={"message": "What is a derivative"})
             sess_id = r1.json()["session_id"]
 
             # Toggle to learning
@@ -117,7 +117,7 @@ class TestUserMessageDispatch:
             # Send a learning-mode message
             await client.post("/api/chat", json={
                 "session_id": sess_id,
-                "message": "学习 导数",
+                "message": "Learn derivative",
             })
 
             state_resp = await client.get(f"/api/chat/{sess_id}/state")
@@ -127,8 +127,8 @@ class TestUserMessageDispatch:
             learn_msgs = data.get("messages") or []
             assert len(chat_msgs) == 2  # user + ai from chat turn
             assert len(learn_msgs) == 2  # user + ai from learning turn
-            assert chat_msgs[0]["content"] == "什么是导数"
-            assert learn_msgs[0]["content"] == "学习 导数"
+            assert chat_msgs[0]["content"] == "What is a derivative"
+            assert learn_msgs[0]["content"] == "Learn derivative"
 
 
 @pytest.mark.asyncio
@@ -149,7 +149,7 @@ class TestStateExposesChatMessages:
                 additional_kwargs={"cta": {"type": "learn_topic", "topic": "X"}},
             ),
         ]
-        state["messages"] = [HumanMessage(content="学习 X")]
+        state["messages"] = [HumanMessage(content="Learn X")]
         chat_api._sessions[sess_id] = state
 
         transport = ASGITransport(app=app)
@@ -162,4 +162,4 @@ class TestStateExposesChatMessages:
                 "cta": {"type": "learn_topic", "topic": "X"}
             }
             assert "messages" in data
-            assert data["messages"][0]["content"] == "学习 X"
+            assert data["messages"][0]["content"] == "Learn X"

@@ -19,22 +19,22 @@ def reset_kc_state(tmp_path):
             "route": "拓展思维----计数模块----加乘原理----乘法原理",
             "leaf": "乘法原理",
             "skill": {
-                "description": "乘法原理 desc",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "description": "multiplication principle desc",
+                "考察重点": "focus",
+                "考察形式": "format",
+                "易错点": "mistake",
+                "难度提示": "difficulty",
             },
         },
         "拓展思维----计数模块----加乘原理----乘法原理----乘法原理里的其他类型": {
             "route": "拓展思维----计数模块----加乘原理----乘法原理----乘法原理里的其他类型",
             "leaf": "乘法原理里的其他类型",
             "skill": {
-                "description": "其他类型 desc",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "description": "other types desc",
+                "考察重点": "focus",
+                "考察形式": "format",
+                "易错点": "mistake",
+                "难度提示": "difficulty",
             },
         },
         # One-char segment to test Tier 2 guard
@@ -42,11 +42,11 @@ def reset_kc_state(tmp_path):
             "route": "知识点----几何----线",
             "leaf": "线",
             "skill": {
-                "description": "线 desc",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "description": "line desc",
+                "考察重点": "focus",
+                "考察形式": "format",
+                "易错点": "mistake",
+                "难度提示": "difficulty",
             },
         },
         # Containment match candidate
@@ -54,11 +54,11 @@ def reset_kc_state(tmp_path):
             "route": "拓展思维----组合----抽屉原理",
             "leaf": "抽屉原理",
             "skill": {
-                "description": "抽屉 desc",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "description": "pigeonhole desc",
+                "考察重点": "focus",
+                "考察形式": "format",
+                "易错点": "mistake",
+                "难度提示": "difficulty",
             },
         },
     }
@@ -90,7 +90,7 @@ def test_rule_match_short_segment_exact_only():
 
 
 def test_rule_match_returns_none_on_unrelated():
-    assert _rule_match_route("完全不相关的词") is None
+    assert _rule_match_route("completely unrelated term") is None
 
 
 def test_rule_match_empty_topic():
@@ -190,7 +190,7 @@ def test_node_id_is_route_and_name_is_last_segment():
 def test_node_description_uses_skill_when_registered():
     g = _extract_subgraph("拓展思维----计数模块----加乘原理----乘法原理", max_nodes=10)
     core = [n for n in g.nodes if n.level == "core"][0]
-    assert core.description == "乘法原理 desc"
+    assert core.description == "multiplication principle desc"
 
 
 def test_node_description_falls_back_for_synthetic():
@@ -324,10 +324,10 @@ def test_resolve_returns_graph_on_match():
 
 def test_resolve_preserves_user_topic_string():
     """KnowledgeGraph.topic is the raw user input, not the matched route's last segment."""
-    g = resolve_kc_graph("我想学乘法原理", max_nodes=10)
+    g = resolve_kc_graph("I want to learn 乘法原理", max_nodes=10)
     assert g is not None
     assert (
-        g.topic == "我想学乘法原理"
+        g.topic == "I want to learn 乘法原理"
     )  # passthrough — fails if topic=topic is dropped from _extract_subgraph call
     cores = [n for n in g.nodes if n.level == "core"]
     assert (
@@ -336,7 +336,7 @@ def test_resolve_preserves_user_topic_string():
 
 
 def test_resolve_returns_none_on_miss():
-    assert resolve_kc_graph("完全无关的话题") is None
+    assert resolve_kc_graph("completely unrelated topic") is None
 
 
 def test_resolve_llm_mode_raises_not_implemented():
@@ -363,8 +363,8 @@ def test_llm_generate_graph_threads_focus_directive_into_prompt():
     state = {
         "use_kc_skills": False,
         "review_result": {
-            "focus_directive": "学生在 分配律 上仍薄弱.",
-            "weak_kps": ["分配律"],
+            "focus_directive": "The student is still weak on distributive law.",
+            "weak_kps": ["distributive law"],
             "strong_kps": [],
             "score": 0.5,
         },
@@ -373,12 +373,12 @@ def test_llm_generate_graph_threads_focus_directive_into_prompt():
     with patch("src.agent.nodes.knowledge_graph.get_llm_client") as mock_client:
         # Return a minimal valid KnowledgeGraph
         mock_client.return_value.chat.completions.create.return_value = (
-            KnowledgeGraph(topic="二次方程", nodes=[], edges=[])
+            KnowledgeGraph(topic="quadratic equations", nodes=[], edges=[])
         )
 
-        _llm_generate_graph("二次方程", state)
+        _llm_generate_graph("quadratic equations", state)
 
         call_kwargs = mock_client.return_value.chat.completions.create.call_args.kwargs
         sent_prompt = call_kwargs["messages"][0]["content"]
-        assert "分配律" in sent_prompt
+        assert "distributive law" in sent_prompt
         assert "Focus Directive" in sent_prompt

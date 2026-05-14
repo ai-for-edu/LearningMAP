@@ -96,18 +96,18 @@ def memory_service(tmp_path_factory: pytest.TempPathFactory):
 
 
 def _make_session_a_state() -> dict:
-    """Session A: 学勾股定理, 判别式答错, 求根公式答对."""
+    """Session A: learning Pythagorean theorem, discriminant wrong, quadratic formula correct."""
     return {
-        "topic": "勾股定理",
+        "topic": "Pythagorean theorem",
         "questions": [
             QuizQuestion(
-                id="q1", knowledge_point="判别式",
-                question="判别式 b²-4ac 的作用是？",
-                options=["判断根的个数", "求根", "因式分解", "配方"], answer=0,
+                id="q1", knowledge_point="discriminant",
+                question="What is the role of the discriminant b²-4ac?",
+                options=["determine the number of roots", "find roots", "factor", "complete the square"], answer=0,
             ),
             QuizQuestion(
-                id="q2", knowledge_point="求根公式",
-                question="x²-4x+4=0 的解是？",
+                id="q2", knowledge_point="quadratic formula",
+                question="Solve x²-4x+4=0.",
                 options=["x=1", "x=2", "x=3", "x=4"], answer=1,
             ),
         ],
@@ -115,35 +115,35 @@ def _make_session_a_state() -> dict:
         "diagnosis_result": DiagnosisResult(
             score=50, total=2, correct=1, incorrect=1,
             breakdown=[
-                DiagnosisBreakdown(name="判别式", status="weak", detail="0/1 需复习"),
-                DiagnosisBreakdown(name="求根公式", status="mastered", detail="1/1 已掌握"),
+                DiagnosisBreakdown(name="discriminant", status="weak", detail="0/1 needs review"),
+                DiagnosisBreakdown(name="quadratic formula", status="mastered", detail="1/1 mastered"),
             ],
         ),
     }
 
 
 def _make_session_b_state() -> dict:
-    """Session B: 学二次函数, 顶点式答错."""
+    """Session B: learning quadratic functions, vertex form wrong."""
     return {
-        "topic": "二次函数",
+        "topic": "quadratic functions",
         "questions": [
             QuizQuestion(
-                id="q3", knowledge_point="顶点式",
-                question="y=2(x-1)²+3 的顶点是？",
+                id="q3", knowledge_point="vertex form",
+                question="What is the vertex of y=2(x-1)²+3?",
                 options=["(1,3)", "(2,3)", "(-1,3)", "(1,-3)"], answer=0,
             ),
             QuizQuestion(
-                id="q4", knowledge_point="开口方向",
-                question="y=-x²+1 的开口方向？",
-                options=["向上", "向下", "向左", "向右"], answer=1,
+                id="q4", knowledge_point="opening direction",
+                question="Which direction does y=-x²+1 open?",
+                options=["up", "down", "left", "right"], answer=1,
             ),
         ],
         "answers": [2, 1],  # q3 wrong, q4 correct
         "diagnosis_result": DiagnosisResult(
             score=50, total=2, correct=1, incorrect=1,
             breakdown=[
-                DiagnosisBreakdown(name="顶点式", status="weak", detail="0/1 需复习"),
-                DiagnosisBreakdown(name="开口方向", status="mastered", detail="1/1 已掌握"),
+                DiagnosisBreakdown(name="vertex form", status="weak", detail="0/1 needs review"),
+                DiagnosisBreakdown(name="opening direction", status="mastered", detail="1/1 mastered"),
             ],
         ),
     }
@@ -162,13 +162,13 @@ class TestPayloadValidity:
         assert resp.status_code == 200, f"Rejected: {resp.text}"
         data = resp.json()
         assert data["status"] == "ok"
-        assert data["memory_count"] == 2  # 判别式 + 求根公式
+        assert data["memory_count"] == 2  # discriminant + quadratic formula
 
     def test_session_b_payload_accepted(self, memory_service: httpx.Client) -> None:
         payload = _build_ingest_payload("user1", "valid_b", _make_session_b_state())
         resp = memory_service.post("/ingest", json=payload)
         assert resp.status_code == 200, f"Rejected: {resp.text}"
-        assert resp.json()["memory_count"] == 2  # 顶点式 + 开口方向
+        assert resp.json()["memory_count"] == 2  # vertex form + opening direction
 
 
 class TestCrossSessionRetrieval:
@@ -185,7 +185,7 @@ class TestCrossSessionRetrieval:
         # Session B: retrieve (different session, same user)
         resp = memory_service.post("/retrieve", json={
             "user_id": "cross_user",
-            "query": "勾股定理 判别式",
+            "query": "Pythagorean theorem discriminant",
             "top_k": 5,
         })
         assert resp.status_code == 200
@@ -196,7 +196,7 @@ class TestCrossSessionRetrieval:
 
         # Should contain session A's topic
         all_text = data["context_text"]
-        assert "勾股定理" in all_text
+        assert "Pythagorean theorem" in all_text
 
     def test_multiple_sessions_accumulate(
         self, memory_service: httpx.Client
@@ -210,7 +210,7 @@ class TestCrossSessionRetrieval:
         # Retrieve broadly
         resp = memory_service.post("/retrieve", json={
             "user_id": "accum_user",
-            "query": "数学学习",
+            "query": "mathematics study",
             "top_k": 10,
         })
         assert resp.status_code == 200
@@ -220,8 +220,8 @@ class TestCrossSessionRetrieval:
         assert len(results) == 4
 
         topics = {r["topic"] for r in results}
-        assert "勾股定理" in topics
-        assert "二次函数" in topics
+        assert "Pythagorean theorem" in topics
+        assert "quadratic functions" in topics
 
     def test_retrieve_shows_diagnosis_detail(
         self, memory_service: httpx.Client
@@ -232,13 +232,13 @@ class TestCrossSessionRetrieval:
 
         resp = memory_service.post("/retrieve", json={
             "user_id": "detail_user",
-            "query": "勾股定理",
+            "query": "Pythagorean theorem",
             "top_k": 5,
         })
 
         context = resp.json()["context_text"]
         # Should contain stats from the ingested session
-        assert "wrong_answer" in context or "weak" in context or "判别式" in context
+        assert "wrong_answer" in context or "weak" in context or "discriminant" in context
 
 
 class TestUserIsolation:
@@ -250,7 +250,7 @@ class TestUserIsolation:
 
         resp = memory_service.post("/retrieve", json={
             "user_id": "iso_user2",
-            "query": "勾股定理",
+            "query": "Pythagorean theorem",
             "top_k": 5,
         })
         assert resp.status_code == 200
@@ -276,7 +276,7 @@ class TestDuplicateProtection:
         # Retrieve should still return exactly 2 (not 4)
         resp = memory_service.post("/retrieve", json={
             "user_id": "dup_user",
-            "query": "勾股定理",
+            "query": "Pythagorean theorem",
             "top_k": 10,
         })
         assert len(resp.json()["results"]) == 2
@@ -288,7 +288,7 @@ class TestEmptyState:
     def test_retrieve_before_any_ingest(self, memory_service: httpx.Client) -> None:
         resp = memory_service.post("/retrieve", json={
             "user_id": "empty_user",
-            "query": "什么都没学过",
+            "query": "nothing studied yet",
             "top_k": 5,
         })
         assert resp.status_code == 200

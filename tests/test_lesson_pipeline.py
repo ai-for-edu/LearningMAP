@@ -29,39 +29,39 @@ from src.prompts.loader import render_prompt
 def test_knowledge_skill_prompt_renders():
     result = render_prompt(
         "knowledge_skill",
-        knowledge_point_name="勾股定理",
-        knowledge_point_description="直角三角形三边关系 a²+b²=c²",
-        pedagogy_method="费曼学习法",
-        pedagogy_instructions="用简单语言解释概念，多用类比",
-        topic="初中数学-勾股定理",
+        knowledge_point_name="Pythagorean theorem",
+        knowledge_point_description="right triangle side relationship a²+b²=c²",
+        pedagogy_method="Feynman Technique",
+        pedagogy_instructions="Explain concepts in simple language, use analogies",
+        topic="middle school math - Pythagorean theorem",
     )
-    assert "勾股定理" in result
-    assert "费曼学习法" in result
+    assert "Pythagorean theorem" in result
+    assert "Feynman Technique" in result
     assert "a²+b²=c²" in result
 
 
 def test_lesson_point_prompt_renders():
     result = render_prompt(
         "lesson_point",
-        topic="初中数学-勾股定理",
-        knowledge_point_name="勾股定理",
-        knowledge_point_description="直角三角形三边关系",
-        pedagogy_instructions="用简单语言解释",
-        knowledge_skill="教学切入点：从测量距离出发...",
+        topic="middle school math - Pythagorean theorem",
+        knowledge_point_name="Pythagorean theorem",
+        knowledge_point_description="right triangle side relationship",
+        pedagogy_instructions="Explain in simple language",
+        knowledge_skill="Teaching entry point: starting from measuring distance...",
         point_index=1,
         total_points=3,
     )
-    assert "勾股定理" in result
-    assert "教学切入点" in result
+    assert "Pythagorean theorem" in result
+    assert "Teaching entry point" in result
 
 
 def test_lesson_point_prompt_without_knowledge_skill():
     result = render_prompt(
         "lesson_point",
-        topic="初中数学",
-        knowledge_point_name="基础",
+        topic="middle school math",
+        knowledge_point_name="fundamentals",
         knowledge_point_description="desc",
-        pedagogy_instructions="用简单语言解释",
+        pedagogy_instructions="Explain in simple language",
         knowledge_skill="no additional teaching strategy",
         point_index=1,
         total_points=1,
@@ -106,7 +106,7 @@ def _make_graph_and_diagnosis(
         )
         breakdown.append(DiagnosisBreakdown(name=name, status="mastered", detail="2/2"))
 
-    graph = KnowledgeGraph(topic="测试主题", nodes=nodes, edges=[])
+    graph = KnowledgeGraph(topic="test topic", nodes=nodes, edges=[])
     diagnosis = DiagnosisResult(
         score=0,
         total=len(nodes) * 2,
@@ -125,23 +125,23 @@ def _make_graph_and_diagnosis(
 def test_retrieve_skills_returns_both_skill_types():
     from src.agent.nodes.lesson import retrieve_skills
 
-    graph, diagnosis = _make_graph_and_diagnosis(["基础"], ["逆定理"])
+    graph, diagnosis = _make_graph_and_diagnosis(["fundamentals"], ["converse theorem"])
     state = {
-        "topic": "勾股定理",
+        "topic": "Pythagorean theorem",
         "knowledge_graph": graph,
         "diagnosis_result": diagnosis,
         "active_skill": "feynman",
-        "active_skill_content": {"lesson": "用简单语言解释概念"},
+        "active_skill_content": {"lesson": "Explain concepts in simple language"},
         "use_knowledge_skills": True,
     }
 
-    mock_client = _make_mock_client(["教学切入点：..."])
+    mock_client = _make_mock_client(["Teaching entry point: ..."])
     with patch("src.agent.nodes.lesson.get_raw_client", return_value=mock_client):
         pedagogy, knowledge_skills, weak_points = retrieve_skills(state)
 
-    assert pedagogy == "用简单语言解释概念"
+    assert pedagogy == "Explain concepts in simple language"
     assert len(knowledge_skills) == 1
-    assert "基础" in knowledge_skills
+    assert "fundamentals" in knowledge_skills
     assert len(weak_points) == 1
 
 
@@ -154,22 +154,22 @@ def test_retrieve_skills_filters_blank_names():
     """
     from src.agent.nodes.lesson import retrieve_skills
 
-    graph, diagnosis = _make_graph_and_diagnosis(["基础", "", "  "])
+    graph, diagnosis = _make_graph_and_diagnosis(["fundamentals", "", "  "])
     state = {
-        "topic": "勾股定理",
+        "topic": "Pythagorean theorem",
         "knowledge_graph": graph,
         "diagnosis_result": diagnosis,
         "active_skill": "feynman",
-        "active_skill_content": {"lesson": "用简单语言解释"},
+        "active_skill_content": {"lesson": "Explain in simple language"},
         "use_knowledge_skills": True,
     }
 
-    mock_client = _make_mock_client(["技能卡片内容"])
+    mock_client = _make_mock_client(["Skill card content"])
     with patch("src.agent.nodes.lesson.get_raw_client", return_value=mock_client):
         pedagogy, knowledge_skills, weak_points = retrieve_skills(state)
 
-    assert list(knowledge_skills.keys()) == ["基础"]
-    assert [wp["name"] for wp in weak_points] == ["基础"]
+    assert list(knowledge_skills.keys()) == ["fundamentals"]
+    assert [wp["name"] for wp in weak_points] == ["fundamentals"]
     assert mock_client.chat.completions.create.call_count == 1
 
 
@@ -182,49 +182,49 @@ def test_retrieve_skills_drops_review_strong_kps():
     """
     from src.agent.nodes.lesson import retrieve_skills
 
-    graph, diagnosis = _make_graph_and_diagnosis(["基础", "应用", "拓展"])
+    graph, diagnosis = _make_graph_and_diagnosis(["fundamentals", "applications", "extensions"])
     state = {
-        "topic": "勾股定理",
+        "topic": "Pythagorean theorem",
         "knowledge_graph": graph,
         "diagnosis_result": diagnosis,
         "use_knowledge_skills": False,
         "review_result": {
-            "weak_kps": ["应用"],
-            "strong_kps": ["基础", "拓展"],
+            "weak_kps": ["applications"],
+            "strong_kps": ["fundamentals", "extensions"],
             "score": 0.33,
             "focus_directive": "...",
         },
     }
     _, _, weak_points = retrieve_skills(state)
-    assert [wp["name"] for wp in weak_points] == ["应用"]
+    assert [wp["name"] for wp in weak_points] == ["applications"]
 
 
 def test_retrieve_skills_no_review_keeps_all_weak():
     """Sanity: missing review_result leaves the diagnosis-weak list untouched."""
     from src.agent.nodes.lesson import retrieve_skills
 
-    graph, diagnosis = _make_graph_and_diagnosis(["基础", "应用"])
+    graph, diagnosis = _make_graph_and_diagnosis(["fundamentals", "applications"])
     state = {
-        "topic": "勾股定理",
+        "topic": "Pythagorean theorem",
         "knowledge_graph": graph,
         "diagnosis_result": diagnosis,
         "use_knowledge_skills": False,
         "review_result": None,
     }
     _, _, weak_points = retrieve_skills(state)
-    assert {wp["name"] for wp in weak_points} == {"基础", "应用"}
+    assert {wp["name"] for wp in weak_points} == {"fundamentals", "applications"}
 
 
 def test_retrieve_skills_skips_when_disabled():
     from src.agent.nodes.lesson import retrieve_skills
 
-    graph, diagnosis = _make_graph_and_diagnosis(["基础", "应用"])
+    graph, diagnosis = _make_graph_and_diagnosis(["fundamentals", "applications"])
     state = {
-        "topic": "勾股定理",
+        "topic": "Pythagorean theorem",
         "knowledge_graph": graph,
         "diagnosis_result": diagnosis,
         "active_skill": "feynman",
-        "active_skill_content": {"lesson": "用简单语言"},
+        "active_skill_content": {"lesson": "Simple language"},
         "use_knowledge_skills": False,
     }
 
@@ -247,23 +247,23 @@ def test_generate_lesson_per_point_concatenates():
 
     mock_client = _make_mock_client(
         [
-            "## 基础\n\n内容A",
-            "## 应用\n\n内容B",
+            "## fundamentals\n\nContent A",
+            "## applications\n\nContent B",
         ]
     )
     with patch("src.agent.nodes.lesson.get_raw_client", return_value=mock_client):
         result = generate_lesson_per_point(
-            topic="勾股定理",
+            topic="Pythagorean theorem",
             weak_points=[
-                {"name": "基础", "description": "desc1"},
-                {"name": "应用", "description": "desc2"},
+                {"name": "fundamentals", "description": "desc1"},
+                {"name": "applications", "description": "desc2"},
             ],
-            pedagogy_instructions="用简单语言",
-            knowledge_skills={"基础": "切入点A", "应用": "切入点B"},
+            pedagogy_instructions="Simple language",
+            knowledge_skills={"fundamentals": "Entry point A", "applications": "Entry point B"},
         )
 
-    assert "## 基础" in result
-    assert "## 应用" in result
+    assert "## fundamentals" in result
+    assert "## applications" in result
     assert "---" in result
     assert mock_client.chat.completions.create.call_count == 2
 
@@ -277,24 +277,24 @@ def test_lesson_node_two_step_pipeline():
     """2 weak points → 4 LLM calls: 2 knowledge skills + 2 lesson sections."""
     from src.agent.nodes.lesson import lesson_node
 
-    graph, diagnosis = _make_graph_and_diagnosis(["基础", "应用"], ["逆定理"])
+    graph, diagnosis = _make_graph_and_diagnosis(["fundamentals", "applications"], ["converse theorem"])
     state = {
         "messages": [],
         "mode": "result",
-        "topic": "勾股定理",
+        "topic": "Pythagorean theorem",
         "knowledge_graph": graph,
         "diagnosis_result": diagnosis,
         "active_skill": "feynman",
-        "active_skill_content": {"lesson": "用类比解释"},
+        "active_skill_content": {"lesson": "Explain with analogies"},
         "use_knowledge_skills": True,
     }
 
     mock_client = _make_mock_client(
         [
-            "教学技能：基础切入...",
-            "教学技能：应用切入...",
-            "## 基础\n\n内容...",
-            "## 应用\n\n内容...",
+            "Teaching skill: fundamentals entry...",
+            "Teaching skill: applications entry...",
+            "## fundamentals\n\nContent...",
+            "## applications\n\nContent...",
         ]
     )
 
@@ -302,10 +302,10 @@ def test_lesson_node_two_step_pipeline():
         result = lesson_node(state)
 
     assert result["mode"] == "lesson"
-    assert "基础" in result["lesson_content"]
-    assert "应用" in result["lesson_content"]
+    assert "fundamentals" in result["lesson_content"]
+    assert "applications" in result["lesson_content"]
     assert result["knowledge_skills"] is not None
-    assert "基础" in result["knowledge_skills"]
+    assert "fundamentals" in result["knowledge_skills"]
     assert mock_client.chat.completions.create.call_count == 4
 
 
@@ -313,22 +313,22 @@ def test_lesson_node_knowledge_skills_disabled():
     """use_knowledge_skills=False → only 2 LLM calls (lesson content only)."""
     from src.agent.nodes.lesson import lesson_node
 
-    graph, diagnosis = _make_graph_and_diagnosis(["基础", "应用"])
+    graph, diagnosis = _make_graph_and_diagnosis(["fundamentals", "applications"])
     state = {
         "messages": [],
         "mode": "result",
-        "topic": "勾股定理",
+        "topic": "Pythagorean theorem",
         "knowledge_graph": graph,
         "diagnosis_result": diagnosis,
         "active_skill": "feynman",
-        "active_skill_content": {"lesson": "用类比解释"},
+        "active_skill_content": {"lesson": "Explain with analogies"},
         "use_knowledge_skills": False,
     }
 
     mock_client = _make_mock_client(
         [
-            "## 基础\n\n内容...",
-            "## 应用\n\n内容...",
+            "## fundamentals\n\nContent...",
+            "## applications\n\nContent...",
         ]
     )
 
@@ -344,11 +344,11 @@ def test_lesson_node_all_mastered():
     """All mastered → 1 LLM call (review lesson), no knowledge skills."""
     from src.agent.nodes.lesson import lesson_node
 
-    graph, diagnosis = _make_graph_and_diagnosis([], ["基础", "应用"])
+    graph, diagnosis = _make_graph_and_diagnosis([], ["fundamentals", "applications"])
     state = {
         "messages": [],
         "mode": "result",
-        "topic": "勾股定理",
+        "topic": "Pythagorean theorem",
         "knowledge_graph": graph,
         "diagnosis_result": diagnosis,
         "active_skill": None,
@@ -356,7 +356,7 @@ def test_lesson_node_all_mastered():
         "use_knowledge_skills": True,
     }
 
-    mock_client = _make_mock_client(["复习内容..."])
+    mock_client = _make_mock_client(["Review content..."])
 
     with patch("src.agent.nodes.lesson.get_raw_client", return_value=mock_client):
         result = lesson_node(state)
@@ -375,19 +375,19 @@ def test_generate_lesson_per_point_threads_focus_directive_into_prompt():
     """Focus directive must appear in the rendered lesson_point prompt."""
     from src.agent.nodes.lesson import generate_lesson_per_point
 
-    weak_points = [{"name": "分配律", "description": "..."}]
+    weak_points = [{"name": "distributive law", "description": "..."}]
     pedagogy_instructions = ""
     knowledge_skills = {}
-    directive = "学生在 分配律 上仍薄弱，本次教案应优先衔接这些点。"
+    directive = "The student is still weak on distributive law; prioritize bridging this point in the lesson plan."
 
     with patch("src.agent.nodes.lesson.get_raw_client") as mock_client:
         mock_resp = MagicMock()
         mock_resp.choices = [MagicMock()]
-        mock_resp.choices[0].message.content = "教案"
+        mock_resp.choices[0].message.content = "Lesson plan"
         mock_client.return_value.chat.completions.create.return_value = mock_resp
 
         generate_lesson_per_point(
-            "二次方程", weak_points, pedagogy_instructions, knowledge_skills,
+            "quadratic equations", weak_points, pedagogy_instructions, knowledge_skills,
             focus_directive=directive,
         )
 

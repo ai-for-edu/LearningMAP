@@ -134,16 +134,16 @@ class TestQuizNodePinsKnowledgePoint:
         from src.llm.schemas import KnowledgeEdge, KnowledgeGraph, QuizQuestion
 
         graph = KnowledgeGraph(
-            topic="二次方程",
-            nodes=[KnowledgeNode(id="n1", name="判别式", description="d", level="core")],
+            topic="quadratic equations",
+            nodes=[KnowledgeNode(id="n1", name="discriminant", description="d", level="core")],
             edges=[],
         )
         # Simulate LLM returning a polluted knowledge_point string
         polluted = QuizQuestion(
             id="q1",
-            knowledge_point="判别式: 这道题考察判别式的计算与根的判断",
-            question="b²-4ac < 0 时？",
-            options=["两实根", "一实根", "无实根", "无法判断"],
+            knowledge_point="discriminant: This question tests discriminant calculation and root judgment",
+            question="When b²-4ac < 0?",
+            options=["two real roots", "one real root", "no real roots", "cannot determine"],
             answer=2,
         )
         with patch("src.agent.nodes.quiz.get_llm_client") as mock_client:
@@ -151,7 +151,7 @@ class TestQuizNodePinsKnowledgePoint:
             out = quiz_node({"knowledge_graph": graph, "questions": []})
 
         # After the pin, the question's knowledge_point must equal the KG node name
-        assert out["questions"][0].knowledge_point == "判别式"
+        assert out["questions"][0].knowledge_point == "discriminant"
 
     def test_progressive_pins_kp_to_node_name(self) -> None:
         from unittest.mock import MagicMock, patch
@@ -159,13 +159,13 @@ class TestQuizNodePinsKnowledgePoint:
         from src.llm.schemas import KnowledgeEdge, KnowledgeGraph, QuizQuestion
 
         graph = KnowledgeGraph(
-            topic="二次方程",
-            nodes=[KnowledgeNode(id="n1", name="求根公式", description="d", level="core")],
+            topic="quadratic equations",
+            nodes=[KnowledgeNode(id="n1", name="quadratic formula", description="d", level="core")],
             edges=[],
         )
         polluted = QuizQuestion(
             id="q1",
-            knowledge_point="求根公式：完整推导",
+            knowledge_point="quadratic formula: complete derivation",
             question="x = ?",
             options=["a", "b", "c", "d"],
             answer=0,
@@ -175,4 +175,4 @@ class TestQuizNodePinsKnowledgePoint:
             batches = list(quiz_generate_progressive({"knowledge_graph": graph}))
 
         assert len(batches) == 1
-        assert batches[0][0].knowledge_point == "求根公式"
+        assert batches[0][0].knowledge_point == "quadratic formula"

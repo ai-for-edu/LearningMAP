@@ -146,22 +146,22 @@ def test_start_review_attaches_source_topic_to_questions(
 
     mock_fetch.return_value = [
         {
-            "subtopic": "因式分解", "topic": "乘法定理",
+            "subtopic": "factoring", "topic": "multiplication theorem",
             "last_seen_at": "2026-04-01T00:00:00Z",
             "session_count": 1, "total_questions": 4,
             "total_correct": 2, "last_accuracy": 0.5,
         },
         {
-            "subtopic": "斜边", "topic": "勾股定理",
+            "subtopic": "hypotenuse", "topic": "Pythagorean theorem",
             "last_seen_at": "2026-04-01T00:00:00Z",
             "session_count": 1, "total_questions": 4,
             "total_correct": 3, "last_accuracy": 0.75,
         },
     ]
     mock_llm.return_value.chat.completions.create.return_value = [
-        QuizQuestion(id="rq_0", knowledge_point="因式分解",
+        QuizQuestion(id="rq_0", knowledge_point="factoring",
                      question="q1", options=["a", "b", "c", "d"], answer=0),
-        QuizQuestion(id="rq_1", knowledge_point="斜边",
+        QuizQuestion(id="rq_1", knowledge_point="hypotenuse",
                      question="q2", options=["a", "b", "c", "d"], answer=1),
     ]
 
@@ -169,8 +169,8 @@ def test_start_review_attaches_source_topic_to_questions(
     assert r.status_code == 200, r.text
     qs = r.json()["questions"]
     by_kp = {q["knowledge_point"]: q for q in qs}
-    assert by_kp["因式分解"]["topic"] == "乘法定理"
-    assert by_kp["斜边"]["topic"] == "勾股定理"
+    assert by_kp["factoring"]["topic"] == "multiplication theorem"
+    assert by_kp["hypotenuse"]["topic"] == "Pythagorean theorem"
 
 
 # ---------------------------------------------------------------------------

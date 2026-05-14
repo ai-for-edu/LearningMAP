@@ -148,25 +148,25 @@ def test_extract_user_prompt_renders_with_full_inputs() -> None:
         source_event="submit-review",
         wrong_items=[
             {
-                "question_text": "x^2-4=0 的根?",
+                "question_text": "Solve x^2-4=0.",
                 "options": ["1", "2", "3", "4"],
                 "correct_label": "B",
                 "student_label": "A",
-                "kp": "求根公式",
+                "kp": "quadratic formula",
                 "last_accuracy": 0.4,
             }
         ],
         dialogue_tail=[
-            {"role": "user", "content": "我不会做"},
-            {"role": "assistant", "content": "我们来分步看"},
+            {"role": "user", "content": "I don't know how to do this"},
+            {"role": "assistant", "content": "Let's work through it step by step"},
         ],
         existing=[
-            {"category": "misconception", "content": "把判别式当求根公式用"},
+            {"category": "misconception", "content": "confuses discriminant with quadratic formula"},
         ],
     )
     assert "x^2-4=0" in out
     assert "[USER]" in out or "[STUDENT]" in out  # role rendering
-    assert "把判别式当求根公式用" in out
+    assert "confuses discriminant with quadratic formula" in out
 
 
 def test_consolidate_system_prompt_renders() -> None:
@@ -182,14 +182,14 @@ def test_consolidate_user_prompt_with_neighbors() -> None:
 
     out = render_prompt(
         "memory_consolidate_user",
-        candidate={"category": "misconception", "content": "新候选"},
+        candidate={"category": "misconception", "content": "new candidate"},
         neighbors=[
-            {"id": 1, "content": "旧条目 1", "sim_score": 0.91, "age_days": 3.0},
-            {"id": 2, "content": "旧条目 2", "sim_score": 0.85, "age_days": 7.5},
+            {"id": 1, "content": "old entry 1", "sim_score": 0.91, "age_days": 3.0},
+            {"id": 2, "content": "old entry 2", "sim_score": 0.85, "age_days": 7.5},
         ],
     )
-    assert "新候选" in out
-    assert "旧条目 1" in out
+    assert "new candidate" in out
+    assert "old entry 1" in out
     assert "id=1" in out
     assert "0.91" in out
 
@@ -199,11 +199,11 @@ def test_consolidate_user_prompt_empty_neighbors() -> None:
 
     out = render_prompt(
         "memory_consolidate_user",
-        candidate={"category": "goal", "content": "学完二次方程"},
+        candidate={"category": "goal", "content": "finish quadratic equations"},
         neighbors=[],
     )
-    assert "学完二次方程" in out
-    assert "邻居：无" in out
+    assert "finish quadratic equations" in out
+    assert "Neighbors: none" in out
 
 
 # ----------------------------------------------------------------------
@@ -238,7 +238,7 @@ def test_hash_matches_server_content_hash() -> None:
 
     from src.reviewer import _hash
 
-    text = "把'坐标两点距离'误用为'两点坐标差'"
+    text = "mistakenly applied 'two-point distance formula' as 'coordinate difference'"
     expected = hashlib.sha256(text.lower().strip().encode("utf-8")).hexdigest()[:16]
     assert _hash(text) == expected
 
@@ -256,7 +256,7 @@ def test_is_injection_catches_known_patterns() -> None:
 def test_is_injection_does_not_flag_normal_content() -> None:
     from src.reviewer import _is_injection
 
-    assert not _is_injection("学生不会用判别式")
+    assert not _is_injection("student cannot use the discriminant")
     assert not _is_injection("apples are sweet")
     assert not _is_injection("")
 
@@ -406,7 +406,7 @@ def test_extract_candidates_calls_llm_with_two_messages() -> None:
         "existing": [],
     }
     expected = ExtractResult(candidates=[
-        FactCandidate(category="goal", content="学完二次方程"),
+        FactCandidate(category="goal", content="finish quadratic equations"),
     ])
 
     fake_client = MagicMock()
@@ -537,17 +537,17 @@ def test_consolidate_renders_user_template_with_candidate_and_neighbors() -> Non
     fake_client.chat.completions.create.return_value = ConsolidationDecision(
         action="NOOP", target_id=1, reason="r",
     )
-    cand = FactCandidate(category="misconception", content="独特的候选")
+    cand = FactCandidate(category="misconception", content="unique candidate")
     neighbors = [
-        {"id": 1, "content": "邻居 A", "sim_score": 0.9, "age_days": 2.0},
+        {"id": 1, "content": "neighbor A", "sim_score": 0.9, "age_days": 2.0},
     ]
     _consolidate(fake_client, cand, neighbors=neighbors, model="m")
     msgs = fake_client.chat.completions.create.call_args.kwargs["messages"]
     assert msgs[0]["role"] == "system"
     assert msgs[1]["role"] == "user"
     user_content = msgs[1]["content"]
-    assert "独特的候选" in user_content
-    assert "邻居 A" in user_content
+    assert "unique candidate" in user_content
+    assert "neighbor A" in user_content
     assert "id=1" in user_content
 
 
@@ -756,8 +756,8 @@ def test_apply_decision_reject_writes_audit_with_candidate_content() -> None:
 @pytest.fixture
 def review_state() -> dict:
     return {
-        "topic": "勾股定理",
-        "messages": [{"role": "user", "content": "我把距离公式记错了"}],
+        "topic": "Pythagorean theorem",
+        "messages": [{"role": "user", "content": "I misremembered the distance formula"}],
         "questions": [],
         "answers": [],
         "wrong_item_last_accuracy": {},
@@ -791,9 +791,9 @@ def test_run_memory_review_full_path_one_add(review_state) -> None:
     from src import reviewer as rv
 
     extract = ExtractResult(candidates=[
-        FactCandidate(category="misconception", content="新误解"),
+        FactCandidate(category="misconception", content="new misconception"),
     ])
-    dec = ConsolidationDecision(action="ADD", new_content="新误解", reason="r")
+    dec = ConsolidationDecision(action="ADD", new_content="new misconception", reason="r")
     fake_llm = MagicMock()
     fake_llm.chat.completions.create.side_effect = [extract, dec]
 
@@ -818,7 +818,7 @@ def test_run_memory_review_hash_dedup_skips_call_b(review_state) -> None:
     from src.llm.schemas import ExtractResult, FactCandidate
     from src import reviewer as rv
 
-    cand_text = "已有同款"
+    cand_text = "existing duplicate"
     h = rv._hash(cand_text)
 
     extract = ExtractResult(candidates=[
@@ -1069,16 +1069,16 @@ def test_collect_extract_input_handles_langchain_message_objects() -> None:
 
     state = {
         "messages": [
-            HumanMessage(content="我不会做"),
-            AIMessage(content="我们来分步看"),
+            HumanMessage(content="I don't know how to do this"),
+            AIMessage(content="Let's work through it step by step"),
         ],
     }
     out = _collect_extract_input(
         state, source_event="submit-quiz", existing_notes=[],
     )
     assert out["dialogue_tail"] == [
-        {"role": "user", "content": "我不会做"},
-        {"role": "assistant", "content": "我们来分步看"},
+        {"role": "user", "content": "I don't know how to do this"},
+        {"role": "assistant", "content": "Let's work through it step by step"},
     ]
 
 

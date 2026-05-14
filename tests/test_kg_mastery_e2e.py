@@ -23,11 +23,11 @@ def test_full_pipeline_kc_path(
     mock_resolve: MagicMock,
 ) -> None:
     mock_resolve.return_value = KnowledgeGraph(
-        topic="二次方程",
+        topic="quadratic equations",
         nodes=[
-            KnowledgeNode(id="n1", name="判别式", description="d", level="core"),
-            KnowledgeNode(id="n2", name="求根公式", description="d", level="core"),
-            KnowledgeNode(id="n3", name="韦达定理", description="d", level="extension"),
+            KnowledgeNode(id="n1", name="discriminant", description="d", level="core"),
+            KnowledgeNode(id="n2", name="quadratic formula", description="d", level="core"),
+            KnowledgeNode(id="n3", name="Vieta theorem", description="d", level="extension"),
         ],
         edges=[KnowledgeEdge(source="n1", target="n2", relation="prerequisite")],
     )
@@ -39,34 +39,34 @@ def test_full_pipeline_kc_path(
     )
     mock_fetch.return_value = [
         {
-            "subtopic": "判别式",
-            "topic": "二次方程",
+            "subtopic": "discriminant",
+            "topic": "quadratic equations",
             "last_accuracy": 1.0,
             "last_seen_at": now_iso_recent,
             "session_count": 2,
         },
         {
-            "subtopic": "求根公式",
-            "topic": "二次方程",
+            "subtopic": "quadratic formula",
+            "topic": "quadratic equations",
             "last_accuracy": 0.5,
             "last_seen_at": now_iso_old,
             "session_count": 1,
         },
     ]
 
-    out = knowledge_graph_node({"topic": "二次方程", "use_kc_skills": True})
+    out = knowledge_graph_node({"topic": "quadratic equations", "use_kc_skills": True})
     graph = out["knowledge_graph"]
 
     by_name = {n.name: n for n in graph.nodes}
     # Recently studied with perfect accuracy → mastered
-    assert by_name["判别式"].mastery is not None
-    assert by_name["判别式"].mastery.status == "mastered"
+    assert by_name["discriminant"].mastery is not None
+    assert by_name["discriminant"].mastery.status == "mastered"
     # 60-day-old session with 50% accuracy → forgotten
-    assert by_name["求根公式"].mastery is not None
-    assert by_name["求根公式"].mastery.status in {"weak", "forgotten"}
+    assert by_name["quadratic formula"].mastery is not None
+    assert by_name["quadratic formula"].mastery.status in {"weak", "forgotten"}
     # Never seen: mastery is None
-    assert by_name["韦达定理"].mastery is None
+    assert by_name["Vieta theorem"].mastery is None
 
     # Quiz allocation should give the forgotten node more questions
     alloc = _allocate_questions_per_node(graph.nodes)
-    assert alloc["求根公式"] >= alloc["判别式"]
+    assert alloc["quadratic formula"] >= alloc["discriminant"]

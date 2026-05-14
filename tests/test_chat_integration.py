@@ -39,14 +39,14 @@ def test_state_persistence_roundtrip_preserves_memory_snapshot(tmp_path, monkeyp
 
     sid = f"test-{uuid.uuid4().hex[:8]}"
     state = chat_module._new_session_state()
-    state["memory_snapshot"] = "## 学习进程\n- 已开始: X"
+    state["memory_snapshot"] = "## Learning Progress\n- Started: X"
     state["memory_snapshot_loaded_at"] = 1715000000
     state["messages"] = []
     store_module.save_session(sid, state)
 
     loaded = store_module.load_session(sid)
     assert loaded is not None
-    assert loaded["memory_snapshot"] == "## 学习进程\n- 已开始: X"
+    assert loaded["memory_snapshot"] == "## Learning Progress\n- Started: X"
     assert loaded["memory_snapshot_loaded_at"] == 1715000000
 
 
@@ -142,12 +142,12 @@ async def test_chat_endpoint_fetches_snapshot_on_new_session(env_on):
     fake_graph_result = {
         "messages": [],
         "mode": "chat",
-        "memory_snapshot": "## 进程\n- X",
+        "memory_snapshot": "## Progress\n- X",
         "memory_snapshot_loaded_at": 1000,
     }
 
     with patch.object(
-        chat_module.memory_client, "fetch_snapshot", return_value="## 进程\n- X"
+        chat_module.memory_client, "fetch_snapshot", return_value="## Progress\n- X"
     ) as mock_fs, patch.object(chat_module, "_get_graph") as mock_graph:
         mock_graph.return_value.invoke.return_value = fake_graph_result
         transport = ASGITransport(app=app)
@@ -576,7 +576,7 @@ async def test_get_state_does_not_expose_memory_snapshot(env_on):
     sid = _make_session(
         {
             "topic": "T",
-            "memory_snapshot": "## 进程\n- 学生在学 X",
+            "memory_snapshot": "## Progress\n- Student studying X",
             "memory_snapshot_loaded_at": 1715000000,
         }
     )
