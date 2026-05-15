@@ -181,55 +181,55 @@ Practical notes:
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 1. 安装依赖
+### 1. Install dependencies
 
 ```bash
-uv sync                              # 主服务
-cd student_memory && uv sync && cd ..  # memory 子服务（按需）
+uv sync                              # main service
+cd student_memory && uv sync && cd ..  # memory subservice (optional)
 ```
 
-### 2. 写入 `.env`
+### 2. Write your `.env`
 
 ```bash
-# .env （仓库根目录）
+# .env (repository root)
 OPENAI_API_KEY=sk-xxxxxxxx
 OPENAI_BASE_URL=https://api.deepseek.com/v1
 LLM_MODEL=deepseek-chat
 
-# 可选 —— 不写则使用默认值
+# Optional — defaults are used if omitted
 MEMORY_SERVICE_URL=http://127.0.0.1:8090
 ALLOWED_ORIGINS=*
 REVIEW_MIN_AGE_SECONDS=86400
 
-# 可选 —— ClassBA 外部 Agent，仅在调用 run/classba_client.py 时需要
+# Optional — ClassBA external Agent, only needed when invoking run/classba_client.py
 # CLASSBA_AUTH=...
 # CLASSBA_API_URL=...
 # CLASSBA_AGENT_NAME=...
 ```
 
-### 3. 启动
+### 3. Start the services
 
-**主服务（8080）**
+**Main service (port 8080)**
 
 ```bash
 uv run python run/serve.py
 # Uvicorn → http://0.0.0.0:8080
 ```
 
-**Memory 子服务（8090，可选）**
+**Memory subservice (port 8090, optional)**
 
 ```bash
 cd student_memory
 SM_USE_FAKE_EMBEDDER=1 uv run uvicorn app.main:app --host 127.0.0.1 --port 8090
 ```
 
-> Memory 服务不可用时，主服务**自动优雅降级**（不注入 context_text、不写 ingest），不会阻塞对话。
+> When the memory service is unavailable, the main service **gracefully degrades** (no `context_text` injection, no `ingest` writes) without blocking the conversation.
 
-### 4. 访问前端
+### 4. Open the frontend
 
-浏览器打开 `http://localhost:8080/`（FastAPI 已挂载 `static/`）。
+Open `http://localhost:8080/` in a browser (FastAPI serves `static/`).
 
 ---
 
