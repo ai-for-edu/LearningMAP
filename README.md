@@ -233,21 +233,21 @@ Open `http://localhost:8080/` in a browser (FastAPI serves `static/`).
 
 ---
 
-## 环境变量
+## Environment Variables
 
-主服务读取的全部变量（在 `.env` 或进程环境中）：
+All variables read by the main service (set in `.env` or process environment):
 
-| 变量 | 默认值 | 用途 |
+| Variable | Default | Purpose |
 |---|---|---|
-| `OPENAI_API_KEY` | — | **必填**，LLM 鉴权 |
-| `OPENAI_BASE_URL` | — | **必填**，OpenAI 兼容端点 |
-| `LLM_MODEL` | — | **必填**，模型名 |
-| `MEMORY_SERVICE_URL` | `http://127.0.0.1:8090` | student_memory 服务地址 |
-| `ALLOWED_ORIGINS` | `*` | CORS 白名单，逗号分隔 |
-| `REVIEW_MIN_AGE_SECONDS` | `86400` | 复盘节点最低间隔（秒） |
-| `CLASSBA_AUTH` / `CLASSBA_API_URL` / `CLASSBA_AGENT_NAME` | — | 可选，调用 ClassBA 外部 Agent |
+| `OPENAI_API_KEY` | — | **Required**. LLM authentication. |
+| `OPENAI_BASE_URL` | — | **Required**. OpenAI-compatible endpoint. |
+| `LLM_MODEL` | — | **Required**. Model name. |
+| `MEMORY_SERVICE_URL` | `http://127.0.0.1:8090` | student_memory service address. |
+| `ALLOWED_ORIGINS` | `*` | Comma-separated CORS whitelist. |
+| `REVIEW_MIN_AGE_SECONDS` | `86400` | Minimum interval between review-node invocations (seconds). |
+| `CLASSBA_AUTH` / `CLASSBA_API_URL` / `CLASSBA_AGENT_NAME` | — | Optional. For ClassBA external Agent calls. |
 
-LLM 客户端已强制 **bypass OS HTTP proxy**（见 commit `fc7e51c`），无需额外配置代理。
+The LLM client has been hardcoded to **bypass the OS HTTP proxy** (see commit `fc7e51c`); no additional proxy configuration is needed.
 
 ---
 
