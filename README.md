@@ -137,47 +137,47 @@ See [Hardware Recommendations](#hardware-recommendations) below for hardware siz
 
 ---
 
-## 所需设备推荐
+## Hardware Recommendations
 
-主服务本身**不跑模型**（推理走外部 LLM 网关），机器压力主要来自 `student_memory` 的本地嵌入模型。按使用方式分档：
+The main service itself **does not run models locally** (inference is offloaded to an external LLM gateway). Machine load comes mostly from `student_memory`'s local embedding model. Recommendations by deployment profile:
 
-### 仅跑主服务（外部 LLM，不启用 memory 子服务）
+### Main service only (external LLM, memory subservice disabled)
 
-| 资源 | 推荐 | 最低 |
+| Resource | Recommended | Minimum |
 |---|---|---|
-| CPU | 4 核 | 2 核 |
-| 内存 | 4 GB | 2 GB |
-| 磁盘 | 2 GB（含依赖 + `sessions.db`） | 1 GB |
-| GPU | 不需要 | 不需要 |
-| 网络 | 能访问 `OPENAI_BASE_URL` 即可；延迟越低响应越快 | — |
+| CPU | 4 cores | 2 cores |
+| Memory | 4 GB | 2 GB |
+| Disk | 2 GB (deps + `sessions.db`) | 1 GB |
+| GPU | Not required | Not required |
+| Network | Reachable `OPENAI_BASE_URL`; lower latency = faster responses | — |
 
-> 真正决定体验的是 **LLM 网关的延迟和并发额度**，不是本机性能。流式接口（`/chat/stream` 等）的首字时间几乎等于网关首字时间。
+> What really determines the user experience is **the LLM gateway's latency and concurrency quota**, not local machine performance. The time-to-first-token of the streaming endpoints (`/chat/stream` etc.) is essentially the gateway's TTFT.
 
-### 启用 memory 子服务（含本地向量嵌入）
+### Memory subservice enabled (with local vector embeddings)
 
-memory 服务把全部嵌入推理放在本机，按嵌入器选择决定硬件需求：
+The memory service runs all embedding inference locally; hardware requirements depend on the embedder you pick:
 
-| 嵌入器 | `SM_EMBEDDING_MODEL` | 维度 | 内存占用 | 磁盘 | GPU |
+| Embedder | `SM_EMBEDDING_MODEL` | Dim | RAM | Disk | GPU |
 |---|---|---|---|---|---|
-| **FakeEmbedder**（开发/演示） | `fake-test` | 16 | < 100 MB | < 10 MB | 不需要 |
-| **bge-small-zh-v1.5**（轻量） | `BAAI/bge-small-zh-v1.5` | 512 | ~1 GB | ~500 MB | 可选（CPU 可跑） |
-| **bge-m3**（默认，多语言） | `BAAI/bge-m3` | 1024 | ~3 GB | ~2.5 GB | 推荐 |
+| **FakeEmbedder** (dev/demo) | `fake-test` | 16 | < 100 MB | < 10 MB | Not required |
+| **bge-small-zh-v1.5** (lightweight) | `BAAI/bge-small-zh-v1.5` | 512 | ~1 GB | ~500 MB | Optional (CPU works) |
+| **bge-m3** (default, multilingual) | `BAAI/bge-m3` | 1024 | ~3 GB | ~2.5 GB | Recommended |
 
-主服务 + memory 服务**部署在同一台机器**时的综合推荐：
+Recommended sizing when the main service and the memory service share a single host:
 
-| 场景 | CPU | 内存 | 磁盘 | GPU |
+| Profile | CPU | RAM | Disk | GPU |
 |---|---|---|---|---|
-| 开发 / 演示（FakeEmbedder） | 4 核 | 4 GB | 2 GB | 无 |
-| 单机生产 · bge-small-zh，纯 CPU | 8 核 | 6 GB | 4 GB | 无 |
-| 单机生产 · bge-m3，CPU | 8 核 | 8 GB | 6 GB | 无（响应稍慢） |
-| 单机生产 · bge-m3，GPU 加速 | 4 核 | 8 GB | 6 GB | ≥ 6 GB 显存（如 RTX 3060 / T4） |
+| Dev / demo (FakeEmbedder) | 4 cores | 4 GB | 2 GB | None |
+| Single-host prod · bge-small-zh, CPU only | 8 cores | 6 GB | 4 GB | None |
+| Single-host prod · bge-m3, CPU | 8 cores | 8 GB | 6 GB | None (slightly slower) |
+| Single-host prod · bge-m3, GPU-accelerated | 4 cores | 8 GB | 6 GB | ≥ 6 GB VRAM (e.g. RTX 3060 / T4) |
 
-实操建议：
+Practical notes:
 
-- **首次启动需要下载模型**：bge-m3 ≈ 2 GB、bge-small-zh ≈ 500 MB。提前预热或挂代理。
-- **没有 GPU 也能跑** bge-m3，但单条 `/retrieve` 推理在 CPU 上约 200–500 ms；高并发场景建议切 bge-small-zh 或加 GPU。
-- **Mac Apple Silicon (M1/M2/M3)** 可用 `SM_EMBEDDING_DEVICE=mps` 走 Metal 加速；8 GB 统一内存机型建议用 bge-small-zh。
-- **多进程禁用**：memory 服务的 hnswlib 索引非进程安全，**只跑单 worker**，通过线程并发。
+- **First start downloads the model**: bge-m3 ≈ 2 GB, bge-small-zh ≈ 500 MB. Warm up beforehand or use a proxy.
+- **GPU is not strictly required** for bge-m3, but a single `/retrieve` inference on CPU takes ~200–500 ms; for high-concurrency scenarios switch to bge-small-zh or add a GPU.
+- **Mac Apple Silicon (M1/M2/M3)** can use `SM_EMBEDDING_DEVICE=mps` for Metal acceleration; on 8 GB unified-memory models, prefer bge-small-zh.
+- **Single-worker only**: the memory service's hnswlib index is not process-safe. **Run a single worker** and rely on thread-level concurrency.
 
 ---
 
