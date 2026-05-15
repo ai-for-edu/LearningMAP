@@ -124,16 +124,16 @@ OpenAILearning/
 
 ---
 
-## 运行环境
+## Runtime Environment
 
-| 依赖 | 版本 | 备注 |
+| Dependency | Version | Notes |
 |---|---|---|
-| Python | 3.11 | `.python-version` 锁定 |
-| [uv](https://docs.astral.sh/uv/) | 0.4+ | 唯一受支持的包管理器 |
-| SQLite | 3.35+ | Python 自带 |
-| OpenAI 兼容 LLM | — | DeepSeek / Moonshot / 任意 OpenAI-Compatible 网关均可 |
+| Python | 3.11 | Locked by `.python-version` |
+| [uv](https://docs.astral.sh/uv/) | 0.4+ | Only supported package manager |
+| SQLite | 3.35+ | Bundled with Python |
+| OpenAI-compatible LLM | — | DeepSeek / Moonshot / any OpenAI-compatible gateway |
 
-详细的硬件建议见下文 [所需设备推荐](#所需设备推荐)。
+See [Hardware Recommendations](#hardware-recommendations) below for hardware sizing.
 
 ---
 
