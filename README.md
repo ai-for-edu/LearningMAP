@@ -363,23 +363,23 @@ Main interaction points (see `docs/superpowers/specs/2026-05-08-hybrid-agent-mem
 
 ---
 
-## 测试
+## Testing
 
 ```bash
-# 主项目
+# Main project
 uv run python -m pytest tests/ -v
-uv run python -m pytest tests/test_api.py::test_name -v   # 单例
+uv run python -m pytest tests/test_api.py::test_name -v   # single test
 
-# memory 子项目
+# Memory subproject
 cd student_memory && uv run pytest -v
 ```
 
-约定：
+Conventions:
 
-- `tests/manual/` 下是手动 smoke 脚本，pytest 默认通过 `norecursedirs` **跳过**。
-- 一次性回归脚本写完跑过即 `rm`，**不要 `git add`**（见 `MEMORY.md`）。
+- Scripts under `tests/manual/` are manual smoke scripts; pytest skips them via `norecursedirs` by default.
+- One-shot regression scripts should be `rm`'d after running — **do not `git add` them** (see `MEMORY.md`).
 
-Lint / Format：
+Lint / Format:
 
 ```bash
 uv run ruff check src/ run/ tests/
@@ -388,17 +388,17 @@ uv run ruff format src/ run/ tests/
 
 ---
 
-## 开发约定
+## Development Conventions
 
-- **包管理**：仅 `uv`，不混用 pip / poetry。
-- **LLM 调用**：全部走 `src/llm/client.py`，全部 `asyncio.to_thread` 包裹。
-- **Prompt 修改**：仅改 `.j2` 文件，禁止在 Python 里拼接 prompt 字符串。
-- **状态可重放**：任何前端需要在刷新后还原的视觉元素，都要能从 `GET /api/chat/{sid}/state` 推导。
-- **PPTElement 扩展**：新增类型时同步修改 5 处 ——`slide_schemas.py`、slides 后处理链、`slides.html` 渲染器、`pptx_export.py`、`slide_content_system.j2`。
-- **XSS**：前端所有 `innerHTML` 必须先 `escapeHtml` 或 DOMPurify。
+- **Package management:** `uv` only; do not mix in pip / poetry.
+- **LLM calls:** always go through `src/llm/client.py`, always wrapped in `asyncio.to_thread`.
+- **Prompt edits:** only inside `.j2` files; never concatenate prompt strings in Python.
+- **Replayable state:** any visual element the frontend needs to restore after a refresh must be derivable from `GET /api/chat/{sid}/state`.
+- **Extending `PPTElement`:** when adding a new type, update all 5 sites — `slide_schemas.py`, the slide post-processing chain, the `slides.html` renderer, `pptx_export.py`, and `slide_content_system.j2`.
+- **XSS:** every frontend `innerHTML` write must go through `escapeHtml` or DOMPurify first.
 
 ---
 
 ## License / Authors
 
-未发布，内部研究项目。
+Unreleased. Internal research project.
