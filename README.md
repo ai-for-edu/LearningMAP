@@ -282,39 +282,39 @@ Main routes (all mounted under the `/api` prefix; see `src/api/chat.py` for the 
 
 ---
 
-## 前端页面
+## Frontend Pages
 
-| 页面 | 入口 | 职责 |
+| Page | URL | Responsibility |
 |---|---|---|
-| `index.html` | `/` | 主对话、题目作答、流式渲染 |
-| `diagnosis.html` | `/diagnosis.html?session_id=…` | 诊断卡片 + 学情雷达图 |
-| `lesson.html` | `/lesson.html?session_id=…` | Markdown 课时阅读 |
-| `slides.html` | `/slides.html?session_id=…` | PPT 渲染（与 PPTX 导出共用 `SlideData`） |
-| `results.html` | `/results.html?session_id=…` | 答题汇总 |
+| `index.html` | `/` | Main chat, quiz answering, streaming rendering |
+| `diagnosis.html` | `/diagnosis.html?session_id=…` | Diagnosis cards + learning radar chart |
+| `lesson.html` | `/lesson.html?session_id=…` | Markdown lesson reader |
+| `slides.html` | `/slides.html?session_id=…` | PPT renderer (shares `SlideData` with PPTX export) |
+| `results.html` | `/results.html?session_id=…` | Quiz summary |
 
-共享脚本：
+Shared scripts:
 
-- `api.js`：HTTP 客户端 + `escapeHtml` / `safeMarkdown` / 导出工具
-- `sidebar.js`：会话列表
-- `session-data.js`：state 反序列化
+- `api.js` — HTTP client + `escapeHtml` / `safeMarkdown` / export utilities
+- `sidebar.js` — Session list
+- `session-data.js` — `state` deserialization
 
-**XSS 纪律**：所有 `innerHTML` 必须经 `escapeHtml` 或 DOMPurify。
+**XSS discipline:** every `innerHTML` write **must** be sanitized via `escapeHtml` or DOMPurify.
 
 ---
 
-## LangGraph 节点
+## LangGraph Nodes
 
-`src/agent/graph.py` 装配的状态机，按 `intent` 节点的判定分支：
+The state machine assembled in `src/agent/graph.py` branches based on the `intent` node's verdict:
 
 ```
 intent ──► chat
        ├─► knowledge_graph
        ├─► quiz
        ├─► grading ──► diagnosis ──► lesson
-       └─► slides   (outline → 逐页内容 + 布局)
+       └─► slides   (outline → per-page content + layout)
 ```
 
-幻灯片 pipeline 的后处理链（移植自 OpenMAIC `scene-generator.ts`）：
+Slide pipeline post-processing chain (ported from OpenMAIC's `scene-generator.ts`):
 
 ```
 LLM JSON
@@ -332,10 +332,10 @@ parse_json_response  →  _fix_element_defaults
                       _assign_ids_and_rotation
                               │
                               ▼
-                          Pydantic 校验
+                          Pydantic validation
 ```
 
-LLM 返回的 JSON 脆弱性问题由 `src/utils/json_repair.py` 的 **4 策略修复**承担，**不要**在 node 里写 ad-hoc 修复。
+Brittle LLM JSON output is handled by the **4-strategy repair** in `src/utils/json_repair.py`. **Do not** add ad-hoc fixes inside individual nodes.
 
 ---
 
