@@ -1,26 +1,28 @@
-# OpenAILearning · `demo+memory` 分支
+# OpenAILearning
 
-面向自适应学习场景的 AI 教学助手。前端是一组静态页面，后端是基于 **LangGraph** 状态机的 FastAPI 服务；本分支在主 demo 之上接入了一个独立的**学习记忆微服务**（`student_memory/`），用于跨会话语义检索 + L2 反思笔记。
+> Chinese version available on the [`zh` branch](../../tree/zh).
 
-> 单次 HTTP 请求驱动一次 LangGraph 单轮执行：`intent → (chat | knowledge_graph | quiz | grading→diagnosis→lesson | slides)`。会话状态持久化在内存 + SQLite。
+An AI tutoring assistant for adaptive learning scenarios. The frontend is a set of static pages; the backend is a FastAPI service built on a **LangGraph** state machine. This branch plugs an independent **learning memory subservice** (`student_memory/`) on top of the base demo, providing cross-session semantic retrieval and L2 reflection notes.
+
+> Each HTTP request drives one single-round LangGraph execution: `intent → (chat | knowledge_graph | quiz | grading→diagnosis→lesson | slides)`. Session state is persisted in memory and SQLite.
 
 ---
 
-## 目录
+## Table of Contents
 
-- [功能流水线](#功能流水线)
-- [仓库结构](#仓库结构)
-- [运行环境](#运行环境)
-- [快速开始](#快速开始)
-- [环境变量](#环境变量)
-- [API 接口](#api-接口)
-- [前端页面](#前端页面)
-- [LangGraph 节点](#langgraph-节点)
-- [Skills / Prompts 体系](#skills--prompts-体系)
-- [Memory 子服务](#memory-子服务)
-- [所需设备推荐](#所需设备推荐)
-- [测试](#测试)
-- [开发约定](#开发约定)
+- [Feature Pipeline](#feature-pipeline)
+- [Repository Structure](#repository-structure)
+- [Runtime Environment](#runtime-environment)
+- [Hardware Recommendations](#hardware-recommendations)
+- [Quick Start](#quick-start)
+- [Environment Variables](#environment-variables)
+- [API Endpoints](#api-endpoints)
+- [Frontend Pages](#frontend-pages)
+- [LangGraph Nodes](#langgraph-nodes)
+- [Skills / Prompts System](#skills--prompts-system)
+- [Memory Subservice](#memory-subservice)
+- [Testing](#testing)
+- [Development Conventions](#development-conventions)
 
 ---
 
