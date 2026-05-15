@@ -26,37 +26,38 @@ An AI tutoring assistant for adaptive learning scenarios. The frontend is a set 
 
 ---
 
-## 功能流水线
+## Feature Pipeline
 
 ```
-用户输入主题
+User enters a topic
       │
       ▼
 ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│ knowledge_   │──►│  自适应 Quiz │──►│  Grading +   │
-│  graph 节点  │   │   (quiz 节点)│   │  Diagnosis   │
+│ knowledge_   │──►│ Adaptive Quiz│──►│  Grading +   │
+│  graph node  │   │  (quiz node) │   │  Diagnosis   │
 └──────────────┘   └──────────────┘   └──────┬───────┘
                                              │
                        ┌─────────────────────┴───────────────┐
                        ▼                                     ▼
                 ┌──────────────┐                      ┌──────────────┐
-                │ Markdown 课时│                      │  PPT 幻灯片  │
-                │ (lesson 节点)│                      │ (slides 节点)│
+                │ Markdown     │                      │  PPT Slides  │
+                │ Lesson       │                      │ (slides node)│
+                │ (lesson node)│                      │              │
                 └──────────────┘                      └──────────────┘
                        │                                     │
                        └─────────────┬───────────────────────┘
                                      ▼
-                         Review 节点 (复盘 / L2 笔记)
+                       Review node (recap / L2 notes)
                                      │
                                      ▼
                POST /ingest + /notes  →  student_memory
                                      │
-                  下次会话 chat 节点  ◄── POST /retrieve
+              next session's chat node  ◄── POST /retrieve
 ```
 
-- **chat 节点**注入历史 memory snapshot 作为 system prompt 增强项；空库时安全降级。
-- **review 节点**触发 L2 反思，把错题摘要落入 memory 的 `/notes` (4-category)。
-- **大模型调用**统一走 `src/llm/client.py`（OpenAI SDK + Instructor 结构化输出），全部包在 `asyncio.to_thread` 中，不阻塞事件循环。
+- The **chat node** injects historical memory snapshots as a system-prompt augmentation; safely degrades when the store is empty.
+- The **review node** triggers L2 reflection and persists wrong-answer summaries into memory `/notes` (4-category).
+- **All LLM calls** go through `src/llm/client.py` (OpenAI SDK + Instructor structured output), wrapped in `asyncio.to_thread` so the event loop is never blocked.
 
 ---
 
