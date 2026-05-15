@@ -61,66 +61,66 @@ User enters a topic
 
 ---
 
-## 仓库结构
+## Repository Structure
 
 ```
 OpenAILearning/
 ├── run/
-│   ├── serve.py                 # FastAPI 入口（端口 8080）
-│   ├── classba_client.py        # 外部 ClassBA Agent 客户端（可选）
-│   └── build_kc_skills.py       # 离线构建 KC-skill 知识表
+│   ├── serve.py                 # FastAPI entry point (port 8080)
+│   ├── classba_client.py        # External ClassBA Agent client (optional)
+│   └── build_kc_skills.py       # Offline build of the KC-skill knowledge table
 ├── src/
-│   ├── api/                     # FastAPI router + session store（SQLite）
-│   │   ├── chat.py              # 全部 HTTP 端点
-│   │   ├── store.py             # 内存 dict + sessions.db 双写
-│   │   └── tasks.py             # 后台异步任务（生成 lesson / slides）
+│   ├── api/                     # FastAPI router + session store (SQLite)
+│   │   ├── chat.py              # All HTTP endpoints
+│   │   ├── store.py             # In-memory dict + sessions.db dual-write
+│   │   └── tasks.py             # Background async tasks (generate lesson / slides)
 │   ├── agent/
-│   │   ├── graph.py             # LangGraph 状态机装配
-│   │   ├── state.py             # LearningState（Pydantic）
-│   │   ├── mastery_annotator.py # KG 节点上的掌握度标注
+│   │   ├── graph.py             # LangGraph state machine assembly
+│   │   ├── state.py             # LearningState (Pydantic)
+│   │   ├── mastery_annotator.py # Mastery annotation on KG nodes
 │   │   └── nodes/
-│   │       ├── intent.py        # 入口路由：chat / kg / quiz / lesson / slides
-│   │       ├── chat.py          # 自由问答 + memory snapshot 注入
+│   │       ├── intent.py        # Entry router: chat / kg / quiz / lesson / slides
+│   │       ├── chat.py          # Free-form Q&A + memory snapshot injection
 │   │       ├── knowledge_graph.py
-│   │       ├── quiz.py          # 自适应出题
-│   │       ├── grading.py       # 阅卷
-│   │       ├── diagnosis.py     # 学情诊断
-│   │       ├── lesson.py        # Markdown 课程
-│   │       ├── slides.py        # PPT 大纲 + 逐页布局
-│   │       ├── review.py        # L2 反思 / 错题复盘
+│   │       ├── quiz.py          # Adaptive question generation
+│   │       ├── grading.py       # Grading
+│   │       ├── diagnosis.py     # Learning diagnosis
+│   │       ├── lesson.py        # Markdown lesson
+│   │       ├── slides.py        # PPT outline + per-page layout
+│   │       ├── review.py        # L2 reflection / wrong-answer review
 │   │       ├── kc_skill_resolver.py
 │   │       └── _helpers.py
 │   ├── llm/
-│   │   ├── client.py            # OpenAI 兼容客户端 + Instructor
-│   │   ├── schemas.py           # 核心 Pydantic 模型
+│   │   ├── client.py            # OpenAI-compatible client + Instructor
+│   │   ├── schemas.py           # Core Pydantic models
 │   │   └── slide_schemas.py     # PPTElement / SlideData
-│   ├── prompts/                 # 全部 Jinja2 .j2 模板
-│   ├── skills/                  # 教学法 skills 加载器
-│   ├── forgetting/              # 遗忘曲线（Ebbinghaus）
-│   ├── export/pptx_export.py    # PPT → .pptx 导出（python-pptx）
-│   ├── utils/json_repair.py     # 4 策略 JSON 修复
-│   ├── memory_client.py         # 调用 student_memory 的唯一接缝
+│   ├── prompts/                 # All Jinja2 .j2 templates
+│   ├── skills/                  # Pedagogy skills loader
+│   ├── forgetting/              # Forgetting curve (Ebbinghaus)
+│   ├── export/pptx_export.py    # PPT → .pptx export (python-pptx)
+│   ├── utils/json_repair.py     # 4-strategy JSON repair
+│   ├── memory_client.py         # The single seam to student_memory
 │   ├── progress_aggregator.py
 │   └── reviewer.py
-├── skills/                      # 可插拔教学法（feynman / scaffolding / socratic）
+├── skills/                      # Pluggable pedagogies (feynman / scaffolding / socratic)
 │   └── <skill>/SKILL.md
-├── static/                      # 前端（vanilla JS + Tailwind）
-│   ├── index.html               # 主对话页
-│   ├── diagnosis.html           # 诊断卡 + 学情图
-│   ├── lesson.html              # Markdown 课时阅读
-│   ├── slides.html              # PPT 渲染
+├── static/                      # Frontend (vanilla JS + Tailwind)
+│   ├── index.html               # Main chat page
+│   ├── diagnosis.html           # Diagnosis card + learning radar chart
+│   ├── lesson.html              # Markdown lesson reader
+│   ├── slides.html              # PPT renderer
 │   ├── results.html
-│   ├── api.js                   # 共享 HTTP 客户端
-│   ├── sidebar.js               # 会话列表
+│   ├── api.js                   # Shared HTTP client
+│   ├── sidebar.js               # Session list
 │   └── session-data.js
-├── tests/                       # pytest 用例（含 manual/ smoke 脚本，pytest 默认跳过）
-├── student_memory/              # 独立 FastAPI 微服务（见下文）
-├── pyproject.toml               # 主项目依赖
+├── tests/                       # pytest cases (incl. manual/ smoke scripts, skipped by default)
+├── student_memory/              # Independent FastAPI microservice (see below)
+├── pyproject.toml               # Main project dependencies
 ├── .python-version              # 3.11
-└── sessions.db                  # SQLite 会话持久化（运行时生成）
+└── sessions.db                  # SQLite session persistence (created at runtime)
 ```
 
-> `student_memory/` 是**独立子项目**，自带 `pyproject.toml` / `uv.lock` / `tests/`，**不**会被根目录 `uv sync` 安装。
+> `student_memory/` is an **independent sub-project** with its own `pyproject.toml` / `uv.lock` / `tests/`. The root `uv sync` will **not** install it.
 
 ---
 
