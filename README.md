@@ -339,27 +339,27 @@ Brittle LLM JSON output is handled by the **4-strategy repair** in `src/utils/js
 
 ---
 
-## Skills / Prompts 体系
+## Skills / Prompts System
 
-- **Skills**（`skills/<name>/SKILL.md`）：可插拔教学法 prompt 片段，加载方 `src/skills/loader.py`，在 chat 节点按 intent/state 注入。
-  - 已内置：`feynman` / `scaffolding` / `socratic`
-  - **新增 skill = 新目录 + `SKILL.md`，零代码改动**
-- **Prompts**（`src/prompts/*.j2`）：所有 LLM prompt 都是 Jinja2 模板，**禁止在 node 里 inline 字符串**。
-  - `slide_content_system.j2` ≈ 961 行，移植自 OpenMAIC，视为 load-bearing，谨慎修改。
+- **Skills** (`skills/<name>/SKILL.md`): pluggable pedagogy prompt fragments, loaded by `src/skills/loader.py`, injected into the chat node based on intent and state.
+  - Built-in: `feynman` / `scaffolding` / `socratic`
+  - **Adding a new skill = a new directory + `SKILL.md`, zero code changes**
+- **Prompts** (`src/prompts/*.j2`): every LLM prompt is a Jinja2 template. **Never inline prompt strings inside nodes.**
+  - `slide_content_system.j2` is ~961 lines, ported from OpenMAIC, treated as load-bearing — modify with care.
 
 ---
 
-## Memory 子服务
+## Memory Subservice
 
-`student_memory/` 是独立 FastAPI 服务，详见其 [README](student_memory/README.md)。本仓库通过 **`src/memory_client.py`** 这一个文件与其通信，无其他耦合。
+`student_memory/` is an independent FastAPI service; see its [README](student_memory/README.md) for details. This repository talks to it through the single seam **`src/memory_client.py`** and has no other coupling.
 
-主要交互点（见 `docs/superpowers/specs/2026-05-08-hybrid-agent-memory-design.md`）：
+Main interaction points (see `docs/superpowers/specs/2026-05-08-hybrid-agent-memory-design.md`):
 
-- `chat` 节点 →  `POST /retrieve`：注入 `context_text` 进 system prompt
-- 诊断/课程结束 →  `POST /ingest`：写入子主题级 MemoryUnit
-- `review` 节点 →  `POST /notes` / `GET /notes/{uid}/neighbors`：4-category L2 反思笔记
+- `chat` node → `POST /retrieve`: injects `context_text` into the system prompt
+- End-of-diagnosis / end-of-lesson → `POST /ingest`: writes sub-topic-level MemoryUnits
+- `review` node → `POST /notes` / `GET /notes/{uid}/neighbors`: 4-category L2 reflection notes
 
-> 默认 8090 端口；可通过 `MEMORY_SERVICE_URL` 覆盖。**不可用时主服务自动跳过**。
+> Default port 8090; override via `MEMORY_SERVICE_URL`. **When unavailable, the main service automatically skips memory calls.**
 
 ---
 
