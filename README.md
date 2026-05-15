@@ -251,34 +251,34 @@ The LLM client has been hardcoded to **bypass the OS HTTP proxy** (see commit `f
 
 ---
 
-## API 接口
+## API Endpoints
 
-主要路由（全部挂在 `/api` 前缀下，详见 `src/api/chat.py`）：
+Main routes (all mounted under the `/api` prefix; see `src/api/chat.py` for the full list):
 
-| Method | Path | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| POST | `/api/chat` | 单轮对话（同步） |
-| POST | `/api/chat/stream` | 单轮对话（SSE 流式） |
-| POST | `/api/chat/{sid}/generate-quiz/stream` | 生成自适应题目 |
-| POST | `/api/chat/{sid}/submit-quiz` | 提交答题 → grading → diagnosis |
-| POST | `/api/chat/{sid}/generate-lesson` | 生成 Markdown 课时 |
-| POST | `/api/chat/{sid}/generate-lesson/stream` | 同上（SSE） |
-| POST | `/api/chat/{sid}/generate-slides` | 生成 PPT |
-| POST | `/api/chat/{sid}/generate-slides/stream` | 同上（SSE） |
-| GET  | `/api/chat/{sid}/export-pptx` | 导出 `.pptx` 文件 |
-| GET  | `/api/chat/{sid}/state` | 取会话完整快照（前端重建用） |
-| POST | `/api/chat/{sid}/generate/{task_type}` | 通用后台任务调度 |
-| GET  | `/api/chat/{sid}/generate/{task_type}/status` | 查任务状态 |
-| POST | `/api/chat/{sid}/generate/{task_type}/cancel` | 取消任务 |
-| GET  | `/api/skills` | 列教学法 skill |
-| POST | `/api/chat/{sid}/set-skill` | 切换当前 skill |
-| POST | `/api/chat/{sid}/toggle-knowledge-skills` | 开关 KS 注入 |
-| POST | `/api/chat/{sid}/toggle-kc-skills` | 开关 KC-skill 注入 |
-| POST | `/api/chat/{sid}/start-review` | 启动 L2 复盘 |
-| POST | `/api/chat/{sid}/submit-review` | 提交复盘结果 |
-| GET  | `/health` | 健康检查 |
+| POST | `/api/chat` | Single-round chat (synchronous) |
+| POST | `/api/chat/stream` | Single-round chat (SSE streaming) |
+| POST | `/api/chat/{sid}/generate-quiz/stream` | Generate adaptive quiz |
+| POST | `/api/chat/{sid}/submit-quiz` | Submit answers → grading → diagnosis |
+| POST | `/api/chat/{sid}/generate-lesson` | Generate Markdown lesson |
+| POST | `/api/chat/{sid}/generate-lesson/stream` | Same, streamed via SSE |
+| POST | `/api/chat/{sid}/generate-slides` | Generate slides |
+| POST | `/api/chat/{sid}/generate-slides/stream` | Same, streamed via SSE |
+| GET  | `/api/chat/{sid}/export-pptx` | Export `.pptx` file |
+| GET  | `/api/chat/{sid}/state` | Fetch full session snapshot (for frontend reconstruction) |
+| POST | `/api/chat/{sid}/generate/{task_type}` | Generic background-task dispatcher |
+| GET  | `/api/chat/{sid}/generate/{task_type}/status` | Get task status |
+| POST | `/api/chat/{sid}/generate/{task_type}/cancel` | Cancel a task |
+| GET  | `/api/skills` | List pedagogy skills |
+| POST | `/api/chat/{sid}/set-skill` | Switch the active skill |
+| POST | `/api/chat/{sid}/toggle-knowledge-skills` | Toggle KS injection |
+| POST | `/api/chat/{sid}/toggle-kc-skills` | Toggle KC-skill injection |
+| POST | `/api/chat/{sid}/start-review` | Start the L2 review flow |
+| POST | `/api/chat/{sid}/submit-review` | Submit review results |
+| GET  | `/health` | Health check |
 
-> 前端会用 `GET /api/chat/{sid}/state` **完整重建**会话视图（图表 / 诊断卡 / 课时按钮）。任何想在刷新后保留的视图元素都**必须可从 state 推导**，不能只依赖消息流。
+> The frontend uses `GET /api/chat/{sid}/state` to **fully reconstruct** the session view (charts, diagnosis cards, lesson buttons). Any view element that must survive a page refresh **must be derivable from `state`** — relying on the message stream alone is not enough.
 
 ---
 
