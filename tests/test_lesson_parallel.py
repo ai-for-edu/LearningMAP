@@ -168,3 +168,43 @@ def test_async_fanout_invokes_on_section_done_monotonically():
         )
 
     assert progress_calls == [1, 2, 3, 4, 5]
+
+
+# ---------------------------------------------------------------------------
+# Failure propagation
+# ---------------------------------------------------------------------------
+
+def test_async_fanout_raises_when_any_section_fails():
+    """Any section raising must propagate; in-flight peers should be cancelled."""
+    from src.agent.nodes.lesson import generate_lesson_per_point_async
+    import time
+
+    call_idx = {"i": 0}
+
+    def _create(**kwargs):
+        i = call_idx["i"]
+        call_idx["i"] += 1
+        if i == 1:
+            raise RuntimeError("synthetic LLM failure")
+        time.sleep(0.05)  # other calls hang long enough for cancellation to bite
+        resp = MagicMock()
+        resp.choices = [MagicMock()]
+        resp.choices[0].message.content = f"S{i}"
+        return resp
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.side_effect = _create
+
+    weak_points = [{"name": f"kc-{i}", "description": f"d{i}"} for i in range(4)]
+
+    with patch("src.agent.nodes.lesson.get_raw_client", return_value=mock_client):
+        with pytest.raises(RuntimeError, match="synthetic LLM failure"):
+            asyncio.run(
+                generate_lesson_per_point_async(
+                    topic="t",
+                    weak_points=weak_points,
+                    pedagogy_instructions="",
+                    knowledge_skills={f"kc-{i}": f"s{i}" for i in range(4)},
+                    limit=4,
+                )
+            )
