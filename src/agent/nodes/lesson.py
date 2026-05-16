@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from src.agent.state import LearningState
 from src.llm.client import get_raw_client, get_model_name
 from src.prompts.loader import render_prompt, render_kc_skill_block
@@ -9,6 +10,23 @@ from src.agent.nodes._helpers import memory_snapshot_block
 from langchain_core.messages import AIMessage
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_fanout_limit(arg: int | None) -> int:
+    """Resolve the lesson fan-out concurrency limit.
+
+    Precedence: explicit `arg` > env var `LESSON_FANOUT_LIMIT` > default 4.
+    A non-integer env value silently falls back to the default.
+    """
+    if arg is not None:
+        return arg
+    env_val = os.environ.get("LESSON_FANOUT_LIMIT")
+    if env_val:
+        try:
+            return int(env_val)
+        except ValueError:
+            pass
+    return 4
 
 
 def generate_knowledge_skill(
