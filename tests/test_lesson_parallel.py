@@ -208,3 +208,26 @@ def test_async_fanout_raises_when_any_section_fails():
                     limit=4,
                 )
             )
+
+
+# ---------------------------------------------------------------------------
+# Empty input
+# ---------------------------------------------------------------------------
+
+def test_async_fanout_empty_weak_points_returns_empty_and_makes_no_calls():
+    from src.agent.nodes.lesson import generate_lesson_per_point_async
+
+    mock_client = MagicMock()
+
+    with patch("src.agent.nodes.lesson.get_raw_client", return_value=mock_client):
+        result = asyncio.run(
+            generate_lesson_per_point_async(
+                topic="t",
+                weak_points=[],
+                pedagogy_instructions="",
+                knowledge_skills={},
+            )
+        )
+
+    assert result == ""
+    assert mock_client.chat.completions.create.call_count == 0
