@@ -87,12 +87,15 @@ def _llm_generate_graph(
         client = get_llm_client()
         return client.chat.completions.create(
             model=get_model_name(),
-            max_tokens=2048,
+            max_tokens=4096,
             messages=[{"role": "user", "content": prompt}],
             response_model=KnowledgeGraph,
         )
-    except Exception:
-        logger.exception("Knowledge graph generation failed")
+    except Exception as e:
+        logger.exception(
+            "Knowledge graph generation failed: topic=%r err_class=%s",
+            topic, type(e).__name__,
+        )
         return None
 
 
