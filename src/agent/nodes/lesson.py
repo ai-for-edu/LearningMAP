@@ -217,34 +217,23 @@ def generate_lesson_per_point(
     focus_directive: str = "",
     state: dict | None = None,
 ) -> str:
-    """Step 2: Generate lesson content per knowledge point, then concatenate."""
-    client = get_raw_client()
-    sections = []
-    total = len(weak_points)
+    """Step 2: Generate lesson content per knowledge point, then concatenate.
 
-    for i, wp in enumerate(weak_points):
-        kc_skill_block = render_kc_skill_block((kc_skills or {}).get(wp["name"]))
-        prompt = render_prompt(
-            "lesson_point",
+    Sync compat wrapper. Delegates to the async fan-out implementation.
+    Safe to call from sync contexts (e.g., the LangGraph lesson_node);
+    must NOT be called from inside an already-running event loop.
+    """
+    return asyncio.run(
+        generate_lesson_per_point_async(
             topic=topic,
-            knowledge_point_name=wp["name"],
-            knowledge_point_description=wp["description"],
-            pedagogy_instructions=pedagogy_instructions or "No specific teaching method",
-            knowledge_skill=knowledge_skills.get(wp["name"], "no additional teaching strategy"),
-            point_index=i + 1,
-            total_points=total,
-            kc_skill_block=kc_skill_block,
+            weak_points=weak_points,
+            pedagogy_instructions=pedagogy_instructions,
+            knowledge_skills=knowledge_skills,
+            kc_skills=kc_skills,
             focus_directive=focus_directive,
-            memory_snapshot_block=memory_snapshot_block(state),
+            state=state,
         )
-        response = client.chat.completions.create(
-            model=get_model_name(),
-            max_tokens=4096,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        sections.append(response.choices[0].message.content.strip())
-
-    return "\n\n---\n\n".join(sections)
+    )
 
 
 def _generate_review_lesson(
