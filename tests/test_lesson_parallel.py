@@ -34,3 +34,62 @@ def test_resolve_fanout_limit_bad_env_falls_back(monkeypatch):
     from src.agent.nodes.lesson import _resolve_fanout_limit
     monkeypatch.setenv("LESSON_FANOUT_LIMIT", "not-a-number")
     assert _resolve_fanout_limit(None) == 4
+
+
+# ---------------------------------------------------------------------------
+# generate_lesson_per_point_async — ordering
+# ---------------------------------------------------------------------------
+
+def _make_async_mock_client(per_call_outputs, per_call_delays=None):
+    """Build a mock OpenAI client whose .chat.completions.create returns sequential
+    outputs. If per_call_delays is provided, each call sleeps that many seconds
+    BEFORE returning (simulates per-section LLM latency)."""
+    import time
+
+    outputs = list(per_call_outputs)
+    delays = list(per_call_delays) if per_call_delays else [0.0] * len(outputs)
+    call_idx = {"i": 0}
+
+    def _create(**kwargs):
+        i = call_idx["i"]
+        call_idx["i"] += 1
+        if delays[i] > 0:
+            time.sleep(delays[i])  # blocks inside asyncio.to_thread worker; fine
+        resp = MagicMock()
+        resp.choices = [MagicMock()]
+        resp.choices[0].message.content = outputs[i]
+        return resp
+
+    client = MagicMock()
+    client.chat.completions.create.side_effect = _create
+    return client
+
+
+def test_async_fanout_preserves_kc_order_when_completions_finish_out_of_order():
+    """First KC sleeps longest; final markdown must still be section-0 then section-1
+    then section-2 in original weak_points order."""
+    from src.agent.nodes.lesson import generate_lesson_per_point_async
+
+    weak_points = [
+        {"name": "kc-0", "description": "d0"},
+        {"name": "kc-1", "description": "d1"},
+        {"name": "kc-2", "description": "d2"},
+    ]
+    # KC 0 takes longest, KC 2 finishes first.
+    mock_client = _make_async_mock_client(
+        per_call_outputs=["SECTION-0", "SECTION-1", "SECTION-2"],
+        per_call_delays=[0.05, 0.02, 0.0],
+    )
+
+    with patch("src.agent.nodes.lesson.get_raw_client", return_value=mock_client):
+        result = asyncio.run(
+            generate_lesson_per_point_async(
+                topic="t",
+                weak_points=weak_points,
+                pedagogy_instructions="",
+                knowledge_skills={"kc-0": "s0", "kc-1": "s1", "kc-2": "s2"},
+            )
+        )
+
+    # Expect original KC order regardless of completion order.
+    assert result == "SECTION-0\n\n---\n\nSECTION-1\n\n---\n\nSECTION-2"

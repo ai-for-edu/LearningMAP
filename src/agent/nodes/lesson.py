@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+from typing import Callable
 from src.agent.state import LearningState
 from src.llm.client import get_raw_client, get_model_name
 from src.prompts.loader import render_prompt, render_kc_skill_block
@@ -143,6 +145,59 @@ def retrieve_skills(state: dict) -> tuple[str, dict[str, str], list[dict]]:
         knowledge_skills[wp["name"]] = skill_text
 
     return pedagogy_instructions, knowledge_skills, weak_points
+
+
+async def generate_lesson_per_point_async(
+    topic: str,
+    weak_points: list[dict],
+    pedagogy_instructions: str,
+    knowledge_skills: dict[str, str],
+    kc_skills: dict | None = None,
+    focus_directive: str = "",
+    state: dict | None = None,
+    limit: int | None = None,
+    on_section_done: Callable[[int], None] | None = None,
+) -> str:
+    """Async fan-out version of generate_lesson_per_point.
+
+    Generates per-KC sections concurrently, joins them in the original
+    weak_points order. Output is byte-identical to the serial version
+    for identical inputs.
+    """
+    if not weak_points:
+        return ""
+
+    client = get_raw_client()
+    total = len(weak_points)
+
+    async def _one_section(i: int, wp: dict) -> tuple[int, str]:
+        kc_skill_block = render_kc_skill_block((kc_skills or {}).get(wp["name"]))
+        prompt = render_prompt(
+            "lesson_point",
+            topic=topic,
+            knowledge_point_name=wp["name"],
+            knowledge_point_description=wp["description"],
+            pedagogy_instructions=pedagogy_instructions or "No specific teaching method",
+            knowledge_skill=knowledge_skills.get(wp["name"], "no additional teaching strategy"),
+            point_index=i + 1,
+            total_points=total,
+            kc_skill_block=kc_skill_block,
+            focus_directive=focus_directive,
+            memory_snapshot_block=memory_snapshot_block(state),
+        )
+        response = await asyncio.to_thread(
+            lambda p=prompt: client.chat.completions.create(
+                model=get_model_name(),
+                max_tokens=4096,
+                messages=[{"role": "user", "content": p}],
+            )
+        )
+        return i, response.choices[0].message.content.strip()
+
+    tasks = [_one_section(i, wp) for i, wp in enumerate(weak_points)]
+    results = await asyncio.gather(*tasks)
+    results.sort(key=lambda x: x[0])
+    return "\n\n---\n\n".join(text for _, text in results)
 
 
 def generate_lesson_per_point(
