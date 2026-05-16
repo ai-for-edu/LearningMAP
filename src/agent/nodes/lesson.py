@@ -169,6 +169,7 @@ async def generate_lesson_per_point_async(
 
     client = get_raw_client()
     total = len(weak_points)
+    sem = asyncio.Semaphore(_resolve_fanout_limit(limit))
 
     async def _one_section(i: int, wp: dict) -> tuple[int, str]:
         kc_skill_block = render_kc_skill_block((kc_skills or {}).get(wp["name"]))
@@ -185,13 +186,14 @@ async def generate_lesson_per_point_async(
             focus_directive=focus_directive,
             memory_snapshot_block=memory_snapshot_block(state),
         )
-        response = await asyncio.to_thread(
-            lambda p=prompt: client.chat.completions.create(
-                model=get_model_name(),
-                max_tokens=4096,
-                messages=[{"role": "user", "content": p}],
+        async with sem:
+            response = await asyncio.to_thread(
+                lambda p=prompt: client.chat.completions.create(
+                    model=get_model_name(),
+                    max_tokens=4096,
+                    messages=[{"role": "user", "content": p}],
+                )
             )
-        )
         return i, response.choices[0].message.content.strip()
 
     tasks = [_one_section(i, wp) for i, wp in enumerate(weak_points)]
