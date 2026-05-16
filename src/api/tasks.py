@@ -184,9 +184,6 @@ async def run_lesson_generation(
 ) -> None:
     """Generate lesson content in background using two-step pipeline."""
     from src.agent.nodes.lesson import retrieve_skills, _generate_review_lesson
-    from src.agent.nodes._helpers import memory_snapshot_block
-    from src.prompts.loader import render_prompt
-    from src.llm.client import get_raw_client, get_model_name
     from src.memory_client import DEFAULT_USER_ID
 
     try:
@@ -225,44 +222,29 @@ async def run_lesson_generation(
                 state=state_snapshot,
             )
         else:
-            # Step 2: Generate per-point content (with progress updates)
+            # Step 2: Generate per-point content via parallel fan-out.
+            # Cancellation is handled by native asyncio cancellation: cancelling
+            # the top-level task cancels in-flight coroutines (in-flight HTTP
+            # requests inside asyncio.to_thread cannot be aborted, but their
+            # results are discarded).
             focus_directive = (state_snapshot.get("review_result") or {}).get("focus_directive", "")
-            client = get_raw_client()
-            sections = []
             total = len(weak_points)
 
-            for i, wp in enumerate(weak_points):
-                if task and task.cancelled:
-                    logger.info("Lesson generation cancelled for %s", session_id)
-                    return
+            def _on_section_done(done: int) -> None:
+                s = get_session(session_id) or {}
+                s["lesson_task_progress"] = f"{done}/{total}"
+                save_session(session_id, s)
 
-                prompt = render_prompt(
-                    "lesson_point",
-                    topic=state_snapshot.get("topic", ""),
-                    knowledge_point_name=wp["name"],
-                    knowledge_point_description=wp["description"],
-                    pedagogy_instructions=pedagogy_instructions or "No specific teaching method",
-                    knowledge_skill=knowledge_skills.get(wp["name"], "no additional teaching strategy"),
-                    point_index=i + 1,
-                    total_points=total,
-                    focus_directive=focus_directive,
-                    memory_snapshot_block=memory_snapshot_block(state_snapshot),
-                )
-                response = await asyncio.to_thread(
-                    lambda p=prompt: client.chat.completions.create(
-                        model=get_model_name(),
-                        max_tokens=4096,
-                        messages=[{"role": "user", "content": p}],
-                    )
-                )
-                sections.append(response.choices[0].message.content.strip())
-
-                # Update progress
-                state = get_session(session_id) or {}
-                state["lesson_task_progress"] = f"{i + 1}/{total}"
-                save_session(session_id, state)
-
-            lesson_text = "\n\n---\n\n".join(sections)
+            from src.agent.nodes.lesson import generate_lesson_per_point_async
+            lesson_text = await generate_lesson_per_point_async(
+                topic=state_snapshot.get("topic", ""),
+                weak_points=weak_points,
+                pedagogy_instructions=pedagogy_instructions,
+                knowledge_skills=knowledge_skills,
+                focus_directive=focus_directive,
+                state=state_snapshot,
+                on_section_done=_on_section_done,
+            )
 
         if task and task.cancelled:
             return
