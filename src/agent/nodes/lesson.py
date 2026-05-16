@@ -19,13 +19,14 @@ def _resolve_fanout_limit(arg: int | None) -> int:
 
     Precedence: explicit `arg` > env var `LESSON_FANOUT_LIMIT` > default 4.
     A non-integer env value silently falls back to the default.
+    Values < 1 are clamped to 1 to prevent asyncio.Semaphore(0) deadlock.
     """
     if arg is not None:
-        return arg
+        return max(1, arg)
     env_val = os.environ.get("LESSON_FANOUT_LIMIT")
     if env_val:
         try:
-            return int(env_val)
+            return max(1, int(env_val))
         except ValueError:
             pass
     return 4

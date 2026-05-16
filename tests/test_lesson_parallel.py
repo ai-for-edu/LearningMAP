@@ -36,6 +36,27 @@ def test_resolve_fanout_limit_bad_env_falls_back(monkeypatch):
     assert _resolve_fanout_limit(None) == 4
 
 
+def test_resolve_fanout_limit_clamps_zero(monkeypatch):
+    """Zero must clamp to 1 — otherwise asyncio.Semaphore(0) would deadlock."""
+    from src.agent.nodes.lesson import _resolve_fanout_limit
+    monkeypatch.delenv("LESSON_FANOUT_LIMIT", raising=False)
+    assert _resolve_fanout_limit(0) == 1
+
+
+def test_resolve_fanout_limit_clamps_env_zero(monkeypatch):
+    """Env LESSON_FANOUT_LIMIT=0 must also clamp to 1."""
+    from src.agent.nodes.lesson import _resolve_fanout_limit
+    monkeypatch.setenv("LESSON_FANOUT_LIMIT", "0")
+    assert _resolve_fanout_limit(None) == 1
+
+
+def test_resolve_fanout_limit_clamps_negative(monkeypatch):
+    """Negative values must also clamp to 1."""
+    from src.agent.nodes.lesson import _resolve_fanout_limit
+    monkeypatch.delenv("LESSON_FANOUT_LIMIT", raising=False)
+    assert _resolve_fanout_limit(-5) == 1
+
+
 # ---------------------------------------------------------------------------
 # generate_lesson_per_point_async — ordering
 # ---------------------------------------------------------------------------
