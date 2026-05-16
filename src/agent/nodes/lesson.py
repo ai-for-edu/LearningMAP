@@ -170,8 +170,10 @@ async def generate_lesson_per_point_async(
     client = get_raw_client()
     total = len(weak_points)
     sem = asyncio.Semaphore(_resolve_fanout_limit(limit))
+    done = 0
 
     async def _one_section(i: int, wp: dict) -> tuple[int, str]:
+        nonlocal done
         kc_skill_block = render_kc_skill_block((kc_skills or {}).get(wp["name"]))
         prompt = render_prompt(
             "lesson_point",
@@ -194,7 +196,11 @@ async def generate_lesson_per_point_async(
                     messages=[{"role": "user", "content": p}],
                 )
             )
-        return i, response.choices[0].message.content.strip()
+        text = response.choices[0].message.content.strip()
+        done += 1
+        if on_section_done is not None:
+            on_section_done(done)
+        return i, text
 
     tasks = [_one_section(i, wp) for i, wp in enumerate(weak_points)]
     results = await asyncio.gather(*tasks)

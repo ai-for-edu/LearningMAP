@@ -138,3 +138,33 @@ def test_async_fanout_caps_concurrency_at_limit():
 
     assert in_flight["peak"] <= 2, f"peak in-flight {in_flight['peak']} exceeded limit 2"
     assert mock_client.chat.completions.create.call_count == 6
+
+
+# ---------------------------------------------------------------------------
+# Progress callback
+# ---------------------------------------------------------------------------
+
+def test_async_fanout_invokes_on_section_done_monotonically():
+    """on_section_done must be called exactly N times with arguments [1, 2, ..., N]."""
+    from src.agent.nodes.lesson import generate_lesson_per_point_async
+
+    N = 5
+    weak_points = [{"name": f"kc-{i}", "description": f"d{i}"} for i in range(N)]
+    mock_client = _make_async_mock_client(
+        per_call_outputs=[f"S{i}" for i in range(N)],
+        per_call_delays=[0.01 * (N - i) for i in range(N)],  # reverse order
+    )
+    progress_calls = []
+
+    with patch("src.agent.nodes.lesson.get_raw_client", return_value=mock_client):
+        asyncio.run(
+            generate_lesson_per_point_async(
+                topic="t",
+                weak_points=weak_points,
+                pedagogy_instructions="",
+                knowledge_skills={f"kc-{i}": f"s{i}" for i in range(N)},
+                on_section_done=progress_calls.append,
+            )
+        )
+
+    assert progress_calls == [1, 2, 3, 4, 5]
