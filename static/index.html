@@ -230,8 +230,7 @@ body.sidebar-collapsed #bottomBar { left: 0; }
 /* ── Streaming cursor ── */
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 .stream-cursor { display: inline-block; width: 2px; height: 1em; background: var(--accent); margin-left: 2px; vertical-align: text-bottom; animation: blink .8s step-end infinite; }
-.thinking-line     { display: inline-flex; gap: 4px; align-items: baseline; }
-.thinking-word     { transition: opacity 280ms ease; display: inline-block; min-width: 96px; }
+.thinking-word     { transition: opacity 280ms ease; display: inline-block; }
 .thinking-word.is-swapping { opacity: 0; }
 .thinking-timer    { opacity: 0.55; font-variant-numeric: tabular-nums; }
 
