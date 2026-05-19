@@ -337,6 +337,43 @@ let _learningArtifacts = null;  // {graph, diagnosis_result, lesson_content, sli
 let _sendInFlight = false;      // SSE stream in progress — toggle disabled
 const _msgStore = [];           // copy/regen store; reset by clearChatHistory on each rebuild
 
+const THINKING_WORDS = [
+  'Reasoning', 'Reviewing', 'Synthesizing', 'Reflecting',
+  'Considering', 'Connecting', 'Mapping', 'Weighing',
+];
+
+function startThinkingAnimator(rootEl) {
+  const wordEl  = rootEl.querySelector('.thinking-word');
+  const timerEl = rootEl.querySelector('.thinking-timer');
+  if (!wordEl || !timerEl) return () => {}; // defensive: nothing to animate
+  const startedAt = performance.now();
+  let i = Math.floor(Math.random() * THINKING_WORDS.length);
+  wordEl.textContent = THINKING_WORDS[i];
+  timerEl.textContent = '(0s)';
+
+  const wordIv = setInterval(() => {
+    wordEl.classList.add('is-swapping');
+    setTimeout(() => {
+      i = (i + 1) % THINKING_WORDS.length;
+      wordEl.textContent = THINKING_WORDS[i];
+      wordEl.classList.remove('is-swapping');
+    }, 280);
+  }, 2000);
+
+  const timerIv = setInterval(() => {
+    const s = Math.floor((performance.now() - startedAt) / 1000);
+    timerEl.textContent = `(${s}s)`;
+  }, 1000);
+
+  let stopped = false;
+  return function stop() {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(wordIv);
+    clearInterval(timerIv);
+  };
+}
+
 function _renderModeToggle(mode) {
   _sessionMode = mode;
   document.querySelectorAll('#modeToggle button').forEach(btn => {
