@@ -992,11 +992,16 @@ async function handleSend(text) {
         </div>
       </div>
     </div>`);
+  const loadingEl = document.getElementById('loading');
+  const stopThinking = startThinkingAnimator(loadingEl);
+  const dismissThinking = () => {
+    stopThinking();
+    document.getElementById('loading')?.remove();
+  };
   chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
   try {
     messageCount++;
-    document.getElementById('loading')?.remove();
 
     // Prepare streaming response container
     const responseId = 'stream-resp-' + Date.now();
@@ -1040,6 +1045,7 @@ async function handleSend(text) {
         }
       },
       token(d) {
+        dismissThinking();
         streamText += d.content;
         contentEl.innerHTML = safeMarkdown(streamText) + '<span class="stream-cursor"></span>';
         chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -1087,6 +1093,7 @@ async function handleSend(text) {
         });
       },
       complete(d) {
+        dismissThinking();
         // Non-chat mode (graph, quiz, etc.) — full response at once
         streamMode = d.mode || 'chat';
         respEl.remove();
@@ -1116,6 +1123,7 @@ async function handleSend(text) {
         }
       },
       error(d) {
+        dismissThinking();
         contentEl.innerHTML = `<span style="color:var(--error);">${escapeHtml(d.message || 'Request failed')}</span>`;
       },
     });
@@ -1140,7 +1148,7 @@ async function handleSend(text) {
       }
     }
   } catch (err) {
-    document.getElementById('loading')?.remove();
+    dismissThinking();
     chatHistory.insertAdjacentHTML('beforeend', `<div style="color:var(--error);font-size:13px;padding:12px;">Request failed: ${escapeHtml(err.message)}</div>`);
   } finally {
     _sendInFlight = false;
