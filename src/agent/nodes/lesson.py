@@ -203,8 +203,14 @@ async def generate_lesson_per_point_async(
             on_section_done(done)
         return i, text
 
-    tasks = [_one_section(i, wp) for i, wp in enumerate(weak_points)]
-    results = await asyncio.gather(*tasks)
+    tasks = [asyncio.create_task(_one_section(i, wp)) for i, wp in enumerate(weak_points)]
+    try:
+        results = await asyncio.gather(*tasks)
+    except BaseException:
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
     results.sort(key=lambda x: x[0])
     return "\n\n---\n\n".join(text for _, text in results)
 

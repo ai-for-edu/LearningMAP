@@ -196,7 +196,9 @@ def test_async_fanout_invokes_on_section_done_monotonically():
 # ---------------------------------------------------------------------------
 
 def test_async_fanout_raises_when_any_section_fails():
-    """Any section raising must propagate; in-flight peers should be cancelled."""
+    """Any section raising must propagate; in-flight peers must be cancelled
+    before they can fire on_section_done — otherwise progress callbacks keep
+    landing on an already-errored parent task."""
     from src.agent.nodes.lesson import generate_lesson_per_point_async
     import time
 
@@ -217,6 +219,7 @@ def test_async_fanout_raises_when_any_section_fails():
     mock_client.chat.completions.create.side_effect = _create
 
     weak_points = [{"name": f"kc-{i}", "description": f"d{i}"} for i in range(4)]
+    progress = MagicMock()
 
     with patch("src.agent.nodes.lesson.get_raw_client", return_value=mock_client):
         with pytest.raises(RuntimeError, match="synthetic LLM failure"):
@@ -227,8 +230,14 @@ def test_async_fanout_raises_when_any_section_fails():
                     pedagogy_instructions="",
                     knowledge_skills={f"kc-{i}": f"s{i}" for i in range(4)},
                     limit=4,
+                    on_section_done=progress,
                 )
             )
+
+    # The failed section never reaches on_section_done; the peers were
+    # cancelled at their `await asyncio.to_thread(...)` before reaching it
+    # either. So the callback must fire strictly fewer than total times.
+    assert progress.call_count < len(weak_points)
 
 
 # ---------------------------------------------------------------------------
