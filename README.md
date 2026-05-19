@@ -296,7 +296,6 @@ Shared scripts:
 
 - `api.js` — HTTP client + `escapeHtml` / `safeMarkdown` / export utilities
 - `sidebar.js` — Session list
-- `session-data.js` — `state` deserialization
 
 **XSS discipline:** every `innerHTML` write **must** be sanitized via `escapeHtml` or DOMPurify.
 
@@ -353,7 +352,7 @@ Brittle LLM JSON output is handled by the **4-strategy repair** in `src/utils/js
 
 `student_memory/` is an independent FastAPI service; see its [README](student_memory/README.md) for details. This repository talks to it through the single seam **`src/memory_client.py`** and has no other coupling.
 
-Main interaction points (see `docs/superpowers/specs/2026-05-08-hybrid-agent-memory-design.md`):
+Main interaction points:
 
 - `chat` node → `POST /retrieve`: injects `context_text` into the system prompt
 - End-of-diagnosis / end-of-lesson → `POST /ingest`: writes sub-topic-level MemoryUnits
@@ -377,7 +376,7 @@ cd student_memory && uv run pytest -v
 Conventions:
 
 - Scripts under `tests/manual/` are manual smoke scripts; pytest skips them via `norecursedirs` by default.
-- One-shot regression scripts should be `rm`'d after running — **do not `git add` them** (see `MEMORY.md`).
+- One-shot regression scripts should be `rm`'d after running — **do not `git add` them**.
 
 Lint / Format:
 
