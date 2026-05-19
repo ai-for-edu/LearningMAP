@@ -203,7 +203,7 @@ def quiz_generate_progressive(state: dict):
         try:
             batch = client.chat.completions.create(
                 model=get_model_name(),
-                max_tokens=2048,
+                max_tokens=4096,
                 messages=[{"role": "user", "content": prompt}],
                 response_model=list[QuizQuestion],
             )
