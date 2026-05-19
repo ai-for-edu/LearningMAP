@@ -980,30 +980,14 @@ async function handleSend(text) {
   // Show user message as-is (no skill badge — skill info only on AI replies)
   appendUserMessageDOM(rawMessage);
 
-  // Show loading
-  chatHistory.insertAdjacentHTML('beforeend', `
-    <div class="ai-msg" id="loading">
-      <div class="ai-avatar">A</div>
-      <div class="ai-content">
-        <div class="ai-name">EduAI</div>
-        <div class="ai-text thinking-line" style="color:var(--text-4);">
-          <span class="thinking-word">Reasoning</span>…
-          <span class="thinking-timer">(0s)</span>
-        </div>
-      </div>
-    </div>`);
-  const loadingEl = document.getElementById('loading');
-  const stopThinking = startThinkingAnimator(loadingEl);
-  const dismissThinking = () => {
-    stopThinking();
-    document.getElementById('loading')?.remove();
-  };
-  chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  // Hoisted so catch/finally can clean up the in-flight response container.
+  let respEl = null;
+  let stopThinking = () => {};
 
   try {
     messageCount++;
 
-    // Prepare streaming response container
+    // Prepare streaming response container (initial content: rotating thinking indicator)
     const responseId = 'stream-resp-' + Date.now();
     let streamText = '';
     let streamBadge = '';
@@ -1017,14 +1001,19 @@ async function handleSend(text) {
           <div class="ai-name">EduAI</div>
           <div class="stream-badge"></div>
           <div class="stream-content ai-text prose">
-            <span class="stream-cursor"></span>
+            <span class="thinking-line" style="color:var(--text-4);">
+              <span class="thinking-word">Reasoning</span>…
+              <span class="thinking-timer">(0s)</span>
+            </span>
           </div>
         </div>
       </div>`);
 
-    const respEl = document.getElementById(responseId);
+    respEl = document.getElementById(responseId);
     const contentEl = respEl.querySelector('.stream-content');
     const badgeEl = respEl.querySelector('.stream-badge');
+    stopThinking = startThinkingAnimator(contentEl);
+    chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
     const body = { message };
     if (currentSessionId) body.session_id = currentSessionId;
@@ -1045,7 +1034,7 @@ async function handleSend(text) {
         }
       },
       token(d) {
-        dismissThinking();
+        stopThinking();
         streamText += d.content;
         contentEl.innerHTML = safeMarkdown(streamText) + '<span class="stream-cursor"></span>';
         chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -1055,6 +1044,7 @@ async function handleSend(text) {
         if (d.topic) streamCtaTopic = d.topic;
       },
       done(d) {
+        stopThinking();
         if (d.session_id) {
           currentSessionId = d.session_id;
           setSessionId(currentSessionId);
@@ -1093,7 +1083,7 @@ async function handleSend(text) {
         });
       },
       complete(d) {
-        dismissThinking();
+        stopThinking();
         // Non-chat mode (graph, quiz, etc.) — full response at once
         streamMode = d.mode || 'chat';
         respEl.remove();
@@ -1123,7 +1113,7 @@ async function handleSend(text) {
         }
       },
       error(d) {
-        dismissThinking();
+        stopThinking();
         contentEl.innerHTML = `<span style="color:var(--error);">${escapeHtml(d.message || 'Request failed')}</span>`;
       },
     });
@@ -1148,10 +1138,11 @@ async function handleSend(text) {
       }
     }
   } catch (err) {
-    dismissThinking();
+    stopThinking();
+    respEl?.remove();
     chatHistory.insertAdjacentHTML('beforeend', `<div style="color:var(--error);font-size:13px;padding:12px;">Request failed: ${escapeHtml(err.message)}</div>`);
   } finally {
-    dismissThinking();
+    stopThinking();
     _sendInFlight = false;
     document.querySelectorAll('#modeToggle button').forEach(b => (b.disabled = false));
   }
