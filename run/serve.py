@@ -18,8 +18,8 @@ load_skills()
 
 app = FastAPI(title="OpenAILearning API", version="0.1.0")
 
-# CORS: 从 .env 读取 ALLOWED_ORIGINS，默认允许所有（开发阶段）
-# 生产环境在 .env 中设置：ALLOWED_ORIGINS=https://yourdomain.com,https://another.com
+# CORS: read ALLOWED_ORIGINS from .env; allow all by default (development).
+# In production, set ALLOWED_ORIGINS=https://yourdomain.com,https://another.com
 _origins = os.environ.get("ALLOWED_ORIGINS", "*")
 _origin_list = ["*"] if _origins == "*" else [o.strip() for o in _origins.split(",")]
 

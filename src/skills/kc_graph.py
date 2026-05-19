@@ -68,7 +68,8 @@ def _ancestors(
     out: list[str] = []
     cur = parent_of.get(route)
     while cur is not None and len(out) < _ANCESTOR_CAP:
-        # Skip the absolute root segment (e.g. "拓展思维"): too generic to use as prerequisite.
+        # Skip the absolute root segment (the top-level taxonomy node in
+        # KC route IDs): too generic to use as a prerequisite.
         if cur in allowed_roots:
             break
         out.append(cur)

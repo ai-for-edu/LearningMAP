@@ -324,7 +324,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="LLM backend to use (default: classba)")
     parser.add_argument("--concurrency", type=int, default=8)
     parser.add_argument("--limit", type=int, default=None, help="only process the first N routes")
-    parser.add_argument("--only-module", type=str, default=None, help="filter by route's 2nd segment, e.g. 计数模块")
+    parser.add_argument("--only-module", type=str, default=None, help="filter by route's 2nd segment")
     parser.add_argument("--no-resume", action="store_true", help="overwrite manifest instead of resuming")
     parser.add_argument("--questions", type=Path, default=Path("XES3G5M/metadata/questions.json"))
     parser.add_argument("--kc-map", type=Path, default=Path("XES3G5M/metadata/kc_routes_map.json"))
