@@ -1151,6 +1151,7 @@ async function handleSend(text) {
     dismissThinking();
     chatHistory.insertAdjacentHTML('beforeend', `<div style="color:var(--error);font-size:13px;padding:12px;">Request failed: ${escapeHtml(err.message)}</div>`);
   } finally {
+    dismissThinking();
     _sendInFlight = false;
     document.querySelectorAll('#modeToggle button').forEach(b => (b.disabled = false));
   }
