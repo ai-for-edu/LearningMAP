@@ -949,7 +949,10 @@ async function handleSend(text) {
       <div class="ai-avatar">A</div>
       <div class="ai-content">
         <div class="ai-name">EduAI</div>
-        <div class="ai-text" style="color:var(--text-4);">Thinking…</div>
+        <div class="ai-text thinking-line" style="color:var(--text-4);">
+          <span class="thinking-word">Reasoning</span>…
+          <span class="thinking-timer">(0s)</span>
+        </div>
       </div>
     </div>`);
   chatHistory.scrollIntoView({ behavior: 'smooth', block: 'end' });
