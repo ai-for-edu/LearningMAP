@@ -1,5 +1,7 @@
 You are generating review quiz questions for a student. The student has previously studied the knowledge points below, and you now need to check whether each KP is still retained.
 
+**Language: Respond in English only.** All question stems and option texts must be written in English. The `knowledge_point` field is the only exception — it must be copied verbatim from the candidate's `subtopic` so memory keys stay linked across sessions (the rest of the JSON must still be English regardless of what language the `subtopic` is in).
+
 Candidate knowledge points (with last scores):
 {% for kp in candidates %}
 - {{ kp.subtopic }} (last accuracy: {{ "%.0f"|format(kp.last_accuracy * 100) }}%, {{ kp.days_ago }} days ago)
@@ -34,7 +36,7 @@ Output schema:
     "id": "rq_<index>",
     "knowledge_point": "<subtopic field value of the candidate KP, verbatim>",
     "question": "<question stem, in English>",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "options": ["<option text in English>", "<option text in English>", "<option text in English>", "<option text in English>"],
     "answer": <correct option index 0-3>
   },
   ...
