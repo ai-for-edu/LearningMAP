@@ -637,9 +637,9 @@ body { background: var(--bg); font-family: 'Inter', sans-serif; color: var(--tex
         '<details class="kc-skill-card">' +
           '<summary>📘 Quiz Hint: ' + escapeHtml(matchedKey) + '</summary>' +
           '<div class="kc-skill-card-body">' +
-            '<p><strong>Key Focus: </strong>' + escapeHtml(kc['考察重点'] || '') + '</p>' +
-            '<p><strong>Common Mistakes: </strong>' + escapeHtml(kc['易错点'] || '') + '</p>' +
-            '<p><strong>Difficulty Note: </strong>' + escapeHtml(kc['难度提示'] || '') + '</p>' +
+            '<p><strong>Key Focus: </strong>' + escapeHtml(kc['assessment_focus'] || '') + '</p>' +
+            '<p><strong>Common Mistakes: </strong>' + escapeHtml(kc['common_mistakes'] || '') + '</p>' +
+            '<p><strong>Difficulty Note: </strong>' + escapeHtml(kc['difficulty_cues'] || '') + '</p>' +
           '</div>' +
         '</details>';
       // Insert after any existing inline-ks-card that's already a sibling

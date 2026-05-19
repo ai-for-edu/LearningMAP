@@ -19,18 +19,18 @@ You are a curriculum-design expert. Below are sample exam questions from the que
 ```json
 {
   "description": "...(40-100 words: one-sentence index + applicable scenario)",
-  "考察重点": "...(80-150 words)",
-  "考察形式": "...(80-150 words)",
-  "易错点": "...(50-120 words)",
-  "难度提示": "...(50-100 words)"
+  "assessment_focus": "...(80-150 words)",
+  "assessment_format": "...(80-150 words)",
+  "common_mistakes": "...(50-120 words)",
+  "difficulty_cues": "...(50-100 words)"
 }
 ```
 
 Field semantics:
 - description: A single sentence telling downstream models "what this skill covers + when to invoke it." Include both content positioning and trigger scenario. Example: "Use when a student confuses step-based and category-based counting in multi-step problems. Builds on the multiplication principle." This field is the retrieval/loading entry point — the more precise, the better.
-- 考察重点: Core concepts / sub-skills / reasoning points assessed
-- 考察形式: Question-type distribution (fill-in / multiple-choice ratio) + common stem patterns + typical contexts
-- 易错点: High-frequency student errors distilled from the explanations
-- 难度提示: Difficulty signals such as numerical scale, nesting depth, and multi-step nature
+- assessment_focus: Core concepts / sub-skills / reasoning points assessed
+- assessment_format: Question-type distribution (fill-in / multiple-choice ratio) + common stem patterns + typical contexts
+- common_mistakes: High-frequency student errors distilled from the explanations
+- difficulty_cues: Difficulty signals such as numerical scale, nesting depth, and multi-step nature
 
 Prohibited: do not restate question text verbatim; do not add teaching recommendations; do not open with filler phrases like "This knowledge component tests..."; do not output anything outside the JSON. For description, skip generic openings like "This KC assesses..." — describe the scenario directly.

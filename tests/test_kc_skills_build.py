@@ -94,7 +94,7 @@ def test_sample_questions_distributes_remainder_to_largest_group():
 
 def test_atomic_write_json_creates_file_with_utf8(tmp_path: Path):
     target = tmp_path / "out.json"
-    data = {"route": {"skill": {"考察重点": "test value"}}}
+    data = {"route": {"skill": {"assessment_focus": "test value"}}}
     atomic_write_json(target, data)
     assert json.loads(target.read_text(encoding="utf-8")) == data
     # no leftover .tmp file
@@ -156,10 +156,10 @@ class _FakeClient:
 def test_generate_kc_skill_renders_prompt_and_uses_schema():
     expected = KCSkill(
         description="when multi-step counting appears, distinguish sequential steps from categories",
-        考察重点="core concept of multiplication principle",
-        考察形式="mostly fill-in-blank",
-        易错点="confusing sequential steps with classification",
-        难度提示="2-4 steps",
+        assessment_focus="core concept of multiplication principle",
+        assessment_format="mostly fill-in-blank",
+        common_mistakes="confusing sequential steps with classification",
+        difficulty_cues="2-4 steps",
     )
     client = _FakeClient(expected)
     samples = [
@@ -272,7 +272,7 @@ def test_run_build_processes_all_routes_and_writes_outputs(tmp_path, monkeypatch
     kc_map_path.write_text(json.dumps(kc_map, ensure_ascii=False), encoding="utf-8")
 
     fake_skill = KCSkill(
-        description="d1", 考察重点="focus1", 考察形式="format2", 易错点="mistake3", 难度提示="difficulty4",
+        description="d1", assessment_focus="focus1", assessment_format="format2", common_mistakes="mistake3", difficulty_cues="difficulty4",
     )
     client = _FakeClient(fake_skill)
 
@@ -333,7 +333,7 @@ def test_run_build_records_failures_and_continues(tmp_path):
             prompt = kwargs["messages"][0]["content"]
             if "root----A" in prompt:
                 raise RuntimeError("fail A")
-            return KCSkill(description="ok", 考察重点="ok-focus", 考察形式="ok-format", 易错点="ok-mistake", 难度提示="ok-difficulty")
+            return KCSkill(description="ok", assessment_focus="ok-focus", assessment_format="ok-format", common_mistakes="ok-mistake", difficulty_cues="ok-difficulty")
 
     client = _FailingForOneRoute()
 

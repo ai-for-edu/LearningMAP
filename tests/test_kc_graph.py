@@ -20,10 +20,10 @@ def reset_kc_state(tmp_path):
             "leaf": "乘法原理",
             "skill": {
                 "description": "multiplication principle desc",
-                "考察重点": "focus",
-                "考察形式": "format",
-                "易错点": "mistake",
-                "难度提示": "difficulty",
+                "assessment_focus": "focus",
+                "assessment_format": "format",
+                "common_mistakes": "mistake",
+                "difficulty_cues": "difficulty",
             },
         },
         "拓展思维----计数模块----加乘原理----乘法原理----乘法原理里的其他类型": {
@@ -31,10 +31,10 @@ def reset_kc_state(tmp_path):
             "leaf": "乘法原理里的其他类型",
             "skill": {
                 "description": "other types desc",
-                "考察重点": "focus",
-                "考察形式": "format",
-                "易错点": "mistake",
-                "难度提示": "difficulty",
+                "assessment_focus": "focus",
+                "assessment_format": "format",
+                "common_mistakes": "mistake",
+                "difficulty_cues": "difficulty",
             },
         },
         # One-char segment to test Tier 2 guard
@@ -43,10 +43,10 @@ def reset_kc_state(tmp_path):
             "leaf": "线",
             "skill": {
                 "description": "line desc",
-                "考察重点": "focus",
-                "考察形式": "format",
-                "易错点": "mistake",
-                "难度提示": "difficulty",
+                "assessment_focus": "focus",
+                "assessment_format": "format",
+                "common_mistakes": "mistake",
+                "difficulty_cues": "difficulty",
             },
         },
         # Containment match candidate
@@ -55,10 +55,10 @@ def reset_kc_state(tmp_path):
             "leaf": "抽屉原理",
             "skill": {
                 "description": "pigeonhole desc",
-                "考察重点": "focus",
-                "考察形式": "format",
-                "易错点": "mistake",
-                "难度提示": "difficulty",
+                "assessment_focus": "focus",
+                "assessment_format": "format",
+                "common_mistakes": "mistake",
+                "difficulty_cues": "difficulty",
             },
         },
     }
@@ -142,10 +142,10 @@ def test_leaf_match_falls_back_to_uncle_nodes(tmp_path):
             "leaf": "叶子",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "assessment_focus": "x",
+                "assessment_format": "x",
+                "common_mistakes": "x",
+                "difficulty_cues": "x",
             },
         },
         "知识点----B----另一个孩子": {
@@ -153,10 +153,10 @@ def test_leaf_match_falls_back_to_uncle_nodes(tmp_path):
             "leaf": "另一个孩子",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "assessment_focus": "x",
+                "assessment_format": "x",
+                "common_mistakes": "x",
+                "difficulty_cues": "x",
             },
         },
     }
@@ -212,10 +212,10 @@ def test_leaf_degradation_stops_at_leaf_min_nodes(tmp_path):
             "leaf": "叶子",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "assessment_focus": "x",
+                "assessment_format": "x",
+                "common_mistakes": "x",
+                "difficulty_cues": "x",
             },
         },
         "知识点----A----分支1": {
@@ -223,10 +223,10 @@ def test_leaf_degradation_stops_at_leaf_min_nodes(tmp_path):
             "leaf": "分支1",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "assessment_focus": "x",
+                "assessment_format": "x",
+                "common_mistakes": "x",
+                "difficulty_cues": "x",
             },
         },
         "知识点----A----分支2": {
@@ -234,10 +234,10 @@ def test_leaf_degradation_stops_at_leaf_min_nodes(tmp_path):
             "leaf": "分支2",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "assessment_focus": "x",
+                "assessment_format": "x",
+                "common_mistakes": "x",
+                "difficulty_cues": "x",
             },
         },
         "知识点----A----分支3": {
@@ -245,10 +245,10 @@ def test_leaf_degradation_stops_at_leaf_min_nodes(tmp_path):
             "leaf": "分支3",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "assessment_focus": "x",
+                "assessment_format": "x",
+                "common_mistakes": "x",
+                "difficulty_cues": "x",
             },
         },
         "知识点----A----分支4": {
@@ -256,10 +256,10 @@ def test_leaf_degradation_stops_at_leaf_min_nodes(tmp_path):
             "leaf": "分支4",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "assessment_focus": "x",
+                "assessment_format": "x",
+                "common_mistakes": "x",
+                "difficulty_cues": "x",
             },
         },
     }
@@ -290,10 +290,10 @@ def test_leaf_with_many_siblings_uses_full_budget(tmp_path):
             "leaf": f"叶{i}",
             "skill": {
                 "description": "d",
-                "考察重点": "x",
-                "考察形式": "x",
-                "易错点": "x",
-                "难度提示": "x",
+                "assessment_focus": "x",
+                "assessment_format": "x",
+                "common_mistakes": "x",
+                "difficulty_cues": "x",
             },
         }
         for i in range(15)

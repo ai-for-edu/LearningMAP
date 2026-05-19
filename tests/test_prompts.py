@@ -48,10 +48,10 @@ def test_render_kc_skill_from_bank_prompt():
         total_count=42,
     )
     assert "拓展思维----计数模块----加乘原理" in result
-    assert "考察重点" in result
-    assert "考察形式" in result
-    assert "易错点" in result
-    assert "难度提示" in result
+    assert "assessment_focus" in result
+    assert "assessment_format" in result
+    assert "common_mistakes" in result
+    assert "difficulty_cues" in result
     assert "Question 1" in result and "Question 2" in result
     assert "fill-in" in result
     # both answers must appear
@@ -71,10 +71,10 @@ def test_render_kc_skill_block_with_content():
     block = render_kc_skill_block(
         {
             "description": "desc",
-            "考察重点": "focus content",
-            "考察形式": "format content",
-            "易错点": "mistake content",
-            "难度提示": "difficulty content",
+            "assessment_focus": "focus content",
+            "assessment_format": "format content",
+            "common_mistakes": "mistake content",
+            "difficulty_cues": "difficulty content",
         }
     )
     assert "Assessment focus" in block

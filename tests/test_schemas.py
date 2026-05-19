@@ -62,13 +62,13 @@ def test_diagnosis_result_schema():
 def test_kc_skill_schema():
     skill = KCSkill(
         description="Use when a student confuses step-based and category-based counting in multi-step problems. Builds on the multiplication principle.",
-        考察重点="Understand the multiplication principle: multiply the number of options at each step in step-based counting.",
-        考察形式="Primarily fill-in-the-blank questions: the stem gives several types of objects and selection steps, requiring calculation of the number of arrangements.",
-        易错点="Students often confuse step-based (multiply) and category-based (add) counting, using addition instead of multiplication.",
-        难度提示="Number scale 2-5, steps 2-4, occasionally with constraint conditions.",
+        assessment_focus="Understand the multiplication principle: multiply the number of options at each step in step-based counting.",
+        assessment_format="Primarily fill-in-the-blank questions: the stem gives several types of objects and selection steps, requiring calculation of the number of arrangements.",
+        common_mistakes="Students often confuse step-based (multiply) and category-based (add) counting, using addition instead of multiplication.",
+        difficulty_cues="Number scale 2-5, steps 2-4, occasionally with constraint conditions.",
     )
-    assert skill.考察重点.startswith("Understand")
-    assert "fill-in" in skill.考察形式
+    assert skill.assessment_focus.startswith("Understand")
+    assert "fill-in" in skill.assessment_format
     assert "Use when" in skill.description or "skill" in skill.description.lower()
 
 

@@ -64,30 +64,26 @@ class KCSkill(BaseModel):
 
     The ``description`` field mirrors the ``description`` frontmatter of
     ``skills/*/SKILL.md`` — a one-line index string a consuming model can
-    read to decide how / when this skill applies. The other four Chinese
-    fields are the subject-matter payload.
+    read to decide how / when this skill applies. The other four fields
+    are the subject-matter payload.
     """
 
     description: str = Field(
         ...,
         description=(
-            "One-sentence index + applicable scenario (40-100 chars, English or Chinese). "
+            "One-sentence index + applicable scenario (40-100 chars, in English). "
             "Must state both 'what this skill covers' and 'when to invoke it'. "
             "Example: 'Use when a student confuses step-by-step counting with "
             "classification counting in multi-step problems. Grounded in the "
             "multiplication principle.'"
         ),
     )
-    # NOTE: Field names below are intentionally kept in Chinese — they match the
-    # XES3G5M kc_skills.json data file keys and are referenced by kc_skill_block.j2,
-    # kc_skill_from_bank.j2, and static/lesson.html. Renaming would require
-    # coordinating four sites for a feature that is off by default (USE_KC_SKILLS).
-    考察重点: str = Field(..., description="Core concepts / sub-skills / thinking points, 80-150 chars")
-    考察形式: str = Field(
+    assessment_focus: str = Field(..., description="Core concepts / sub-skills / thinking points, 80-150 chars")
+    assessment_format: str = Field(
         ..., description="Question-type distribution + common stem patterns + scenario conventions, 80-150 chars"
     )
-    易错点: str = Field(..., description="High-frequency errors inferred from analysis, 50-120 chars")
-    难度提示: str = Field(..., description="Numeric magnitude / nesting depth / multi-step complexity, 50-100 chars")
+    common_mistakes: str = Field(..., description="High-frequency errors inferred from analysis, 50-120 chars")
+    difficulty_cues: str = Field(..., description="Numeric magnitude / nesting depth / multi-step complexity, 50-100 chars")
 
 
 class ResolverMapping(BaseModel):

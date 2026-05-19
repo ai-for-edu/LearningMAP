@@ -15,10 +15,10 @@ from src.skills import kc_loader
 def _skill(mark: str = "focus") -> KCSkill:
     return KCSkill(
         description="d",
-        考察重点=f"{mark}-focus",
-        考察形式="format",
-        易错点="mistake",
-        难度提示="difficulty",
+        assessment_focus=f"{mark}-focus",
+        assessment_format="format",
+        common_mistakes="mistake",
+        difficulty_cues="difficulty",
     )
 
 
@@ -69,7 +69,7 @@ def test_resolver_rule_match_only_fills_kc_skills():
     mock_llm.assert_not_called()
     assert "kc_skills" in patch_dict
     assert "乘法原理" in patch_dict["kc_skills"]
-    assert patch_dict["kc_skills"]["乘法原理"]["考察重点"] == "A-focus"
+    assert patch_dict["kc_skills"]["乘法原理"]["assessment_focus"] == "A-focus"
     # stored as plain dict, not KCSkill instance
     assert isinstance(patch_dict["kc_skills"]["乘法原理"], dict)
 
@@ -100,8 +100,8 @@ def test_resolver_falls_back_to_llm_for_unmatched_nodes():
     mock_llm.assert_called_once()
     called_args = mock_llm.call_args
     assert called_args.args[0] == ["color-the-map"]  # only unresolved node passed
-    assert patch_dict["kc_skills"]["乘法原理"]["考察重点"] == "A-focus"
-    assert patch_dict["kc_skills"]["color-the-map"]["考察重点"] == "B-focus"
+    assert patch_dict["kc_skills"]["乘法原理"]["assessment_focus"] == "A-focus"
+    assert patch_dict["kc_skills"]["color-the-map"]["assessment_focus"] == "B-focus"
 
 
 def test_resolver_llm_error_preserves_rule_results():
@@ -158,7 +158,7 @@ def test_resolver_id_fast_path_for_route_id():
         mock_leaf.assert_not_called()
 
     assert "乘法原理" in result["kc_skills"]
-    assert result["kc_skills"]["乘法原理"]["考察重点"] == "A-focus"
+    assert result["kc_skills"]["乘法原理"]["assessment_focus"] == "A-focus"
 
 
 def test_resolver_skips_synthetic_prefix_silently():
