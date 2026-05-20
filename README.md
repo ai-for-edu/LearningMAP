@@ -162,7 +162,7 @@ JSON repair itself is centralized in `src/utils/json_repair.py` (4-strategy).
 - **Provider**: OpenAI-compatible gateway only (DeepSeek / Moonshot / any OpenAI-compatible API). No multi-provider abstraction, no tool-use loop.
 - **Structured output**: Instructor on top of the OpenAI SDK; schemas in `src/llm/schemas.py` and `src/llm/slide_schemas.py`.
 - **Async discipline**: every LLM call goes through `src/llm/client.py`, wrapped in `asyncio.to_thread` so the event loop is never blocked.
-- **Prompts**: all live in `src/prompts/*.j2` as Jinja2 templates. Never inline a prompt string in a Python module. `slide_content_system.j2` (~961 lines, ported from OpenMAIC) is load-bearing.
+- **Prompts**: all live in `src/prompts/*.j2` as Jinja2 templates. Never inline a prompt string in a Python module. `slide_content_system.j2` (~961 lines) is load-bearing.
 
 ---
 
