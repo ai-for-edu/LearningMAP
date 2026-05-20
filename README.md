@@ -56,7 +56,7 @@ A linear loop converts a topic into multi-format study materials:
 - **Adaptive Quiz** — questions calibrated to the current KG mastery state.
 - **Grading & Diagnosis** — per-question grading feeds a diagnosis card and a learning radar chart.
 - **Markdown Lesson** — targeted to the weak points exposed by diagnosis; streamed via SSE.
-- **Slide Deck** — outline-first pipeline ported from OpenMAIC, exported to `.pptx` via `python-pptx`. The post-processing chain enforces a 1000 × 562.5 canvas, repairs LaTeX/CJK elements, and assigns stable IDs (see [Architecture](#architecture)).
+- **Slide Deck** — outline-first pipeline, exported to `.pptx` via `python-pptx`. The post-processing chain enforces a 1000 × 562.5 canvas, repairs LaTeX/CJK elements, and assigns stable IDs (see [Architecture](#architecture)).
 
 ### 🧠 Persistent Memory
 
