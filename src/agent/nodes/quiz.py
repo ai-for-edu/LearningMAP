@@ -322,6 +322,17 @@ async def generate_quiz_per_point_async(
         return i, batch
 
     tasks = [asyncio.create_task(_one_point(i, n)) for i, n in enumerate(nodes)]
-    results = await asyncio.gather(*tasks)
+    try:
+        results = await asyncio.gather(*tasks)
+    except BaseException:
+        # gather() does not auto-cancel siblings when one task raises
+        # (including CancelledError propagated from the outer task).
+        # Without this cleanup, cancelled run_quiz_generation would leave
+        # per-KC coroutines running in the background, firing
+        # on_point_done into a dead session. Mirror lesson.py:206-213.
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
     results.sort(key=lambda pair: pair[0])
     return [q for _, batch in results for q in batch]

@@ -262,3 +262,46 @@ def test_async_best_effort_on_single_kc_failure():
     failed = [c for c in callbacks if c[2] == 0]
     assert len(failed) == 1
     assert failed[0][1] == 1  # kc_index of the failure
+
+
+def test_async_cancellation_propagates_and_cancels_siblings():
+    """When the outer task is cancelled, the gather re-raises and pending
+    _one_point coroutines are cancelled — they don't continue firing
+    on_point_done after the parent died."""
+    from src.agent.nodes.quiz import generate_quiz_per_point_async
+    import time
+
+    call_idx = {"i": 0}
+
+    def _create(**kwargs):
+        i = call_idx["i"]
+        call_idx["i"] += 1
+        time.sleep(0.2)  # long enough that we can cancel mid-flight
+        return [_make_mock_question("x", f"q-{i}")]
+
+    callback_count = {"n": 0}
+
+    def _on_done(done_count, kc_index, batch):
+        callback_count["n"] += 1
+
+    async def _runner():
+        state = _make_kg_state(4)
+        ctx, _ = _patch_quiz_client(_create)
+        with ctx:
+            await generate_quiz_per_point_async(state, on_point_done=_on_done)
+
+    async def _outer():
+        task = asyncio.create_task(_runner())
+        await asyncio.sleep(0.05)  # let the fan-out start
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(_outer())
+
+    # The cancellation must have prevented all 4 KCs from firing callbacks.
+    # asyncio.to_thread workers cannot be aborted, so some callbacks may
+    # still have fired (those whose to_thread returned before cancel
+    # propagated), but the count must be strictly less than 4 — and in
+    # practice, with 0.2s sleep and 0.05s cancel timing, 0 or close to 0.
+    assert callback_count["n"] < 4
