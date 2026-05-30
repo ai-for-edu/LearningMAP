@@ -305,3 +305,59 @@ def test_async_cancellation_propagates_and_cancels_siblings():
     # propagated), but the count must be strictly less than 4 — and in
     # practice, with 0.2s sleep and 0.05s cancel timing, 0 or close to 0.
     assert callback_count["n"] < 4
+
+
+# ---------------------------------------------------------------------------
+# quiz_generate_progressive — sync queue-bridge over async core
+# ---------------------------------------------------------------------------
+
+def test_progressive_yields_kc_idx_batch_tuples():
+    """New shape: yields (kc_idx, list[QuizQuestion]) per completed KC."""
+    from src.agent.nodes.quiz import quiz_generate_progressive
+    import time
+
+    delays = [0.03, 0.0, 0.02]  # KC-1 finishes first, then KC-2, then KC-0
+    call_idx = {"i": 0}
+
+    def _create(**kwargs):
+        i = call_idx["i"]
+        call_idx["i"] += 1
+        time.sleep(delays[i])
+        return [_make_mock_question("x", f"q-{i}")]
+
+    state = _make_kg_state(3)
+    ctx, _ = _patch_quiz_client(_create)
+    with ctx:
+        items = list(quiz_generate_progressive(state))
+
+    # Three tuples, one per KC.
+    assert len(items) == 3
+    for item in items:
+        assert isinstance(item, tuple)
+        assert len(item) == 2
+        kc_idx, batch = item
+        assert isinstance(kc_idx, int)
+        assert isinstance(batch, list)
+
+    # kc_idx covers 0..N-1, in completion order (not KC declaration order).
+    kc_indices = [k for k, _ in items]
+    assert sorted(kc_indices) == [0, 1, 2]
+    # Combined batches contain one question per KC.
+    all_qs = [q for _, b in items for q in b]
+    assert len(all_qs) == 3
+
+
+def test_progressive_completes_when_async_runner_finishes():
+    """Generator must terminate (not hang) once all KCs are done."""
+    from src.agent.nodes.quiz import quiz_generate_progressive
+
+    def _create(**kwargs):
+        return [_make_mock_question("x", "q")]
+
+    state = _make_kg_state(2)
+    ctx, _ = _patch_quiz_client(_create)
+    with ctx:
+        # If this hangs, the SENTINEL drain logic is broken.
+        items = list(quiz_generate_progressive(state))
+
+    assert len(items) == 2

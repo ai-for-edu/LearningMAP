@@ -153,53 +153,42 @@ def quiz_node(state: LearningState) -> dict:
 
 
 def quiz_generate_progressive(state: dict):
-    """Generate quiz questions one knowledge point at a time, weighted by mastery.
+    """Yield (kc_idx, list[QuizQuestion]) tuples in COMPLETION order.
 
-    Yields list[QuizQuestion] batches.
+    Generates per-KC batches concurrently via generate_quiz_per_point_async.
+    The async core runs on a private event loop inside a daemon thread;
+    completed batches are pushed into a queue that this sync generator
+    drains. Yield shape is (kc_idx, batch) so the consumer can re-sort
+    back to KC declaration order at the end.
     """
-    graph = state.get("knowledge_graph")
-    if not graph:
-        return
+    import queue as _queue
+    import threading as _threading
 
-    raw_nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
-    nodes = [_coerce_node(n) for n in raw_nodes]
-    per_node = _allocate_questions_per_node(nodes)
+    q: _queue.Queue = _queue.Queue()
+    SENTINEL = object()
 
-    skill_instructions = get_skill_section(state, "quiz")
-    client = get_llm_client()
+    def _on_point_done(done_count, kc_idx, batch):
+        q.put((kc_idx, batch))
 
-    for node in nodes:
-        count = per_node.get(node.name, QUESTIONS_PER_POINT)
-        if count <= 0:
-            continue
-        point = {"name": node.name, "description": node.description}
-        kc_skill_block = render_kc_skill_block(
-            (state.get("kc_skills") or {}).get(node.name)
-        )
-        prompt = render_prompt(
-            "quiz_generate",
-            knowledge_points=[point],
-            questions_per_point=count,
-            skill_instructions=skill_instructions,
-            kc_skill_block=kc_skill_block,
-            memory_snapshot_block=memory_snapshot_block(state),
-        )
+    async def _runner():
         try:
-            batch = client.chat.completions.create(
-                model=get_model_name(),
-                max_tokens=4096,
-                messages=[{"role": "user", "content": prompt}],
-                response_model=list[QuizQuestion],
-            )
-            # Pin knowledge_point to the KG node name — same reason as in
-            # quiz_node: prevent LLM-paraphrase pollution from breaking memory matching.
-            for q in batch:
-                q.knowledge_point = node.name
-            yield batch
-        except Exception:
-            logger.exception(
-                "Failed to generate quiz for knowledge point: %s", node.name
-            )
+            await generate_quiz_per_point_async(state, on_point_done=_on_point_done)
+        finally:
+            q.put(SENTINEL)
+
+    def _run_in_thread():
+        asyncio.run(_runner())
+
+    t = _threading.Thread(target=_run_in_thread, daemon=True)
+    t.start()
+    try:
+        while True:
+            item = q.get()
+            if item is SENTINEL:
+                break
+            yield item
+    finally:
+        t.join()
 
 
 async def generate_quiz_per_point_async(
