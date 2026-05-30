@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Sequence
 
 from langchain_core.messages import AIMessage
@@ -13,6 +14,25 @@ from src.prompts.loader import render_kc_skill_block, render_prompt
 from src.skills.loader import get_skill_section
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_quiz_fanout_limit(arg: int | None) -> int:
+    """Resolve the quiz fan-out concurrency limit.
+
+    Precedence: explicit `arg` > env var `QUIZ_FANOUT_LIMIT` > default 4.
+    A non-integer env value silently falls back to the default.
+    Values < 1 are clamped to 1 to prevent asyncio.Semaphore(0) deadlock.
+    """
+    if arg is not None:
+        return max(1, arg)
+    env_val = os.environ.get("QUIZ_FANOUT_LIMIT")
+    if env_val:
+        try:
+            return max(1, int(env_val))
+        except ValueError:
+            pass
+    return 4
+
 
 QUESTIONS_PER_POINT = 2
 # UNSEEN_PRIORITY = priority for nodes with NO memory record at all
