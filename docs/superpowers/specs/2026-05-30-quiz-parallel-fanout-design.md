@@ -13,15 +13,15 @@ Quiz generation currently runs one LLM call per knowledge point (KC) in a serial
 - New shared core `src/agent/nodes/quiz.py::generate_quiz_per_point_async` — async fan-out, semaphore-bounded.
 - Refactor existing call sites to converge on the new core:
   - `quiz_node` (sync, LangGraph entry, `quiz.py:94`) — internal `for` loop replaced by `asyncio.run(generate_quiz_per_point_async(...))`.
-  - `quiz_generate_progressive` (sync generator, `quiz.py:171`) — internals rewritten as a thin queue-bridging wrapper over the async core; signature unchanged so `run_quiz_generation` does not have to change.
-  - `run_quiz_generation` (async background task, `src/api/tasks.py:124`) — unchanged loop structure; gains a final post-loop re-sort step so persisted `state["questions"]` ends in KC declaration order.
+  - `quiz_generate_progressive` (sync generator, `quiz.py:171`) — internals rewritten as a thin queue-bridging wrapper over the async core; yielded shape changes from `list[QuizQuestion]` to `(kc_idx, list[QuizQuestion])`. Kept only for the sync consumer in `generate_quiz_stream` (SSE) — `run_quiz_generation` switches off it.
+  - `run_quiz_generation` (async background task, `src/api/tasks.py:124`) — switches its import from `quiz_generate_progressive` to `generate_quiz_per_point_async` and `await`s the async core directly. Intermediate writes flow through an `on_point_done` callback; the final post-loop write re-sorts collected batches to KC declaration order. Bypassing the sync bridge is required for `asyncio.CancelledError` from `task_manager.cancel()` to propagate natively through `gather` — going through `queue.get()` would block the event loop and defeat cancellation.
 - New environment variable `QUIZ_FANOUT_LIMIT` (default `4`) controlling the `asyncio.Semaphore` upper bound.
 - New tests under `tests/test_quiz_parallel.py` and a small smoke test for ordered final persistence in `run_quiz_generation`.
 
 ### Out of scope
 
 - `_priority` / `_allocate_questions_per_node` (`quiz.py:27`, `:34`): per-KC question-count weighting stays unchanged. This refactor only parallelizes the LLM call layer.
-- `generate_quiz_stream` SSE endpoint (`src/api/chat.py:588`): kept functionally as-is. The frontend does not consume it (it uses `startGeneration('quiz')` + polling). The only edit is mechanical: unpack the new `(kc_idx, batch)` tuple from `quiz_generate_progressive` and forward `kc_idx` in the SSE payload (additive field; no consumer cares). Deletion is left to a follow-up cleanup PR.
+- `generate_quiz_stream` SSE endpoint (`src/api/chat.py:588`): kept functionally as-is at the protocol level. The frontend does not consume it (it uses `startGeneration('quiz')` + polling). Required edits are: (a) unpack the new `(kc_idx, batch)` tuple from `quiz_generate_progressive` and forward `kc_idx` in the SSE payload (additive field; no consumer cares), and (b) collect emitted batches and re-sort by `kc_idx` before the existing post-loop `state["questions"] = all_questions` save, so the persisted state matches `run_quiz_generation` and the serial endpoint's prior contract (KC declaration order). The SSE stream itself stays in arrival order — only the post-stream persistence is reordered. Deletion of this endpoint is left to a follow-up cleanup PR.
 - Cross-session global throttling: `task_manager` already enforces session-internal mutex of `quiz`/`lesson`/`slides`. Cross-session fan-out caps are deferred until production traffic demands it.
 - Retry/backoff for failed KCs: per-KC failures log and continue (best-effort), no retry layer added.
 - LLM client construction: `get_llm_client()` returns an `instructor.Instructor` over a shared `httpx.Client`; `httpx.Client` is documented as thread-safe, so reusing the singleton from `asyncio.to_thread` workers is OK and matches the lesson fan-out pattern.
@@ -69,33 +69,40 @@ def _resolve_quiz_fanout_limit(limit: int | None) -> int:
     """Resolution: explicit arg > QUIZ_FANOUT_LIMIT env > 4. Clamps to >= 1."""
 ```
 
-`quiz_node` and `quiz_generate_progressive` keep their public signatures — `quiz_node(state: LearningState) -> dict` and `quiz_generate_progressive(state: dict)` (sync generator). All existing callers (LangGraph, `run_quiz_generation`, the SSE endpoint) keep working with no signature changes.
+`quiz_node` keeps its public signature — `quiz_node(state: LearningState) -> dict`. `quiz_generate_progressive(state: dict)` keeps its function signature but its yielded shape becomes `tuple[int, list[QuizQuestion]]`; the remaining production consumer (the SSE endpoint) is updated to unpack the tuple. `run_quiz_generation` stops calling `quiz_generate_progressive` altogether and awaits `generate_quiz_per_point_async` directly. LangGraph's call into `quiz_node` is unaffected — `quiz_node` internally wraps the async core with `asyncio.run`.
 
 ### Call graph
 
 ```
-LangGraph                       run_quiz_generation              generate_quiz_stream (SSE, unused by FE)
-   │                                    │                                 │
-   ▼                                    ▼                                 ▼
-quiz_node (sync)              for batch in progressive(state):     for batch in progressive(state):
-   │ asyncio.run                        │                                 │
-   ▼                                    ▼                                 ▼
-   └──────────── generate_quiz_per_point_async (async) ────────── quiz_generate_progressive
-                              │                                      (thin queue-bridge wrapper)
-                              │                                              │
-                              │ ◄────────── runs the async core in a
-                              │              private asyncio loop;
-                              │              on_point_done pushes batches
-                              │              into a queue; sync generator
-                              │              drains the queue.
+LangGraph                       run_quiz_generation                   generate_quiz_stream (SSE, unused by FE)
+   │                                    │                                       │
+   ▼                                    ▼                                       ▼
+quiz_node (sync)              await generate_quiz_per_point_async(...)   for (kc_idx, batch) in progressive(state):
+   │ asyncio.run                        │ (on_point_done callback for             │
+   ▼                                    │  intermediate state writes)             ▼
+   │                                    │                              quiz_generate_progressive
+   │                                    │                                (thin queue-bridge wrapper —
+   │                                    │                                 daemon thread + queue.Queue)
+   │                                    │                                          │
+   │                                    │                                          │ runs the async core in a
+   │                                    │                                          │ private asyncio loop;
+   │                                    │                                          │ on_point_done pushes
+   │                                    │                                          │ (kc_idx, batch) into the
+   │                                    │                                          │ queue; sync generator
+   │                                    │                                          │ drains the queue.
+   ▼                                    ▼                                          ▼
+   └──────────────────── generate_quiz_per_point_async (async) ──────────────────────┘
+                              │
                               ▼
               sem = asyncio.Semaphore(_resolve_quiz_fanout_limit(limit))
               tasks = [_one_point(i, node) for i, node in enumerate(nodes)]
-              results = await asyncio.gather(*tasks)   # return_exceptions=True
+              results = await asyncio.gather(*tasks)
                               │
                               ▼
               return list[QuizQuestion] flattened in KC index order
 ```
+
+`run_quiz_generation` deliberately calls the async core directly rather than via `quiz_generate_progressive`. The sync bridge's `queue.get()` is a blocking call; consuming it from an async coroutine would prevent `asyncio.CancelledError` from being delivered until the next natural yield, defeating native cancellation. `quiz_node` is sync (LangGraph invocation path) so it must wrap with `asyncio.run`; the SSE endpoint is async but iterates a sync generator, so the bridge serves it.
 
 ## 3. Concurrency & Failure Handling
 
@@ -169,6 +176,8 @@ async def generate_quiz_per_point_async(state, *, limit=None, on_point_done=None
 
 Per-KC try/except inside `_one_point` swallows the exception, logs it via `logger.exception(...)`, and yields an empty batch. `asyncio.gather` therefore never raises for an LLM error. The function returns a list with as many questions as succeeded — possibly fewer than `sum(per_node.values())`, possibly zero. This matches today's `quiz_generate_progressive` semantics exactly (`quiz.py:215-218`: `try / except / logger.exception / no yield`).
 
+The `try` must wrap **prompt assembly as well** — `render_kc_skill_block(...)`, `render_prompt(...)`, and `memory_snapshot_block(state)` can each raise (template lookup failures, malformed `kc_skills` shape, memory service unavailable). If any of those land outside the try, `asyncio.gather` raises and aborts all sibling KCs — a behavioral regression vs. the serial path, which fails one KC at a time. Only `count <= 0` short-circuits before the try block, since no work to do means no work to fail.
+
 The `on_point_done` callback also fires on the failed-batch path (with `batch=[]`), so progress counters reach `N/N` instead of stalling at `N-1/N`.
 
 `asyncio.CancelledError` (raised when `run_quiz_generation`'s top-level task is cancelled) is **not** caught by the try/except — `CancelledError` subclasses `BaseException` in Python 3.8+, not `Exception`. Cancellation propagates correctly through the `gather`.
@@ -211,24 +220,33 @@ Why a thread instead of `asyncio.run` directly in the generator?
 - The thread is daemon-ized so an interpreter exit will not hang waiting for a stuck LLM call.
 - Completion order (not KC order) is what `run_quiz_generation` writes into intermediate `state["questions"]` between polls — fine, because the final overwrite (below) re-sorts.
 
-### `run_quiz_generation` — final re-sort
+### `run_quiz_generation` — direct await + final re-sort
 
-`run_quiz_generation` (`src/api/tasks.py:124`) keeps its `for batch in quiz_generate_progressive(...)` loop. The intermediate `state["questions"]` writes during the loop hold partial, completion-ordered questions (good for polling latency). After the loop completes, we re-run `generate_quiz_per_point_async`'s ordering by piggy-backing on the fact that the loop already collected all batches, then sort by KC index.
+`run_quiz_generation` (`src/api/tasks.py:124`) is already async. It **switches its import** from `quiz_generate_progressive` to `generate_quiz_per_point_async` and awaits the async core directly. Intermediate `state["questions"]` writes flow through the core's `on_point_done` callback (completion order, good for polling latency). After the await completes, the function re-sorts the collected batches by KC index and performs a single terminal write.
 
-Implementation choice: change `quiz_generate_progressive` to yield `(kc_idx, batch)` tuples instead of bare `batch` lists, so the consumer can re-sort at the end. `run_quiz_generation` becomes:
+Why bypass the sync bridge here: `quiz_generate_progressive` exposes a synchronous generator backed by `queue.Queue.get()` + `threading.Thread.join()` — both are blocking calls. Calling them from an async coroutine pins the event loop on the OS thread and prevents `asyncio.CancelledError` (delivered by `task_manager.cancel()` doing `asyncio_task.cancel()`) from being observed until the bridge's daemon thread happens to push another item. The existing serial code could check `task.cancelled` between iterations because each iteration was a sync `for`, but a true async background task should rely on native cancellation, not flag-polling. Awaiting the async core directly puts the `gather` (and therefore each `_one_point`'s `await asyncio.to_thread(...)`) on the same event loop as the cancel signal.
 
 ```python
+nodes = state_snapshot.get("knowledge_graph")
+if nodes:
+    nodes = nodes.nodes if hasattr(nodes, "nodes") else nodes.get("nodes", [])
+total = len(nodes) if nodes else 0
+
 collected: list[tuple[int, list]] = []
-for kc_idx, batch in quiz_generate_progressive(state_snapshot):
+
+def _on_done(done_count: int, kc_idx: int, batch: list) -> None:
     if task and task.cancelled:
-        break
+        # Skip intermediate writes after cancel — the final write
+        # below gates quiz_task_status on the same flag.
+        return
     collected.append((kc_idx, batch))
-    # Intermediate write: completion order, fine for polling.
     flat = [q for _, b in collected for q in b]
     state = get_session(session_id) or {}
     state["questions"] = [q.model_dump() for q in flat]
-    state["quiz_task_progress"] = f"{len(collected)}/{total}"
+    state["quiz_task_progress"] = f"{done_count}/{total}"
     save_session(session_id, state)
+
+await generate_quiz_per_point_async(state_snapshot, on_point_done=_on_done)
 
 # Final write: KC declaration order.
 collected.sort(key=lambda pair: pair[0])
@@ -243,12 +261,12 @@ state["quiz_task_progress"] = None
 save_session(session_id, state)
 ```
 
-This is a **breaking change to `quiz_generate_progressive`'s yielded shape** (`list[QuizQuestion]` → `tuple[int, list[QuizQuestion]]`). Callers:
+The change to `quiz_generate_progressive`'s yielded shape (`list[QuizQuestion]` → `tuple[int, list[QuizQuestion]]`) is still a breaking-but-internal API change. Remaining callers:
 
-- `src/api/tasks.py::run_quiz_generation` — updated as above.
-- `src/api/chat.py::generate_quiz_stream` — SSE endpoint, currently unpacks `batch` as a plain list. Updated to unpack `(kc_idx, batch)` and include `kc_idx` in the SSE payload (frontend doesn't consume it, so this is purely a contract correction).
+- `src/api/chat.py::generate_quiz_stream` — SSE endpoint, async route iterating a sync generator. Updated to unpack `(kc_idx, batch)`, include `kc_idx` in the SSE payload, and re-sort collected batches before its post-loop `state["questions"]` save so the persisted contract matches `run_quiz_generation`.
+- `tests/test_quiz_node_weighting.py` (line 175) — `batches = list(quiz_generate_progressive(...))` updated to unpack the tuple.
 
-No other production callers (`grep -rn quiz_generate_progressive`).
+No other production callers (`grep -rn quiz_generate_progressive`). `run_quiz_generation` is **no longer** a consumer.
 
 ### Key decisions
 
@@ -260,7 +278,7 @@ No other production callers (`grep -rn quiz_generate_progressive`).
 | Final question ordering | KC declaration order, sorted post-gather | Same KC index → same question position across runs. Stable for regression tests and for student UX (consecutive sessions feel coherent). |
 | Intermediate ordering during polling | completion order | Maximizes time-to-first-question. The final overwrite corrects to KC order before the user transitions to the quiz screen. |
 | Progress callback shape | `(done_count, kc_idx, batch)` | `done_count` for progress bars; `kc_idx` for completion-order rendering; `batch` for in-place persistence. |
-| `quiz_generate_progressive` yielded shape | `(kc_idx, batch)` (breaking) | Lets the consumer reconstruct KC order without re-querying the graph. Only two production call sites — both updated. |
+| `quiz_generate_progressive` yielded shape | `(kc_idx, batch)` (breaking) | Lets the consumer reconstruct KC order without re-querying the graph. Only one production call site remains (SSE in `generate_quiz_stream`); `run_quiz_generation` switched to direct await. |
 | Sync wrapper strategy for `quiz_node` | `asyncio.run` | `quiz_node` runs in the LangGraph sync invocation path, not inside an event loop. Same pattern as lesson's sync wrapper. |
 | Cancellation strategy | native asyncio cancellation | Top-level task cancel → `CancelledError` propagates through `gather` and into `_one_point`'s `await asyncio.to_thread`. In-flight HTTP requests run to completion in the worker thread but their results are discarded. |
 
@@ -314,6 +332,6 @@ Mirror `tests/test_lesson_parallel.py`'s structure with quiz-shaped fixtures.
 | `quiz_task_progress` semantics | `"i/N"` = "generating KC i" | `"k/N"` = "completed k of N" | yes — front-end label may need wording check (`static/diagnosis.html:238`) |
 | Per-KC failure | logs + skips, others continue | logs + skips, others continue | no |
 | Wall-clock latency for N KCs | `N · t` | `⌈N/4⌉ · t` (≈25% for N=8) | yes — much faster |
-| `quiz_generate_progressive` yielded shape | `list[QuizQuestion]` | `tuple[int, list[QuizQuestion]]` | no — internal API; two callers both updated |
+| `quiz_generate_progressive` yielded shape | `list[QuizQuestion]` | `tuple[int, list[QuizQuestion]]` | no — internal API; remaining production caller (SSE) updated, `run_quiz_generation` no longer uses it |
 | Cancellation latency | next loop iteration | flight-time of in-flight requests (up to `limit` concurrent) | weakly |
 | Tokens spent on cancelled tasks | up to one KC in flight | up to `limit` KCs in flight | billing-only |
