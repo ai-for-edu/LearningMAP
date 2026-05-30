@@ -609,7 +609,14 @@ async def generate_quiz_stream(session_id: str):
         all_questions = []
         point_idx = 0
 
-        for batch in quiz_generate_progressive(state):
+        # Track (kc_index, batch) so the final state save can be re-sorted
+        # to KC declaration order — matching run_quiz_generation and the
+        # serial endpoint's prior behavior. The SSE stream still emits in
+        # completion order (arrival semantics).
+        collected: list[tuple[int, list]] = []
+
+        for kc_index, batch in quiz_generate_progressive(state):
+            collected.append((kc_index, batch))
             questions_data = [q.model_dump() for q in batch]
             all_questions.extend(batch)
             point_idx += 1
@@ -618,9 +625,16 @@ async def generate_quiz_stream(session_id: str):
                     "type": "questions",
                     "batch": questions_data,
                     "point_index": point_idx,
+                    "kc_index": kc_index,  # additive field
                     "total_points": total_points,
                 }
             )
+
+        # Re-build all_questions in KC declaration order before the
+        # post-loop state save (the existing save block below writes
+        # state["questions"] = all_questions).
+        collected.sort(key=lambda pair: pair[0])
+        all_questions = [q for _, b in collected for q in b]
 
         # Save all questions to state
         state["questions"] = all_questions
