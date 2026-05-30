@@ -125,44 +125,7 @@ def quiz_node(state: LearningState) -> dict:
                 "messages": [AIMessage(content="Please select a learning topic first.")],
             }
 
-        raw_nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
-        nodes = [_coerce_node(n) for n in raw_nodes]
-        per_node = _allocate_questions_per_node(nodes)
-
-        skill_instructions = get_skill_section(state, "quiz")
-        kc_skills_state = state.get("kc_skills") or {}
-
-        all_generated: list[QuizQuestion] = []
-        client = get_llm_client()
-        for node in nodes:
-            count = per_node.get(node.name, QUESTIONS_PER_POINT)
-            if count <= 0:
-                continue
-            point = {"name": node.name, "description": node.description}
-            block = render_kc_skill_block(kc_skills_state.get(node.name))
-            kc_skill_block = block or ""
-            prompt = render_prompt(
-                "quiz_generate",
-                knowledge_points=[point],
-                questions_per_point=count,
-                skill_instructions=skill_instructions,
-                kc_skill_block=kc_skill_block,
-                memory_snapshot_block=memory_snapshot_block(state),
-            )
-            batch = client.chat.completions.create(
-                model=get_model_name(),
-                max_tokens=4096,
-                messages=[{"role": "user", "content": prompt}],
-                response_model=list[QuizQuestion],
-            )
-            # Pin knowledge_point to the KG node name. The LLM has been
-            # observed to paraphrase or append the description into this
-            # field (e.g. "multiplication principle: explanation of step-by-step counting..."),
-            # which then becomes the subtopic key in memory and breaks cross-session matching.
-            for q in batch:
-                q.knowledge_point = node.name
-            all_generated.extend(batch)
-
+        all_generated = asyncio.run(generate_quiz_per_point_async(state))
         return {
             "questions": all_generated,
             "current_question_index": 0,
