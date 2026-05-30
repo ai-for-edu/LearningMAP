@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Sequence
@@ -236,3 +237,91 @@ def quiz_generate_progressive(state: dict):
             logger.exception(
                 "Failed to generate quiz for knowledge point: %s", node.name
             )
+
+
+async def generate_quiz_per_point_async(
+    state: dict,
+    *,
+    limit: int | None = None,
+    on_point_done=None,
+) -> list:
+    """Generate quiz batches concurrently across knowledge points.
+
+    Returns the full list of QuizQuestion in KC declaration order
+    (i.e. as nodes appear in state['knowledge_graph'].nodes). Per-KC
+    failures are logged and contribute an empty batch — the function
+    never raises for an LLM error.
+
+    on_point_done(done_count, kc_index, batch) fires once per completed
+    KC, with done_count monotonically increasing 1..N in completion
+    order (not KC order). kc_index is the original index into nodes.
+    """
+    graph = state.get("knowledge_graph")
+    if not graph:
+        return []
+    raw_nodes = graph.nodes if hasattr(graph, "nodes") else graph.get("nodes", [])
+    if not raw_nodes:
+        return []
+
+    nodes = [_coerce_node(n) for n in raw_nodes]
+    per_node = _allocate_questions_per_node(nodes)
+    skill_instructions = get_skill_section(state, "quiz")
+    kc_skills_state = state.get("kc_skills") or {}
+    client = get_llm_client()
+    sem = asyncio.Semaphore(_resolve_quiz_fanout_limit(limit))
+    done_counter = {"n": 0}
+
+    async def _one_point(i: int, node: KnowledgeNode):
+        count = per_node.get(node.name, QUESTIONS_PER_POINT)
+        if count <= 0:
+            batch: list[QuizQuestion] = []
+        else:
+            # try wraps prompt assembly AS WELL — render_prompt,
+            # render_kc_skill_block, and memory_snapshot_block(state) can
+            # all raise (template lookup, malformed kc_skills, memory
+            # service down). Keeping them outside the try would let
+            # asyncio.gather raise and abort all sibling KCs, breaking
+            # the best-effort contract that matches the serial path.
+            try:
+                point = {"name": node.name, "description": node.description}
+                kc_skill_block = render_kc_skill_block(
+                    kc_skills_state.get(node.name)
+                ) or ""
+                prompt = render_prompt(
+                    "quiz_generate",
+                    knowledge_points=[point],
+                    questions_per_point=count,
+                    skill_instructions=skill_instructions,
+                    kc_skill_block=kc_skill_block,
+                    memory_snapshot_block=memory_snapshot_block(state),
+                )
+                async with sem:
+                    batch = await asyncio.to_thread(
+                        lambda p=prompt: client.chat.completions.create(
+                            model=get_model_name(),
+                            max_tokens=4096,
+                            messages=[{"role": "user", "content": p}],
+                            response_model=list[QuizQuestion],
+                        )
+                    )
+                # Pin knowledge_point to the KG node name. The LLM has been
+                # observed to paraphrase or append the description into this
+                # field, which then becomes the subtopic key in memory and
+                # breaks cross-session matching.
+                for q in batch:
+                    q.knowledge_point = node.name
+            except Exception:
+                logger.exception(
+                    "Failed to generate quiz for knowledge point: %s", node.name
+                )
+                batch = []
+
+        done_counter["n"] += 1
+        if on_point_done is not None:
+            on_point_done(done_counter["n"], i, batch)
+        return i, batch
+
+    tasks = [asyncio.create_task(_one_point(i, n)) for i, n in enumerate(nodes)]
+    results = await asyncio.gather(*tasks)
+    results.sort(key=lambda pair: pair[0])
+    return [q for _, batch in results for q in batch]
