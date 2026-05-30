@@ -172,7 +172,8 @@ class TestQuizNodePinsKnowledgePoint:
         )
         with patch("src.agent.nodes.quiz.get_llm_client") as mock_client:
             mock_client.return_value.chat.completions.create.return_value = [polluted]
-            batches = list(quiz_generate_progressive({"knowledge_graph": graph}))
+            # quiz_generate_progressive now yields (kc_idx, batch) tuples.
+            batches = [batch for _kc_idx, batch in quiz_generate_progressive({"knowledge_graph": graph})]
 
         assert len(batches) == 1
         assert batches[0][0].knowledge_point == "quadratic formula"

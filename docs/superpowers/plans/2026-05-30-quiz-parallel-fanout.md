@@ -4,7 +4,7 @@
 
 **Goal:** Converge three quiz-generation entry points (`quiz_node`, `quiz_generate_progressive`, `run_quiz_generation`) onto a single async fan-out core that generates per-KC question batches concurrently (default 4 in-flight). Final `state["questions"]` stays in KC declaration order; per-KC failures stay best-effort (logged, others continue).
 
-**Architecture:** New `generate_quiz_per_point_async` in `src/agent/nodes/quiz.py` mirrors the existing `generate_lesson_per_point_async` pattern (`asyncio.Semaphore` + `asyncio.to_thread` + KC-index sort post-`gather`). `quiz_node` wraps it with `asyncio.run`. `quiz_generate_progressive` bridges async→sync via a `queue.Queue` + daemon thread; its yielded shape changes from `list[QuizQuestion]` to `tuple[int, list[QuizQuestion]]`. `run_quiz_generation` consumes the new tuple shape and re-sorts to KC order before the final state write. SSE endpoint gets a mechanical unpack fix.
+**Architecture:** New `generate_quiz_per_point_async` in `src/agent/nodes/quiz.py` mirrors the existing `generate_lesson_per_point_async` pattern (`asyncio.Semaphore` + `asyncio.to_thread` + KC-index sort post-`gather`). `quiz_node` wraps it with `asyncio.run`. `quiz_generate_progressive` bridges async→sync via a `queue.Queue` + daemon thread; its yielded shape changes from `list[QuizQuestion]` to `tuple[int, list[QuizQuestion]]`. `run_quiz_generation` is itself async — it awaits `generate_quiz_per_point_async` directly (NOT through the sync bridge) so that `asyncio.CancelledError` propagates natively through `gather` instead of being trapped behind a blocking `queue.get()`; intermediate writes happen via the `on_point_done` callback, and the final write re-sorts collected batches to KC declaration order. The SSE endpoint keeps the sync bridge (it's still a synchronous generator inside an async route), unpacks the new tuple, and re-sorts before its post-loop state save so persisted order matches the serial contract.
 
 **Tech Stack:** Python 3.11+, `asyncio`, `queue`, `threading`, `pytest`, `instructor` over OpenAI SDK (sync client wrapped in `asyncio.to_thread`).
 
@@ -16,8 +16,8 @@
 
 **Modified:**
 - `src/agent/nodes/quiz.py` — adds `_resolve_quiz_fanout_limit`, adds `generate_quiz_per_point_async`, rewrites `quiz_node` body to call async core, rewrites `quiz_generate_progressive` as a sync queue-bridge over the async core (and changes its yield shape to `(kc_idx, batch)`).
-- `src/api/tasks.py::run_quiz_generation` (lines 124-176) — updates the `for batch in quiz_generate_progressive(...)` loop to unpack the new tuple, then re-sorts collected batches by KC index before the final state write.
-- `src/api/chat.py::generate_quiz_stream` (lines 588-636) — updates the loop to unpack the new tuple; adds `kc_idx` to the SSE event payload (additive; no consumer cares).
+- `src/api/tasks.py::run_quiz_generation` (lines 124-176) — switches its import from `quiz_generate_progressive` to `generate_quiz_per_point_async` and `await`s the async core directly via an `on_point_done` callback. The sync bridge is bypassed entirely so native asyncio cancellation works. Final write re-sorts collected batches by KC index.
+- `src/api/chat.py::generate_quiz_stream` (lines 588-636) — updates the loop to unpack the new `(kc_index, batch)` tuple; adds `kc_idx` to the SSE event payload (additive). Collects batches and re-sorts to KC declaration order **before** the post-loop `state["questions"] = all_questions` save, matching `run_quiz_generation` and the serial endpoint's prior persistence contract.
 - `tests/test_quiz_node_weighting.py:175` — updates `batches = list(quiz_generate_progressive(graph))` call site to handle the new tuple shape.
 
 **Created:**
@@ -246,10 +246,18 @@ Append to `tests/test_quiz_parallel.py`:
 # ---------------------------------------------------------------------------
 
 def _make_kg_state(num_nodes: int) -> dict:
-    """Build a state dict whose knowledge_graph has N named KCs."""
+    """Build a state dict whose knowledge_graph has N named KCs.
+
+    NOTE: KnowledgeNode requires id + level (see src/llm/schemas.py:20-25).
+    """
     from src.llm.schemas import KnowledgeNode
     nodes = [
-        KnowledgeNode(name=f"kc-{i}", description=f"desc-{i}", mastery=None)
+        KnowledgeNode(
+            id=f"kc-{i}",
+            name=f"kc-{i}",
+            description=f"desc-{i}",
+            level="core",
+        )
         for i in range(num_nodes)
     ]
     graph = MagicMock()
@@ -258,14 +266,19 @@ def _make_kg_state(num_nodes: int) -> dict:
 
 
 def _make_mock_question(kc_name: str, text: str):
-    """Build a mock QuizQuestion-like object the async core can re-tag."""
+    """Build a mock QuizQuestion-like object the async core can re-tag.
+
+    NOTE: QuizQuestion has fields {id, knowledge_point, question, options,
+    answer: int}. There is no `correct_answer` or `explanation` field on
+    the current schema (see src/llm/schemas.py:40-45).
+    """
     from src.llm.schemas import QuizQuestion
     return QuizQuestion(
+        id=f"q-{text}",
         knowledge_point=kc_name,
         question=text,
         options=["A", "B", "C", "D"],
-        correct_answer="A",
-        explanation="x",
+        answer=0,
     )
 
 
@@ -459,19 +472,25 @@ async def generate_quiz_per_point_async(
         if count <= 0:
             batch: list[QuizQuestion] = []
         else:
-            point = {"name": node.name, "description": node.description}
-            kc_skill_block = render_kc_skill_block(
-                kc_skills_state.get(node.name)
-            ) or ""
-            prompt = render_prompt(
-                "quiz_generate",
-                knowledge_points=[point],
-                questions_per_point=count,
-                skill_instructions=skill_instructions,
-                kc_skill_block=kc_skill_block,
-                memory_snapshot_block=memory_snapshot_block(state),
-            )
+            # try wraps prompt assembly AS WELL — render_prompt,
+            # render_kc_skill_block, and memory_snapshot_block(state) can
+            # all raise (template lookup, malformed kc_skills, memory
+            # service down). Keeping them outside the try would let
+            # asyncio.gather raise and abort all sibling KCs, breaking
+            # the best-effort contract that matches the serial path.
             try:
+                point = {"name": node.name, "description": node.description}
+                kc_skill_block = render_kc_skill_block(
+                    kc_skills_state.get(node.name)
+                ) or ""
+                prompt = render_prompt(
+                    "quiz_generate",
+                    knowledge_points=[point],
+                    questions_per_point=count,
+                    skill_instructions=skill_instructions,
+                    kc_skill_block=kc_skill_block,
+                    memory_snapshot_block=memory_snapshot_block(state),
+                )
                 async with sem:
                     batch = await asyncio.to_thread(
                         lambda p=prompt: client.chat.completions.create(
@@ -851,10 +870,18 @@ from unittest.mock import MagicMock, patch
 
 
 def _make_kg_state(num_nodes: int) -> dict:
-    """Build a minimal state dict that run_quiz_generation can consume."""
+    """Build a minimal state dict that run_quiz_generation can consume.
+
+    NOTE: KnowledgeNode requires id + level (see src/llm/schemas.py:20-25).
+    """
     from src.llm.schemas import KnowledgeNode
     nodes = [
-        KnowledgeNode(name=f"kc-{i}", description=f"desc-{i}", mastery=None)
+        KnowledgeNode(
+            id=f"kc-{i}",
+            name=f"kc-{i}",
+            description=f"desc-{i}",
+            level="core",
+        )
         for i in range(num_nodes)
     ]
     graph = MagicMock()
@@ -863,13 +890,17 @@ def _make_kg_state(num_nodes: int) -> dict:
 
 
 def _make_question(kc_name: str, text: str):
+    """NOTE: QuizQuestion has fields {id, knowledge_point, question, options,
+    answer: int}. There is no `correct_answer` or `explanation` field
+    (see src/llm/schemas.py:40-45).
+    """
     from src.llm.schemas import QuizQuestion
     return QuizQuestion(
+        id=f"q-{text}",
         knowledge_point=kc_name,
         question=text,
         options=["A", "B", "C", "D"],
-        correct_answer="A",
-        explanation="x",
+        answer=0,
     )
 
 
@@ -949,9 +980,21 @@ Run: `uv run pytest tests/test_quiz_background_task.py -v`
 
 Expected: Either an unpacking error (current loop does `for batch in ...` but new generator yields tuples) OR a wrong-order assertion failure (intermediate write order is completion order, and there's no final re-sort yet).
 
-- [ ] **Step 3: Update `run_quiz_generation` for the new tuple shape + final re-sort**
+- [ ] **Step 3: Update `run_quiz_generation` to await the async core directly + final re-sort**
 
-In `src/api/tasks.py`, replace the body of `run_quiz_generation` (currently lines 124-176) — specifically the section starting at the `for batch in quiz_generate_progressive(state_snapshot):` loop and through the final state write. Replace this block:
+In `src/api/tasks.py`, **update the import at line 131** from:
+
+```python
+from src.agent.nodes.quiz import quiz_generate_progressive
+```
+
+to:
+
+```python
+from src.agent.nodes.quiz import generate_quiz_per_point_async
+```
+
+Then replace the body of `run_quiz_generation` (currently lines 124-176) — specifically the section starting at the `for batch in quiz_generate_progressive(state_snapshot):` loop and through the final state write. Replace this block:
 
 ```python
         all_questions = []
@@ -993,22 +1036,34 @@ with:
             nodes = nodes.nodes if hasattr(nodes, "nodes") else nodes.get("nodes", [])
         total = len(nodes) if nodes else 0
 
-        # Collected as (kc_idx, batch) in completion order; re-sorted at end.
+        # Collected via on_point_done in completion order; re-sorted at end.
         collected: list[tuple[int, list]] = []
 
-        for kc_idx, batch in quiz_generate_progressive(state_snapshot):
+        def _on_done(done_count: int, kc_idx: int, batch: list) -> None:
             if task and task.cancelled:
-                logger.info("Quiz generation cancelled for %s", session_id)
-                break
+                # Skip intermediate writes after cancel; the final write
+                # below will gate quiz_task_status on the same flag.
+                return
             collected.append((kc_idx, batch))
-
             # Intermediate write: completion order. Good for polling latency;
             # final write below corrects to KC declaration order.
             flat = [q for _, b in collected for q in b]
             state = get_session(session_id) or {}
             state["questions"] = [q.model_dump() for q in flat]
-            state["quiz_task_progress"] = f"{len(collected)}/{total}"
+            state["quiz_task_progress"] = f"{done_count}/{total}"
             save_session(session_id, state)
+
+        # Direct await — NOT the sync quiz_generate_progressive bridge.
+        # task_manager.cancel() flips task.cancelled and (depending on
+        # task_manager impl) calls asyncio_task.cancel(); a real
+        # CancelledError then propagates through gather → into _one_point's
+        # `await asyncio.to_thread` → unwinds here. Bridging through a
+        # daemon thread + queue.get() would block the event loop and
+        # prevent cancellation from being observed until the next
+        # natural yield, defeating the spec's native-cancellation claim.
+        await generate_quiz_per_point_async(
+            state_snapshot, on_point_done=_on_done
+        )
 
         # Finalize: re-sort to KC declaration order before the terminal write.
         collected.sort(key=lambda pair: pair[0])
@@ -1023,9 +1078,12 @@ with:
         save_session(session_id, state)
 ```
 
-Two real changes:
-1. Loop unpacks `(kc_idx, batch)` instead of `batch`.
-2. Final write rebuilds `state["questions"]` from `collected` sorted by `kc_idx`. (Removed the heuristic `point_idx = len(all_questions) // 2` — `len(collected)` is the exact count of completed KCs.)
+Three real changes:
+1. Import switches from `quiz_generate_progressive` → `generate_quiz_per_point_async`.
+2. The sync bridge is bypassed entirely; intermediate writes happen inside the `on_point_done` callback (which runs on the event-loop thread per the async core's design). Cancellation no longer relies on between-batch flag polling — `asyncio.CancelledError` propagates natively through the awaited gather.
+3. Final write rebuilds `state["questions"]` from `collected` sorted by `kc_idx`. (Removed the heuristic `point_idx = len(all_questions) // 2` — `done_count` is the exact count of completed KCs.)
+
+> `quiz_generate_progressive` stays for sync consumers (`quiz_node` does NOT use it, but the SSE endpoint in Task 6 does — it's an async function but its inner iteration is a sync generator). The bridge is no longer used by `run_quiz_generation`.
 
 - [ ] **Step 4: Run the smoke test, verify it passes**
 
@@ -1065,7 +1123,7 @@ wall-clock of the serial version.
 
 Read `src/api/chat.py` lines 588-636 to confirm the current loop shape. It iterates `for batch in quiz_generate_progressive(state):` and emits SSE events of `{"type": "questions", "batch": ..., "point_index": point_idx, "total_points": total_points}`.
 
-- [ ] **Step 2: Update the loop to unpack the tuple and forward `kc_index`**
+- [ ] **Step 2: Update the loop to unpack the tuple and forward `kc_index`, AND re-sort before the final state save**
 
 In `src/api/chat.py`, find the loop inside `generate_quiz_stream`'s `stream_sse` (around line 612):
 
@@ -1087,7 +1145,14 @@ In `src/api/chat.py`, find the loop inside `generate_quiz_stream`'s `stream_sse`
 Replace with:
 
 ```python
+        # Track (kc_index, batch) so the final state save can be re-sorted
+        # to KC declaration order — matching run_quiz_generation and the
+        # serial endpoint's prior behavior. The SSE stream still emits in
+        # completion order (arrival semantics).
+        collected: list[tuple[int, list]] = []
+
         for kc_index, batch in quiz_generate_progressive(state):
+            collected.append((kc_index, batch))
             questions_data = [q.model_dump() for q in batch]
             all_questions.extend(batch)
             point_idx += 1
@@ -1100,9 +1165,15 @@ Replace with:
                     "total_points": total_points,
                 }
             )
+
+        # Re-build all_questions in KC declaration order before the
+        # post-loop state save (the existing save block at lines ~625-629
+        # writes state["questions"] = all_questions).
+        collected.sort(key=lambda pair: pair[0])
+        all_questions = [q for _, b in collected for q in b]
 ```
 
-The `state["questions"] = all_questions` save block AFTER the loop already exists at lines ~625-629; it persists in completion order. Since this endpoint is not consumed by the frontend (per spec), do NOT add the final re-sort here — the SSE is a streaming protocol where order represents arrival order. If a future consumer needs KC order, they can use `kc_index` to reassemble.
+The SSE stream itself remains in completion (arrival) order, which is the correct semantics for a streaming protocol — but the **persisted `state["questions"]` must end in KC declaration order** to match `run_quiz_generation` and not silently regress the serial endpoint's contract. Spec §4 Behavior Change Matrix lists final question order as "no" user-visible change; reordering the post-loop `all_questions` keeps that promise on this code path too. A future SSE consumer that wants streaming KC order can use the per-event `kc_index` to reassemble.
 
 - [ ] **Step 3: Run any existing SSE coverage**
 
@@ -1201,8 +1272,8 @@ Expected: 6 new commits on top of the spec commit (`16afe16`):
 **Spec coverage check:** Every requirement in `docs/superpowers/specs/2026-05-30-quiz-parallel-fanout-design.md` Section 1-4 maps to at least one task above. The deferred decision in spec Section 4 about `test_R4_quiz_node_reads` is resolved: pre-existing failure, out of scope, documented in "Out of scope" at the top of this plan.
 
 **Type consistency check:**
-- `on_point_done(done_count, kc_index, batch)` signature used identically in Task 2 (implementation) and Task 4 (the bridge wraps it).
-- Generator yield shape `(kc_idx, batch)` used identically in Task 4 (implementation), Task 5 (run_quiz_generation consumer), and Task 6 (SSE consumer).
+- `on_point_done(done_count, kc_index, batch)` signature used identically in Task 2 (implementation), Task 4 (the sync bridge wraps it), and Task 5 (`run_quiz_generation` passes its own `_on_done` callback directly).
+- Generator yield shape `(kc_idx, batch)` used identically in Task 4 (implementation) and Task 6 (SSE consumer). Task 5 does NOT consume the generator — it awaits the async core directly.
 - `_resolve_quiz_fanout_limit` name used identically in Task 1 (definition) and Task 2 (consumption inside `generate_quiz_per_point_async`).
 
 **Placeholder scan:** No TBD / TODO / "implement later" markers. Every code step shows complete code. Every test step shows complete test code.

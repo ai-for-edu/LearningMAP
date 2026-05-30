@@ -128,7 +128,7 @@ async def run_quiz_generation(
     save_session,
 ) -> None:
     """Generate quiz questions in background, one knowledge point at a time."""
-    from src.agent.nodes.quiz import quiz_generate_progressive
+    from src.agent.nodes.quiz import generate_quiz_per_point_async
 
     task = task_manager.get_task(session_id, "quiz")
 
@@ -139,35 +139,69 @@ async def run_quiz_generation(
         state["quiz_task_progress"] = "0/?"
         save_session(session_id, state)
 
-        all_questions = []
         nodes = state_snapshot.get("knowledge_graph")
         if nodes:
             nodes = nodes.nodes if hasattr(nodes, "nodes") else nodes.get("nodes", [])
         total = len(nodes) if nodes else 0
 
-        for batch in quiz_generate_progressive(state_snapshot):
+        # Collected via on_point_done in completion order; re-sorted at end.
+        collected: list[tuple[int, list]] = []
+
+        def _on_done(done_count: int, kc_idx: int, batch: list) -> None:
             if task and task.cancelled:
-                logger.info("Quiz generation cancelled for %s", session_id)
-                break
-
-            all_questions.extend(batch)
-            point_idx = len(all_questions) // 2  # ~2 questions per point
-
-            # Save intermediate results
+                # Skip intermediate writes after cancel; the cancel-path
+                # arm below writes terminal state (status=None,
+                # progress=None) once CancelledError unwinds here.
+                return
+            collected.append((kc_idx, batch))
+            # Intermediate write: completion order. Good for polling latency;
+            # final write below corrects to KC declaration order.
+            flat = [q for _, b in collected for q in b]
             state = get_session(session_id) or {}
-            state["questions"] = [q.model_dump() for q in all_questions]
-            state["quiz_task_progress"] = f"{point_idx}/{total}"
+            state["questions"] = [q.model_dump() for q in flat]
+            state["quiz_task_progress"] = f"{done_count}/{total}"
             save_session(session_id, state)
 
-        # Finalize
+        # Direct await — NOT the sync quiz_generate_progressive bridge.
+        # task_manager.cancel() flips task.cancelled and (depending on
+        # task_manager impl) calls asyncio_task.cancel(); a real
+        # CancelledError then propagates through gather → into _one_point's
+        # `await asyncio.to_thread` → unwinds here. Bridging through a
+        # daemon thread + queue.get() would block the event loop and
+        # prevent cancellation from being observed until the next
+        # natural yield, defeating the spec's native-cancellation claim.
+        await generate_quiz_per_point_async(
+            state_snapshot, on_point_done=_on_done
+        )
+
+        # Finalize: re-sort to KC declaration order before the terminal write.
+        collected.sort(key=lambda pair: pair[0])
+        final_flat = [q for _, b in collected for q in b]
         state = get_session(session_id) or {}
-        state["questions"] = [q.model_dump() for q in all_questions]
+        state["questions"] = [q.model_dump() for q in final_flat]
         state["current_question_index"] = 0
         state["answers"] = []
         state["mode"] = "quiz"
         state["quiz_task_status"] = "done" if not (task and task.cancelled) else None
         state["quiz_task_progress"] = None
         save_session(session_id, state)
+
+    except asyncio.CancelledError:
+        # CancelledError is a BaseException since Py3.8 — the broad
+        # `except Exception` below cannot catch it, so without this arm
+        # the final cleanup write is skipped and persisted state remains
+        # quiz_task_status="running" with completion-ordered questions.
+        # Re-sort whatever batches completed before cancel, write a clean
+        # terminal state, then re-raise so the asyncio task ends cancelled.
+        logger.info("Quiz generation cancelled for %s", session_id)
+        collected.sort(key=lambda pair: pair[0])
+        final_flat = [q for _, b in collected for q in b]
+        state = get_session(session_id) or {}
+        state["questions"] = [q.model_dump() for q in final_flat]
+        state["quiz_task_status"] = None
+        state["quiz_task_progress"] = None
+        save_session(session_id, state)
+        raise
 
     except Exception:
         logger.exception("Quiz generation failed for %s", session_id)
