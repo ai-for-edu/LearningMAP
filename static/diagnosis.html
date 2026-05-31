@@ -280,22 +280,26 @@ async function initDiagnosis() {
 
   updateStepNav(3);
 
-  // Check if questions already exist (returning to page)
-  try {
-    const state = await getSessionState(sessionId);
-    if (!_forceRegen && state.questions && state.questions.length > 0) {
-      allQuestions = state.questions;
-      quizFullyLoaded = state.quiz_task_status !== 'running';
-      buildQuizUI();
-      showQuestion();
-      updateNavButtons();
-      // If still generating, poll for more
-      if (!quizFullyLoaded) {
-        startPolling();
-      }
-      return;
-    }
-  } catch (e) { /* continue to generate */ }
+  // Check current state (returning to page)
+  let existingState = null;
+  try { existingState = await getSessionState(sessionId); } catch (e) { /* continue */ }
+
+  // Only show quiz UI when generation is fully done; otherwise show the
+  // loading screen and poll until done (partial state is never rendered).
+  const fullyDone =
+    existingState &&
+    existingState.questions &&
+    existingState.questions.length > 0 &&
+    existingState.quiz_task_status !== 'running';
+
+  if (!_forceRegen && fullyDone) {
+    allQuestions = existingState.questions;
+    quizFullyLoaded = true;
+    buildQuizUI();
+    showQuestion();
+    updateNavButtons();
+    return;
+  }
 
   // Show loading
   document.querySelector('main').innerHTML = `
@@ -314,14 +318,16 @@ async function initDiagnosis() {
 
   _forceRegen = false;
 
-  // Trigger background generation
-  try {
-    await startGeneration(sessionId, 'quiz');
-  } catch (err) {
-    // May already be running — that's fine
+  // Kick off generation only if not already running in the background.
+  if (!existingState || existingState.quiz_task_status !== 'running') {
+    try {
+      await startGeneration(sessionId, 'quiz');
+    } catch (err) {
+      // May already be running — that's fine
+    }
   }
 
-  // Poll for results
+  // Poll for completion (UI stays on loading screen until done)
   startPolling();
 }
 
@@ -340,23 +346,14 @@ function updateNavButtons() {
 function startPolling() {
   updateNavButtons();
   _poller = pollStatus(sessionId, 'quiz',
-    async function onUpdate(status) {
-      // Check for new questions
-      try {
-        const state = await getSessionState(sessionId);
-        if (state.questions && state.questions.length > allQuestions.length) {
-          allQuestions = state.questions;
-          if (!document.getElementById('optionsContainer')) {
-            buildQuizUI();
-          }
-          showQuestion();
-          // Update loading hint
-          const hint = document.getElementById('loadingHint');
-          if (hint && status.progress) {
-            hint.innerHTML = `<span class="animate-pulse">Generating ${status.progress}...</span>`;
-          }
-        }
-      } catch (e) { /* ignore */ }
+    function onUpdate(status) {
+      // Don't render partial questions — only update the loading-screen
+      // progress hint. The quiz UI is built in onDone once everything
+      // is generated.
+      const hint = document.getElementById('loadingHint');
+      if (hint && status.progress) {
+        hint.innerHTML = `<span class="animate-pulse">Generating ${status.progress}...</span>`;
+      }
     },
     async function onDone(status) {
       quizFullyLoaded = true;
