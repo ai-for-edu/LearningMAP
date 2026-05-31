@@ -187,7 +187,7 @@
       '  <p class="font-body text-sm text-on-surface-variant mb-6">Are you sure you want to delete "' + escapeHtml(sessionName) + '"? This cannot be undone.</p>' +
       '  <div class="flex gap-3 justify-end">' +
       '    <button id="cancelDelete" class="px-5 py-2.5 rounded-xl text-sm font-headline font-bold text-on-surface-variant hover:bg-slate-100 transition-colors">Cancel</button>' +
-      '    <button id="confirmDelete" class="px-5 py-2.5 rounded-xl text-sm font-headline font-bold text-white bg-error hover:bg-error/90 transition-colors shadow-sm">Delete</button>' +
+      '    <button id="confirmDelete" class="px-5 py-2.5 rounded-xl text-sm font-headline font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-sm">Delete</button>' +
       '  </div>' +
       '</div>';
 
