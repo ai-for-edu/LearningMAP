@@ -456,6 +456,7 @@ function _renderModeToggle(mode) {
 async function _handleModeToggleClick(targetMode) {
   if (_sendInFlight) return;
   if (targetMode === _sessionMode) return;
+  exitFreshLanding();
   const buttons = document.querySelectorAll('#modeToggle button');
   buttons.forEach(b => (b.disabled = true));
   const previous = _sessionMode;
@@ -826,6 +827,7 @@ function maybeEnterFreshLanding() {
 }
 
 function renderEmptyState(mode) {
+  if (_isFreshLanding) return;
   const text = mode === 'chat'
     ? "Let's start a conversation — I can chat about any topic, or recommend a subject for structured learning."
     : 'Enter a topic you\'d like to learn and start structured study.';
@@ -1068,6 +1070,7 @@ document.addEventListener('click', function(e) {
 });
 
 async function handleSend(text) {
+  exitFreshLanding();
   const input = document.getElementById('chatInput');
   const rawMessage = text || input.value.trim();
   if (!rawMessage) return;
@@ -1577,6 +1580,7 @@ async function showLessonFormatChoice(sid) {
 
   _renderModeToggle(state.session_mode || 'chat');
   renderActiveView(_sessionMode);
+  maybeEnterFreshLanding();
 
   // Show review banner if backend reports has_history (review-flow PR-3)
   if (state.has_history) {
