@@ -271,6 +271,67 @@ body.sidebar-collapsed #bottomBar { left: 0; }
 /* ── Hint chips ── */
 .hint-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 99px; border: 1px solid var(--border); background: white; font-size: 12px; color: var(--text-3); cursor: pointer; transition: all .15s; white-space: nowrap; }
 .hint-chip:hover { background: var(--bg-sidebar); border-color: var(--accent-border); color: var(--text-2); }
+
+/* ── Hero Landing ────────────────────────────────────────────────────────── */
+#heroLanding { display: none; }
+
+body.is-fresh-landing #chatArea,
+body.is-fresh-landing #reviewBanner { display: none; }
+
+body.is-fresh-landing #heroLanding {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 32px;
+  width: 100%;
+}
+
+.hero-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: 100%;
+  max-width: 720px;
+}
+
+.hero-headline-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.hero-mark.material-symbols-outlined {
+  font-size: 48px;
+  color: var(--text);
+  font-variation-settings: 'wght' 300, 'FILL' 0;
+  flex-shrink: 0;
+}
+
+.hero-headline {
+  font-family: 'EB Garamond', 'Source Serif Pro', Georgia, 'Times New Roman', serif;
+  font-size: clamp(34px, 5vw, 58px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.012em;
+  color: var(--text);
+  margin: 0;
+}
+
+body.is-fresh-landing #bottomBar {
+  position: static;
+  left: auto; right: auto; bottom: auto;
+  background: transparent;
+  border-top: none;
+  padding: 0;
+  width: 100%;
+}
+
+body.is-fresh-landing #bottomBar .hint-row {
+  margin-top: 12px;
+  justify-content: flex-start;
+}
 </style>
 </head>
 <body>
@@ -305,7 +366,7 @@ body.sidebar-collapsed #bottomBar { left: 0; }
 <script src="sidebar.js?v=3"></script>
 <script src="api.js?v=8"></script>
 <main id="mainContent">
-  <section id="heroLanding" aria-label="Start a new session" style="display:none;">
+  <section id="heroLanding" aria-label="Start a new session">
     <div class="hero-inner">
       <div class="hero-headline-row">
         <span class="hero-mark material-symbols-outlined" aria-hidden="true">auto_stories</span>
