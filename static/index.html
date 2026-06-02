@@ -780,7 +780,6 @@ function renderHeroStarterChips() {
     { label: '✨ Photosynthesis',                 fill: 'Photosynthesis' },
     { label: '✨ Linear algebra basics',          fill: 'Linear algebra basics' },
     { label: '🔍 Diagnose what I already know',   fill: 'Diagnose what I already know' },
-    { label: '/skill  Pick a teaching method',    fill: '/skill ' },
   ];
   const slot = document.getElementById('suggestBtns');
   slot.innerHTML = chips.map((c, i) =>
@@ -792,7 +791,6 @@ function renderHeroStarterChips() {
       const input = document.getElementById('chatInput');
       input.value = c.fill;
       input.focus();
-      if (c.fill.startsWith('/skill')) handleInputChange({ target: input });
     });
   });
 }
