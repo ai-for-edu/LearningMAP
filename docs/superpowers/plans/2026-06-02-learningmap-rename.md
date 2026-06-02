@@ -53,7 +53,7 @@ If a file shows fewer hits than expected, STOP and re-read the spec — the file
 
 Run: `git grep -nE "OpenAILearning|openail" -- '*.toml' 'openail.egg-info/'`
 
-Expected: at least `pyproject.toml:6:name = "openail"` and several lines from `openail.egg-info/`. Record this list (paste into your scratchpad) — verification Task 9 will re-run this grep and the output must be identical to this baseline.
+Expected: at least `pyproject.toml:6:name = "openail"`. Record the exact output (paste into your scratchpad) — verification Task 9 will re-run this grep and the output must be identical to this baseline. It is acceptable if the current tracked tree has no `openail.egg-info/` matches (the directory is gitignored); compare against the recorded baseline, not an assumed count.
 
 - [ ] **Step 3: Record `git status` baseline**
 
@@ -315,23 +315,24 @@ Expected output: **(empty — zero lines).**
 
 If any line matches, identify the file, return to its task above, and fix.
 
-- [ ] **Step 2: A2 — out-of-scope grep still matches expected lines**
+- [ ] **Step 2: A2 — out-of-scope grep still matches the recorded baseline**
 
 Run: `git grep -nE "OpenAILearning|openail" -- '*.toml' 'openail.egg-info/'`
 
-Expected output: identical to the baseline recorded in Task 1, Step 2 (at minimum: `pyproject.toml:6:name = "openail"` plus several `openail.egg-info/...` lines).
+Expected output: identical to the baseline recorded in Task 1, Step 2. At minimum in the current tree this should include `pyproject.toml:6:name = "openail"`.
 
 If the output differs from baseline, we accidentally edited an out-of-scope file — STOP and investigate `git diff` before continuing.
 
-- [ ] **Step 3: Broad sanity grep — catch anything missed**
+- [ ] **Step 3: Broad sanity grep — catch anything missed outside known out-of-scope docs/history**
 
 Run: `git grep -nE "OpenAILearning|EduAI"`
 
-Expected output: zero lines.
+Expected output: matches ONLY in explicitly out-of-scope documentation/history paths:
+- `development_log.md` for the preserved `/workspace/OpenAILearning` RunPod path (Spec § Scope (out) #3)
+- `docs/superpowers/specs/2026-06-02-learningmap-rename-design.md` (the spec itself mentions both strings repeatedly)
+- `docs/superpowers/plans/2026-06-02-learningmap-rename.md` (this plan)
 
-Why: the spec's A1 grep deliberately scopes to known files. This broader grep catches surprises (e.g., a `.json`, `.svg`, hidden config file we forgot about). If anything else matches, surface it to the user before committing — don't silently auto-fix, because it may be intentional history (e.g., this spec file itself in `docs/superpowers/specs/` mentions both strings repeatedly; if any path under `docs/superpowers/` shows up here that's expected and fine).
-
-If matches appear OUTSIDE `docs/superpowers/`, STOP and flag to user.
+No matches should appear in `static/`, `README.md`, `run/serve.py`, `src/`, config files, or asset files. If any other path matches, STOP and surface it to the user before committing — don't silently auto-fix, because it may be intentional history or a newly discovered out-of-scope identifier.
 
 ---
 
@@ -407,29 +408,72 @@ Open each page (these typically need the running backend serving them on `http:/
 
 ## Task 12: Backend verification (Spec A5)
 
-**Files:** none modified — start server and curl.
+**Files:** none modified — start server, curl, and clean up the process.
 
-- [ ] **Step 1: Start the backend in the background**
+- [ ] **Step 1: Confirm port 8080 is free, then start the backend with a PID file and log**
 
-Run: `uv run python run/serve.py` (start it in a background shell so subsequent steps can run; the server binds `0.0.0.0:8080` and runs uvicorn internally per `run/serve.py` lines 45-47).
+Run:
 
-Wait ~3 seconds for boot.
+```bash
+if lsof -ti tcp:8080 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Port 8080 is already in use; stop the existing process before Task 12."
+  lsof -nP -iTCP:8080 -sTCP:LISTEN
+  exit 1
+fi
 
-- [ ] **Step 2: Verify OpenAPI `info.title` via `/openapi.json` (authoritative source)**
+rm -f /tmp/learningmap-serve.pid /tmp/learningmap-serve.log
+(uv run python run/serve.py > /tmp/learningmap-serve.log 2>&1 & echo $! > /tmp/learningmap-serve.pid)
+```
+
+- [ ] **Step 2: Wait for readiness (poll up to 5 s)**
+
+Run:
+
+```bash
+for i in 1 2 3 4 5; do
+  curl -sf http://localhost:8080/openapi.json >/dev/null && break
+  sleep 1
+done
+
+if ! curl -sf http://localhost:8080/openapi.json >/dev/null; then
+  echo "Server did not become ready within 5 seconds. Log:"
+  cat /tmp/learningmap-serve.log
+  exit 1
+fi
+```
+
+(Note: `run/serve.py` runs uvicorn with `reload=True`, so the readiness probe also tells you the reloader's child has bound the port.)
+
+- [ ] **Step 3: Verify OpenAPI `info.title` via `/openapi.json` (authoritative source)**
 
 Run: `curl -s http://localhost:8080/openapi.json | python -c "import sys, json; print(json.load(sys.stdin)['info']['title'])"`
 
 Expected output: `LearningMAP API`
 
-- [ ] **Step 3: Verify Swagger UI page title (browser-rendered)**
+- [ ] **Step 4: Verify Swagger UI page title (browser-rendered)**
 
 Run: `curl -s http://localhost:8080/docs | grep -oE "<title>[^<]+</title>"`
 
 Expected output: `<title>LearningMAP API - Swagger UI</title>`
 
-- [ ] **Step 4: Stop the background server**
+- [ ] **Step 5: Stop the backend and confirm port 8080 is released**
 
-Kill the background shell from Step 1.
+Run:
+
+```bash
+kill "$(cat /tmp/learningmap-serve.pid)" 2>/dev/null || true
+# uvicorn reload=True spawns a child; kill anything still on 8080 too
+pkill -f "run/serve.py" 2>/dev/null || true
+sleep 2
+
+if lsof -ti tcp:8080 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Port 8080 is still in use after stopping the Task 12 server."
+  lsof -nP -iTCP:8080 -sTCP:LISTEN
+  exit 1
+fi
+
+rm -f /tmp/learningmap-serve.pid /tmp/learningmap-serve.log
+```
 
 ---
 
@@ -468,29 +512,7 @@ Expected: same 7 files as Step 1; no extras.
 Run:
 
 ```bash
-git commit -m "$(cat <<'EOF'
-chore(brand): rename OpenAILearning → LearningMAP, EduAI → Merlin (frontend + docs)
-
-Product brand: OpenAILearning → LearningMAP across 5 static pages,
-README.md, and FastAPI app title in run/serve.py.
-
-Assistant persona: EduAI → LearningMAP for brand surfaces
-(<title>, topnav) and EduAI → Merlin for the 6 chat-bubble ai-name
-labels (visual rendering remains uppercase MERLIN, intentional).
-
-Out-of-scope (deliberately unchanged):
-  - zh branch (separate cycle)
-  - /workspace/OpenAILearning RunPod deploy path and its log entry
-  - openail Python package name and openail.egg-info/
-  - openail_* localStorage keys (would orphan user sessions)
-  - favicon/manifest/og: metadata
-
-Spec: docs/superpowers/specs/2026-06-02-learningmap-rename-design.md
-Plan: docs/superpowers/plans/2026-06-02-learningmap-rename.md
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
+git commit -m "chore(brand): rename OpenAILearning → LearningMAP, EduAI → Merlin (frontend + docs)"
 ```
 
 - [ ] **Step 5: Verify the commit looks right**
