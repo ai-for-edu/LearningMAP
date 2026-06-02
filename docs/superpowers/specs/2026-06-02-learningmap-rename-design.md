@@ -29,7 +29,7 @@ Splitting brand from persona resolves both — the title bar/topnav consistently
 
 ## Scope (in)
 
-Eight files on `main`, all edits via the `Edit` tool (no `sed` / bulk replace, to avoid collateral damage in surrounding markup):
+Seven files on `main`, all edits via the `Edit` tool (no `sed` / bulk replace, to avoid collateral damage in surrounding markup):
 
 ### `static/index.html` (9 edits in one file)
 
@@ -71,10 +71,11 @@ Note: the 6 `ai-name` occurrences are produced by 6 separate JS template literal
 ### `run/serve.py` (1 edit)
 - L19: `app = FastAPI(title="OpenAILearning API", version="0.1.0")` → `app = FastAPI(title="LearningMAP API", version="0.1.0")`
 
-### `development_log.md` (1 edit)
-- L67: prose mention `/workspace/OpenAILearning` → `/workspace/LearningMAP`. **Description-only**; does NOT change the actual deployment path on the RunPod server.
+### `development_log.md` (0 edits)
 
-**Total: 22 edits across 8 files** (9 in `static/index.html`, 2×4 in the other static pages, 3 in `README.md`, 1 in `run/serve.py`, 1 in `development_log.md`).
+No edit. Keep `/workspace/OpenAILearning` in the existing log entry because it records the actual RunPod deployment path. The RunPod path and documentation whose purpose is to record that path are out of scope for this rename.
+
+**Total: 21 edits across 7 files** (9 in `static/index.html`, 2×4 in the other static pages, 3 in `README.md`, 1 in `run/serve.py`).
 
 ## Scope (out)
 
@@ -82,9 +83,11 @@ Explicitly NOT changed in this spec:
 
 1. **`zh` branch** — same 8 files exist there with similar pattern plus an `OpenAILearning · 中文版` README heading. Handled in a separate cycle after `main` ships.
 2. **Python package name** `openail` in `pyproject.toml` and the `openail.egg-info/` directory — these are backend code identifiers, not user-facing brand surfaces.
-3. **RunPod server deploy path** `/workspace/OpenAILearning` (actual filesystem location on the deployment box) — coupled to `nginx` config and persistent volumes. Only the prose description of this path in `development_log.md` changes; the path itself stays put.
+3. **RunPod server deploy path** `/workspace/OpenAILearning` (actual filesystem location on the deployment box) — coupled to `nginx` config and persistent volumes. Both the path itself and the prose mention in `development_log.md` (which records that path) stay unchanged.
 4. **Git repository name** `OpenAILearning` (GitHub repo name) — outside the working tree.
 5. **Git history** — historical commit messages and prior log entries are not rewritten.
+6. **Frontend persistence keys** `openail_sessions`, `openail_current_session`, `openail_v4`, `openail_examples_v2`, and `openail_v3_clean` in `static/sidebar.js` and `static/index.html` stay unchanged. They are client storage identifiers, not user-visible copy; changing them would orphan or clear existing browser sessions unless a migration is designed, and no such migration is in scope for this brand-only rename.
+7. **HTML metadata and icon assets** — no favicon, PWA manifest, Open Graph, or social-preview work is included in this rename. A live audit of `static/*.html` shows no manifest links and no `og:` tags; `static/results.html` has an existing `<link rel="icon" href="favicon.ico"/>`, but there is no tracked favicon asset, so this spec leaves that unrelated link unchanged and adds no new assets.
 
 ## Approach
 
@@ -98,7 +101,7 @@ No new files. No removed files. No code-logic changes.
 
 A1. **No residual occurrences in the in-scope file set.** This command returns zero lines:
 ```bash
-git grep -nE "OpenAILearning|EduAI" -- 'static/*.html' 'README.md' 'run/serve.py' 'development_log.md'
+git grep -nE "OpenAILearning|EduAI" -- 'static/*.html' 'README.md' 'run/serve.py'
 ```
 
 A2. **Out-of-scope occurrences still present.** This command returns at least the expected matches (`pyproject.toml`, `openail.egg-info/`, possibly other historical references) — i.e., we did not over-reach:
@@ -110,7 +113,7 @@ A3. **Visual check `static/index.html`** (open in a browser):
 - Browser tab title: `LearningMAP`
 - Top navigation bar: `LearningMAP`
 - Sidebar logo text: `LearningMAP`
-- All 6 chat-bubble assistant labels: `Merlin` (exercise: send a message, replay session history, trigger streaming, view a diagnosis card, view a knowledge-graph card, view a generic ai message — covers all 6 template paths)
+- All 6 chat-bubble assistant labels use source text `<div class="ai-name">Merlin</div>`. Keep the existing `.ai-name { text-transform: uppercase; }` CSS, so the rendered browser label may appear as `MERLIN`; that uppercase visual rendering is acceptable for this rename. (Exercise: send a message, replay session history, trigger streaming, view a diagnosis card, view a knowledge-graph card, view a generic ai message — covers all 6 template paths.)
 
 A4. **Visual check other static pages** (open each in a browser):
 - `lesson.html`: tab = `LearningMAP - Lesson`, sidebar logo = `LearningMAP`
@@ -118,9 +121,9 @@ A4. **Visual check other static pages** (open each in a browser):
 - `results.html`: tab = `LearningMAP - Results`, sidebar logo = `LearningMAP`
 - `slides.html`: tab = `LearningMAP - Slides`, sidebar logo = `LearningMAP`
 
-A5. **Backend check.** `python run/serve.py` (which internally runs uvicorn on port 8080 via the `if __name__ == "__main__":` block) → open `http://localhost:8080/docs` → OpenAPI page title shows `LearningMAP API`.
+A5. **Backend check.** From the repo root, run `uv run python run/serve.py`; open `http://localhost:8080/openapi.json` and verify `info.title` is `LearningMAP API`; then open `http://localhost:8080/docs` and verify the browser tab title is `LearningMAP API - Swagger UI`.
 
-A6. **Single commit.** `git log -1 --stat` on `main` shows exactly one new commit touching exactly the 8 files above, no other files modified.
+A6. **Single commit.** `git log -1 --stat` on `main` shows exactly one new commit touching exactly the 7 files above, no other files modified.
 
 ## Risks and mitigations
 
