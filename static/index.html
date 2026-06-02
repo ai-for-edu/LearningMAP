@@ -812,7 +812,9 @@ function exitFreshLanding() {
   _isFreshLanding = false;
   document.body.classList.remove('is-fresh-landing');
   const bar = document.getElementById('bottomBar');
-  if (bar.parentElement !== document.body) document.body.appendChild(bar);
+  if (bar.parentElement !== document.body) {
+    document.getElementById('mainContent').insertAdjacentElement('afterend', bar);
+  }
   document.getElementById('suggestBtns').innerHTML = '';
 }
 
