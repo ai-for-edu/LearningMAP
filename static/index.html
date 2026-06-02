@@ -761,6 +761,70 @@ function appendAiMessageDOM(content, additionalKwargs) {
   document.getElementById('chatHistory').insertAdjacentHTML('beforeend', html);
 }
 
+// ─── Hero landing (fresh-session homepage) ────────────────────────────────
+let _isFreshLanding = false;
+
+function computeHeroGreeting() {
+  const h = new Date().getHours();
+  if (h >= 6  && h < 11) return 'Morning — what shall we learn today?';
+  if (h >= 11 && h < 17) return 'Afternoon — what shall we learn next?';
+  if (h >= 17 && h < 23) return 'Evening — what shall we learn tonight?';
+  return "Late night — still curious? Let's learn.";
+}
+
+function renderHeroStarterChips() {
+  const chips = [
+    { label: '✨ Photosynthesis',                 fill: 'Photosynthesis' },
+    { label: '✨ Linear algebra basics',          fill: 'Linear algebra basics' },
+    { label: '🔍 Diagnose what I already know',   fill: 'Diagnose what I already know' },
+    { label: '/skill  Pick a teaching method',    fill: '/skill ' },
+  ];
+  const slot = document.getElementById('suggestBtns');
+  slot.innerHTML = chips.map((c, i) =>
+    `<button class="hint-chip" data-hero-chip="${i}">${escapeHtml(c.label)}</button>`
+  ).join('');
+  slot.querySelectorAll('[data-hero-chip]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const c = chips[Number(btn.dataset.heroChip)];
+      const input = document.getElementById('chatInput');
+      input.value = c.fill;
+      input.focus();
+      if (c.fill.startsWith('/skill')) handleInputChange({ target: input });
+    });
+  });
+}
+
+function enterFreshLanding() {
+  if (_isFreshLanding) return;
+  _isFreshLanding = true;
+  document.body.classList.add('is-fresh-landing');
+  document.getElementById('heroHeadline').textContent = computeHeroGreeting();
+  const hero = document.querySelector('#heroLanding .hero-inner');
+  const bar  = document.getElementById('bottomBar');
+  if (bar.parentElement !== hero) hero.appendChild(bar);
+  renderHeroStarterChips();
+  document.getElementById('chatInput').focus();
+}
+
+function exitFreshLanding() {
+  if (!_isFreshLanding) return;
+  _isFreshLanding = false;
+  document.body.classList.remove('is-fresh-landing');
+  const bar = document.getElementById('bottomBar');
+  if (bar.parentElement !== document.body) document.body.appendChild(bar);
+  document.getElementById('suggestBtns').innerHTML = '';
+}
+
+function maybeEnterFreshLanding() {
+  if (_chatMessages.length === 0 &&
+      _learningMessages.length === 0 &&
+      _learningArtifactsEmpty()) {
+    enterFreshLanding();
+  } else {
+    exitFreshLanding();
+  }
+}
+
 function renderEmptyState(mode) {
   const text = mode === 'chat'
     ? "Let's start a conversation — I can chat about any topic, or recommend a subject for structured learning."
