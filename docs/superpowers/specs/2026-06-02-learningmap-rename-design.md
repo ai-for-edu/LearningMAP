@@ -31,7 +31,7 @@ Splitting brand from persona resolves both — the title bar/topnav consistently
 
 Eight files on `main`, all edits via the `Edit` tool (no `sed` / bulk replace, to avoid collateral damage in surrounding markup):
 
-### `static/index.html` (10 edits in one file)
+### `static/index.html` (9 edits in one file)
 
 | Line | Current | New |
 |---|---|---|
@@ -74,7 +74,7 @@ Note: the 6 `ai-name` occurrences are produced by 6 separate JS template literal
 ### `development_log.md` (1 edit)
 - L67: prose mention `/workspace/OpenAILearning` → `/workspace/LearningMAP`. **Description-only**; does NOT change the actual deployment path on the RunPod server.
 
-**Total: 23 edits across 8 files.**
+**Total: 22 edits across 8 files** (9 in `static/index.html`, 2×4 in the other static pages, 3 in `README.md`, 1 in `run/serve.py`, 1 in `development_log.md`).
 
 ## Scope (out)
 
@@ -118,7 +118,7 @@ A4. **Visual check other static pages** (open each in a browser):
 - `results.html`: tab = `LearningMAP - Results`, sidebar logo = `LearningMAP`
 - `slides.html`: tab = `LearningMAP - Slides`, sidebar logo = `LearningMAP`
 
-A5. **Backend check.** `python -m uvicorn run.serve:app` (or however the project starts) → open `/docs` → OpenAPI page title shows `LearningMAP API`.
+A5. **Backend check.** `python run/serve.py` (which internally runs uvicorn on port 8080 via the `if __name__ == "__main__":` block) → open `http://localhost:8080/docs` → OpenAPI page title shows `LearningMAP API`.
 
 A6. **Single commit.** `git log -1 --stat` on `main` shows exactly one new commit touching exactly the 8 files above, no other files modified.
 
