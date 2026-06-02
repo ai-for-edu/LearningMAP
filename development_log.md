@@ -66,3 +66,7 @@
 ## 2026-05-31
 - quiz 生成从「按知识点串行 N·t」改成基于 asyncio 的并发 fan-out,瓶颈降到 ⌈N/limit⌉·t;SSE 流式入口同步切到 (kc_idx, batch) 元组,保持前端按知识点分桶展示。
 - 并发度通过 `QUIZ_FANOUT_LIMIT` 环境变量调,默认 4;任一分支失败或被取消时同胞任务一起取消,避免悬挂的 LLM 调用浪费配额。
+
+## 2026-06-02
+- 首页空状态换成 hero landing:仅在「全新会话」上显示,居中放 outlined `auto_stories` 图标 + 时段问候(Morning / Afternoon / Evening / Late night),输入框上浮到屏幕中央,下面挂 4 个 starter chips(2 个主题示例 + 「Diagnose what I already know」+ `/skill` 入口)。
+- 通过 `body.is-fresh-landing` + 运行时把 `#bottomBar` 临时挪进 `#heroLanding` 里实现:textarea / send / `/skill` 弹窗都是同一个 DOM,事件无须重接。发首条消息或切 mode(非同模点击)即收起,且只有 New Chat 能让 hero 再回来。
