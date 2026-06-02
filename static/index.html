@@ -305,6 +305,15 @@ body.sidebar-collapsed #bottomBar { left: 0; }
 <script src="sidebar.js?v=3"></script>
 <script src="api.js?v=8"></script>
 <main id="mainContent">
+  <section id="heroLanding" aria-label="Start a new session" style="display:none;">
+    <div class="hero-inner">
+      <div class="hero-headline-row">
+        <span class="hero-mark material-symbols-outlined" aria-hidden="true">auto_stories</span>
+        <h1 class="hero-headline" id="heroHeadline"></h1>
+      </div>
+      <!-- #bottomBar gets appended here at runtime when is-fresh-landing is active -->
+    </div>
+  </section>
   <div id="chatArea">
     <div id="reviewBanner" style="display:none;"></div>
     <div id="chatHistory"></div>
