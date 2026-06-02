@@ -293,17 +293,18 @@ body.is-fresh-landing #heroLanding {
   flex-direction: column;
   gap: 28px;
   width: 100%;
-  max-width: 720px;
+  max-width: 1080px;
 }
 
 .hero-headline-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 18px;
 }
 
 .hero-mark.material-symbols-outlined {
-  font-size: 48px;
+  font-size: 44px;
   color: var(--text);
   font-variation-settings: 'wght' 300, 'FILL' 0;
   flex-shrink: 0;
@@ -311,12 +312,13 @@ body.is-fresh-landing #heroLanding {
 
 .hero-headline {
   font-family: 'EB Garamond', 'Source Serif Pro', Georgia, 'Times New Roman', serif;
-  font-size: clamp(34px, 5vw, 58px);
+  font-size: clamp(28px, 4vw, 48px);
   font-weight: 500;
   line-height: 1.1;
   letter-spacing: -0.012em;
   color: var(--text);
   margin: 0;
+  white-space: nowrap;
 }
 
 body.is-fresh-landing #bottomBar {
