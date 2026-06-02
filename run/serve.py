@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 from src.skills import load_skills
 load_skills()
 
-app = FastAPI(title="OpenAILearning API", version="0.1.0")
+app = FastAPI(title="LearningMAP API", version="0.1.0")
 
 # CORS: read ALLOWED_ORIGINS from .env; allow all by default (development).
 # In production, set ALLOWED_ORIGINS=https://yourdomain.com,https://another.com

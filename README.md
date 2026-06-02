@@ -1,4 +1,4 @@
-# OpenAILearning
+# LearningMAP
 
 ![Python](https://img.shields.io/badge/python-3.11-blue.svg)
 ![LangGraph](https://img.shields.io/badge/built%20with-LangGraph-purple.svg)
@@ -30,7 +30,7 @@ An AI tutoring assistant that turns a single user-entered topic into an adaptive
 
 ## Overview
 
-OpenAILearning is a full-stack tutoring demo. The frontend is a set of static pages; the backend is a FastAPI service built on a **LangGraph** state machine. Every HTTP request drives one single-round graph execution; branches are selected by an `intent` node:
+LearningMAP is a full-stack tutoring demo. The frontend is a set of static pages; the backend is a FastAPI service built on a **LangGraph** state machine. Every HTTP request drives one single-round graph execution; branches are selected by an `intent` node:
 
 ```
 intent ──► chat
@@ -179,7 +179,7 @@ JSON repair itself is centralized in `src/utils/json_repair.py` (4-strategy).
 ## Repository Structure
 
 ```
-OpenAILearning/
+LearningMAP/
 ├── run/
 │   ├── serve.py                 # FastAPI entry point (port 8080)
 │   ├── classba_client.py        # External ClassBA Agent client (optional)
