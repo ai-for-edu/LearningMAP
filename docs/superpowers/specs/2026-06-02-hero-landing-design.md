@@ -246,7 +246,7 @@ Four touch points, all in `static/index.html`. No changes to `static/sidebar.js`
 
 1. **State hydration completion.** The IIFE around index.html:1442 calls `renderActiveView(_sessionMode)` after populating `_chatMessages`, `_learningMessages`, and `_learningArtifacts` from `/state`. Append `maybeEnterFreshLanding();` on the line right after `renderActiveView(_sessionMode);`.
 2. **`handleSend()` entry point** (index.html:933). Call `exitFreshLanding();` as the first line of the function body, before any state reads or network calls.
-3. **`_handleModeToggleClick(targetMode)`** (definition near index.html:386; receives the clicked mode from the delegated handler at index.html:416). Call `exitFreshLanding();` as the first line.
+3. **`_handleModeToggleClick(targetMode)`** (definition at index.html:383; receives the clicked mode from the delegated handler at index.html:416). Call `exitFreshLanding();` **after** the two early-return guards (`_sendInFlight` and `targetMode === _sessionMode` checks at index.html:384–385). Clicking the already-active mode is a no-op and should not dismiss the hero.
 4. **`renderEmptyState(mode)`** (index.html:691). At the top of the function, `if (_isFreshLanding) return;` — the hero owns the empty state and the function's normal gray-sentence rendering should not run while the hero is active.
 
 Sidebar interactions (`createNewSession` in sidebar.js:276, session-click in sidebar.js:75) both navigate via `window.location.href`, triggering a full page reload. The reload's hydration path re-runs `maybeEnterFreshLanding()`, which gives correct behaviour automatically — no `exitFreshLanding()` call needed from sidebar.js.
