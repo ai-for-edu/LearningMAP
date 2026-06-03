@@ -18,7 +18,12 @@ ever learned and how much has decayed since.
 from __future__ import annotations
 
 import math
+import os
 from datetime import datetime
+
+# Seconds per "day" in the decay formula. Defaults to a real day; set to
+# 60 in demo/recording mode so a minute of wall-clock decays like a day.
+_TIME_UNIT_SECONDS = float(os.getenv("FORGETTING_TIME_UNIT_SECONDS", "86400"))
 
 
 class EbbinghausV1:
@@ -57,7 +62,7 @@ class EbbinghausV1:
         """
         if last_accuracy is None:
             return 0.0
-        days = max((now - last_seen).total_seconds() / 86400.0, 0.0)
+        days = max((now - last_seen).total_seconds() / _TIME_UNIT_SECONDS, 0.0)
         stability = self.S0 + self.beta * max(session_count - 1, 0)
         if stability <= 0:
             return 0.0
