@@ -1,4 +1,8 @@
-# LearningMAP
+<p align="center">
+  <img src="images/logo.png" alt="LearningMAP logo" width="320">
+</p>
+
+# LearningMAP: Learning via Memory and Personalization
 
 ![Python](https://img.shields.io/badge/python-3.11-blue.svg)
 ![LangGraph](https://img.shields.io/badge/built%20with-LangGraph-purple.svg)
