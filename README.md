@@ -4,12 +4,15 @@
 
 # LearningMAP: Learning via Memory and Personalization
 
+<p align="center">
+  <a href="./README.md"><img alt="English" src="https://img.shields.io/badge/English-BCDCF7?style=flat-square"></a>
+  <a href="./README_CN.md"><img alt="简体中文" src="https://img.shields.io/badge/简体中文-CDCFD4?style=flat-square"></a>
+</p>
+
 ![Python](https://img.shields.io/badge/python-3.11-blue.svg)
 ![LangGraph](https://img.shields.io/badge/built%20with-LangGraph-purple.svg)
 ![uv](https://img.shields.io/badge/packaging-uv-orange.svg)
 ![Status](https://img.shields.io/badge/status-internal%20research-lightgrey.svg)
-
-> Chinese version available on the [`zh` branch](../../tree/zh).
 
 An AI tutoring assistant that turns a single user-entered topic into an adaptive learning loop — knowledge graph → quiz → diagnosis → Markdown lesson → slide deck → review — with cross-session semantic memory provided by an independent subservice.
 
