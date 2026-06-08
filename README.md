@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/logo.png" alt="LearningMAP logo" width="320">
+  <img src="resources/logo.png" alt="LearningMAP logo" width="320">
 </p>
 
 # LearningMAP: Learning via Memory and Personalization
@@ -22,6 +22,7 @@ An AI tutoring assistant that turns a single user-entered topic into an adaptive
 
 - [Overview](#overview)
 - [Key Features](#key-features)
+- [Demos](#demos)
 - [Architecture](#architecture)
 - [Capabilities Summary](#capabilities-summary)
 - [Repository Structure](#repository-structure)
@@ -93,6 +94,24 @@ After the main learning loop, the review node:
 - Subsequent sessions surface these notes through `/retrieve`, closing the cross-session feedback loop.
 
 The minimum gap between review runs is bounded by `REVIEW_MIN_AGE_SECONDS` (default 24 h).
+
+---
+
+## Demos
+
+Two end-to-end walkthroughs of the learning loop on different subjects:
+
+### Computer Science
+
+<video src="resources/cs_demo.mov" controls width="720"></video>
+
+> If the inline player does not load, download/view [`resources/cs_demo.mov`](resources/cs_demo.mov).
+
+### Physics
+
+<video src="resources/phy_demo.mov" controls width="720"></video>
+
+> If the inline player does not load, download/view [`resources/phy_demo.mov`](resources/phy_demo.mov).
 
 ---
 
