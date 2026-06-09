@@ -70,6 +70,7 @@ Two end-to-end walkthroughs of the learning loop on different subjects:
 ## Quickstart
 
 Get the main service running in three steps (cross-session memory is optional — see [Installation](#installation)):
+### TODO: Add we recommend use XXX model for better experience
 
 ```bash
 # 1. Install the main service
