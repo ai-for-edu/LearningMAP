@@ -43,11 +43,11 @@ Knowledge graph → quiz → diagnosis → lesson → slide deck → review, gen
 ## Overview
 
 - **One topic in, a full study plan out.** A student enters a topic; LearningMAP builds an adaptive learning loop around it, end to end.
-- **Personalized to each learner.** Adapts to actual mastery and remembers across sessions via a human-like memory system.
-- **Focused on what's tested.** Expert-backed, knowledge-level skills keep every lesson on the exam-critical points.
+- 🚀 **Personalized to each learner.** Adapts to actual mastery and remembers across sessions via a human-like memory system.
+- 🚀 **Focused on what's tested.** Expert-backed, knowledge-level skills keep every lesson on the exam-critical points. **We're open-sourcing `XXX` distilled K-12 math skills today — with more skills and more subjects on the way.**
 - **Complete, working demo.** Full cycle — chat, quiz, learn, review — with everything streamed live to the browser.
 
-LearningMAP takes a topic the learner types in and runs it through one adaptive loop — knowledge graph, quiz, diagnosis, targeted lesson, and slide deck — then remembers what happened for the next session. 
+LearningMAP takes a topic the learner types in and runs it through one adaptive loop — knowledge graph, quiz, diagnosis, targeted lesson, and slide deck — then remembers what happened for the next session.
 
 ---
 
