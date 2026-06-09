@@ -101,17 +101,15 @@ The minimum gap between review runs is bounded by `REVIEW_MIN_AGE_SECONDS` (defa
 
 Two end-to-end walkthroughs of the learning loop on different subjects:
 
+> Recordings are sped up (~6×). Click through to the full `.mov` for real-time playback.
+
 ### Computer Science
 
-<video src="resources/cs_demo.mov" controls width="720"></video>
-
-> If the inline player does not load, download/view [`resources/cs_demo.mov`](resources/cs_demo.mov).
+[![Computer Science demo](resources/cs_demo.gif)](resources/cs_demo.mov)
 
 ### Physics
 
-<video src="resources/phy_demo.mov" controls width="720"></video>
-
-> If the inline player does not load, download/view [`resources/phy_demo.mov`](resources/phy_demo.mov).
+[![Physics demo](resources/phy_demo.gif)](resources/phy_demo.mov)
 
 ---
 
