@@ -45,7 +45,7 @@ Knowledge graph → quiz → diagnosis → lesson → slide deck → review, gen
 - **One topic in, a full study plan out.** A student enters a topic; LearningMAP builds an adaptive learning loop around it, end to end.
 - **Complete, working demo.** Full cycle — chat, quiz, learn, review — with everything streamed live to the browser.
 - 🚀 **Personalized to each learner.** Adapts to actual mastery and remembers across sessions via a human-like memory system.
-- 🚀 **Focused on what's tested.** Expert-backed, knowledge-level skills keep every lesson on the exam-critical points. **We're open-sourcing `XXX` distilled K-12 math skills today — with more skills and more subjects on the way.**
+- 🚀 **Focused on what's tested.** Expert-backed, knowledge-level skills keep every lesson on the exam-critical points. **We're open-sourcing `865` distilled K-12 math skills today — with more skills and more subjects on the way.**
 
 LearningMAP takes a topic the learner types in and runs it through one adaptive loop — knowledge graph, quiz, diagnosis, targeted lesson, and slide deck — then remembers what happened for the next session.
 
@@ -69,8 +69,9 @@ Two end-to-end walkthroughs of the learning loop on different subjects:
 
 ## Quickstart
 
-Get the main service running in three steps (cross-session memory is optional — see [Installation](#installation)):
-### TODO: Add we recommend use XXX model for better experience
+Get the main service running in three steps (cross-session memory is optional — see [Installation](#installation)).
+
+> For the best experience, we recommend using **DeepSeek-V4 or a model of equivalent or higher capability**. Any OpenAI-compatible model works, but weaker models may degrade lesson quality and KC-skill resolution.
 
 ```bash
 # 1. Install the main service
