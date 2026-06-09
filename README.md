@@ -48,6 +48,11 @@ An AI tutoring assistant that turns a single user-entered topic into an adaptive
 
 ## Overview
 
+- **One topic in, a full study plan out.** A student enters a topic; LearningMAP builds an adaptive learning loop around it, end to end.
+- **Personalized to each learner.** Adapts to actual mastery and remembers across sessions via a human-like memory system.
+- **Focused on what's tested.** Expert-backed, knowledge-level skills keep every lesson on the exam-critical points.
+- **Complete, working demo.** Full cycle — chat, quiz, learn, review — with everything streamed live to the browser.
+
 LearningMAP is a full-stack tutoring demo. The frontend is a set of static pages; the backend is a FastAPI service built on a **LangGraph** state machine. Every HTTP request drives one single-round graph execution; branches are selected by an `intent` node:
 
 ```
@@ -146,11 +151,25 @@ The minimum gap between review runs is bounded by `REVIEW_MIN_AGE_SECONDS` (defa
 
 ## Capabilities Summary
 
-- **Adaptive learning loop** — topic → KG → quiz → grading → diagnosis → targeted lesson, all derivable from session state on refresh.
-- **Slide generation** — Markdown lessons re-rendered as 16:9 slide decks (1000 × 562.5 canvas), with LaTeX/CJK aware post-processing and `.pptx` export.
-- **Cross-session memory** — prior sessions resurface as system-prompt augmentations, decoupled behind a single seam and degraded gracefully when offline.
-- **Pluggable pedagogy** — switch teaching style at runtime without redeploying; new pedagogies are plain directories.
-- **Streaming everywhere** — chat, lesson, and slides ship over SSE.
+Three selling points — and what each is built on.
+
+### 1 · Personalized learning experience
+
+Adapts to each student's actual mastery, powered by a human-like memory system that remembers across sessions — prior sessions resurface as system-prompt augmentations, and teaching style is switchable at runtime.
+
+> **Built on:** knowledge graph + cross-session memory (`student_memory/`, decoupled behind a single seam and degraded gracefully when offline) + pluggable pedagogy (`skills/<name>/SKILL.md`).
+
+### 2 · Expert-backed, knowledge-level skills
+
+Distilled from real exam questions and expert teaching, scoped to specific knowledge components — so materials hit what's tested, never generic.
+
+> **Built on:** the KC-skill bank (built offline via `run/build_kc_skills.py`, resolved per topic by `kc_skill_resolver.py`).
+
+### 3 · Full-cycle, production-ready
+
+A working end-to-end demo covering the complete journey: chat → quiz → grading → diagnosis → lesson → review, all derivable from session state on refresh and streamed live to the browser.
+
+> **Built on:** FastAPI + SSE streaming everywhere (chat / lesson / slides), with Markdown lessons re-rendered as 16:9 slide decks (1000 × 562.5 canvas, LaTeX/CJK-aware) and `.pptx` export.
 
 ---
 
