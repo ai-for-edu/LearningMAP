@@ -69,7 +69,7 @@ Two end-to-end walkthroughs of the learning loop on different subjects:
 
 ## Quickstart
 
-Get the main service running in three steps (cross-session memory is optional — see [Installation](#installation)).
+Get the main service running in three steps (the human-like memory module is not included in quickstart, please see [Installation](#installation) for full configuration).
 
 > For the best experience, we recommend using **DeepSeek-V4 or a model of equivalent or higher capability**. Any OpenAI-compatible model works, but weaker models may degrade lesson quality and KC-skill resolution.
 
