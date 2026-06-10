@@ -228,10 +228,4 @@ REVIEW_MIN_AGE_SECONDS=86400
 
 ---
 
-## Status
-
-Internal research project. Unreleased.
-
----
-
 For repository layout, hardware sizing, and development conventions, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
