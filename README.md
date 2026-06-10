@@ -20,7 +20,7 @@ Knowledge graph → quiz → diagnosis → lesson → slide deck → review, gen
 </p>
 
 <p align="center">
-  <a href="resources/cs_demo.mov"><img src="resources/cs_demo.gif" alt="LearningMAP demo" width="760"></a>
+  <a href="resources/math_demo.mov"><img src="resources/math_demo.gif" alt="LearningMAP demo" width="760"></a>
 </p>
 
 ---
