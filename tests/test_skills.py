@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from src.skills import loader as skill_loader_module
 from src.skills.loader import (
     SkillMeta,
     _parse_frontmatter,
@@ -177,8 +178,17 @@ class TestLoadSkills:
             assert "sections" in s
             assert "body" in s
 
-    def test_load_from_tmp_dir(self, tmp_path: Path) -> None:
+    def test_load_from_tmp_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test loading a custom skill from a temp directory."""
+        # load_skills intentionally replaces the module-level registry. Keep
+        # this fixture-specific load from leaking into later tests.
+        monkeypatch.setattr(
+            skill_loader_module,
+            "_registry",
+            skill_loader_module._registry.copy(),
+        )
         skill_dir = tmp_path / "my_skill"
         skill_dir.mkdir()
         (skill_dir / "SKILL.md").write_text(textwrap.dedent("""\
